@@ -1,0 +1,37 @@
+# Normalización de finales de línea
+#
+# Sin este archivo, Git decide los finales de línea según el sistema de
+# cada colaborador. El resultado son diffs donde el archivo completo
+# aparece modificado aunque solo haya cambiado una línea.
+#
+# `text=auto eol=lf` guarda todo con LF en el repositorio y lo entrega
+# con los finales nativos en el directorio de trabajo.
+
+* text=auto eol=lf
+
+# Archivos binarios: nunca tocar
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.pdf   binary
+*.docx  binary
+*.xlsx  binary
+*.pptx  binary
+*.zip   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+
+# Scripts de shell: siempre LF, incluso en Windows.
+# Con CRLF fallan al ejecutarse en Linux (Railway, contenedores).
+*.sh    text eol=lf
+
+# Scripts de Windows: siempre CRLF
+*.bat   text eol=crlf
+*.ps1   text eol=crlf
+
+# Archivos generados: excluir del cálculo de estadísticas del lenguaje
+# y colapsar en los diffs de GitHub.
+package-lock.json  -diff linguist-generated

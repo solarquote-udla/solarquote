@@ -1,0 +1,367 @@
+﻿Issue ID,Issue Type,Parent,Summary,Description,Epic Name,Story Points,Priority,Assignee,Sprint,Labels,Status
+1,Epic,,"Infraestructura, despliegue e integración continua","Configuración del repositorio, entornos de desarrollo, despliegue en la nube y canalización de integración y entrega continua.",Infraestructura,,High,,,,To Do
+2,Story,1,Configurar repositorio y flujo de trabajo Git,"Como equipo, necesitamos un repositorio con estrategia de ramas definida para trabajar en paralelo sin conflictos.
+
+Criterios de aceptación:
+- Monorepo con carpetas por contenedor
+- Ramas main y develop protegidas, con revisión obligatoria
+- Convenciones de rama y commit documentadas en el README",,3,Highest,Joseph Flores,SQ Sprint 1,infraestructura,Done
+3,Sub-task,2,Crear monorepo y estructura de carpetas,,,,Medium,Joseph Flores,SQ Sprint 1,infraestructura,Done
+4,Sub-task,2,Configurar reglas de protección de ramas,,,,Medium,Joseph Flores,SQ Sprint 1,infraestructura,Done
+5,Sub-task,2,Documentar convenciones de trabajo,,,,Medium,Joseph Flores,SQ Sprint 1,documentacion,Done
+6,Story,1,Configurar backend FastAPI con conexión a base de datos,"Como desarrollador, necesito el esqueleto del backend con configuración validada y conexión a PostgreSQL.
+
+Criterios de aceptación:
+- La aplicación falla al arrancar si falta configuración obligatoria
+- Endpoints /health y /health/db responden correctamente
+- Documentación interactiva disponible en /docs",,5,Highest,Joseph Flores,SQ Sprint 1,"backend,infraestructura",Done
+7,Sub-task,6,Crear estructura del backend y configuración centralizada,,,,Medium,Joseph Flores,SQ Sprint 1,backend,Done
+8,Sub-task,6,Configurar SQLAlchemy y sesiones de base de datos,,,,Medium,Joseph Flores,SQ Sprint 1,backend,Done
+9,Sub-task,6,Configurar Alembic para migraciones,,,,Medium,Joseph Flores,SQ Sprint 1,backend,Done
+10,Sub-task,6,Crear base de datos en Neon,,,,Medium,Joseph Flores,SQ Sprint 1,infraestructura,Done
+11,Story,1,Configurar frontend React con Tailwind y enrutamiento,"Como desarrollador, necesito el esqueleto del frontend con navegación y consumo autenticado de la API.
+
+Criterios de aceptación:
+- Cliente HTTP adjunta el token automáticamente
+- Rutas protegidas redirigen al login sin sesión
+- Shell con barra lateral filtrada por rol",,8,Highest,Joseph Flores,SQ Sprint 1,"frontend,infraestructura",Done
+12,Sub-task,11,Inicializar proyecto Vite con TypeScript,,,,Medium,Joseph Flores,SQ Sprint 1,frontend,Done
+13,Sub-task,11,Configurar cliente HTTP con interceptores de JWT,,,,Medium,Joseph Flores,SQ Sprint 1,frontend,Done
+14,Sub-task,11,Crear contexto de autenticación y rutas protegidas,,,,Medium,Joseph Flores,SQ Sprint 1,frontend,Done
+15,Sub-task,11,Construir shell de la aplicación,,,,Medium,Joseph Flores,SQ Sprint 1,frontend,Done
+16,Story,1,Desplegar backend y frontend en la nube,"Como equipo, necesitamos el sistema accesible en línea para validar el comportamiento real y poder mostrarlo.
+
+Criterios de aceptación:
+- Backend en Railway con migraciones automáticas al desplegar
+- Frontend en Vercel con enrutamiento de SPA resuelto
+- Bases de datos separadas para desarrollo y producción
+- CORS configurado entre ambos dominios",,5,Highest,Joseph Flores,SQ Sprint 1,"infraestructura,despliegue",Done
+17,Sub-task,16,Desplegar backend en Railway,,,,Medium,Joseph Flores,SQ Sprint 1,despliegue,Done
+18,Sub-task,16,Crear base de datos de producción,,,,Medium,Joseph Flores,SQ Sprint 1,despliegue,Done
+19,Sub-task,16,Desplegar frontend en Vercel,,,,Medium,Joseph Flores,SQ Sprint 1,despliegue,Done
+20,Sub-task,16,Configurar CORS entre dominios,,,,Medium,Joseph Flores,SQ Sprint 1,despliegue,Done
+21,Story,1,Desplegar microservicio de cálculo,"Como sistema, el microservicio de cálculo debe estar disponible para que el backend resuelva las cotizaciones.
+
+Criterios de aceptación:
+- Servicio desplegado en Railway
+- Comunicación por red interna con el backend
+- Sin dominio público expuesto",,3,Medium,Esteban Narvaez,SQ Sprint 2,"infraestructura,despliegue",To Do
+22,Sub-task,21,Configurar servicio en Railway,,,,Medium,Esteban Narvaez,,despliegue,To Do
+23,Sub-task,21,Conectar backend con calc-service,,,,Medium,Esteban Narvaez,,despliegue,To Do
+24,Story,1,Configurar integración continua con pruebas automatizadas,"Como equipo, necesitamos que las pruebas se ejecuten en cada pull request para detectar regresiones antes del merge.
+
+Criterios de aceptación:
+- Workflow de GitHub Actions ejecuta pytest en backend y calc-service
+- El workflow corre en cada pull request hacia develop
+- Un pull request con pruebas fallidas no se puede mergear",,5,Medium,Joseph Flores,SQ Sprint 2,"infraestructura,pruebas",To Do
+25,Sub-task,24,Crear workflow de pruebas del backend,,,,Medium,Joseph Flores,,infraestructura,To Do
+26,Sub-task,24,Crear workflow de compilación del frontend,,,,Medium,Joseph Flores,,infraestructura,To Do
+27,Sub-task,24,Exigir pruebas en verde para mergear,,,,Medium,Joseph Flores,,infraestructura,To Do
+28,Epic,,RF-11 - Seguridad y gestión de usuarios,"Autenticación, autorización por rol y administración de cuentas del sistema.",Seguridad,,High,,,,To Do
+29,Story,28,Autenticar usuarios con JWT,"Como usuario del sistema, quiero iniciar sesión con mis credenciales para acceder a las funciones que me corresponden.
+
+Criterios de aceptación:
+- Las contraseñas se almacenan con hash bcrypt
+- El token expira a las 8 horas
+- El mensaje de error no revela si el correo existe
+- Los endpoints protegidos rechazan peticiones sin token válido",,8,Highest,Joseph Flores,SQ Sprint 1,"backend,RF-11",Done
+30,Sub-task,29,Implementar hashing de contraseñas y generación de tokens,,,,Medium,Joseph Flores,SQ Sprint 1,backend,Done
+31,Sub-task,29,Crear dependencias de autorización por rol,,,,Medium,Joseph Flores,SQ Sprint 1,backend,Done
+32,Sub-task,29,Crear endpoints de login y perfil,,,,Medium,Joseph Flores,SQ Sprint 1,backend,Done
+33,Sub-task,29,Crear pantalla de inicio de sesión,,,,Medium,Joseph Flores,SQ Sprint 1,frontend,Done
+34,Story,28,Administrar usuarios desde la interfaz,"Como Gerente General, quiero crear y desactivar cuentas de usuario para controlar quién accede al sistema.
+
+Criterios de aceptación:
+- Solo el Gerente General accede a esta sección
+- Se pueden crear usuarios con rol asignado
+- Desactivar una cuenta revoca el acceso inmediatamente
+- No se permiten correos duplicados",,5,Medium,Esteban Narvaez,SQ Sprint 4,"frontend,backend,RF-11",To Do
+35,Sub-task,34,Crear endpoints de listado y actualización de usuarios,,,,Medium,Esteban Narvaez,,backend,To Do
+36,Sub-task,34,Crear pantalla de gestión de usuarios,,,,Medium,Esteban Narvaez,,frontend,To Do
+37,Story,28,Autenticar la comunicación entre servicios,"Como sistema, el microservicio de cálculo debe rechazar peticiones que no provengan del backend principal.
+
+Criterios de aceptación:
+- Cabecera con secreto compartido validada en calc-service
+- El secreto se gestiona como variable de entorno
+- Una petición sin el secreto recibe 401",,3,High,Esteban Narvaez,SQ Sprint 2,"backend,seguridad",To Do
+38,Epic,,Modelos de datos compartidos entre módulos,"Entidades Cliente y Proyecto, consumidas tanto por el módulo de Layout como por el de Cotización. Cambios requieren acuerdo entre ambos desarrolladores.",Modelos compartidos,,High,,,,To Do
+39,Story,38,Modelar Cliente y Proyecto,"Como equipo, necesitamos entidades compartidas acordadas para que los módulos se integren sin conflictos.
+
+Criterios de aceptación:
+- Cliente con identificación ecuatoriana y baja lógica
+- Proyecto enlazado a Cliente con estados definidos
+- Cotización referencia ambos sin perder el snapshot de datos
+- Acuerdo documentado en el repositorio",,5,High,Joseph Flores,SQ Sprint 1,"backend,modelos",To Do
+40,Sub-task,39,Crear modelo Cliente,,,,Medium,Joseph Flores,SQ Sprint 1,backend,Done
+41,Sub-task,39,Crear modelo Proyecto,,,,Medium,Joseph Flores,SQ Sprint 1,backend,Done
+42,Sub-task,39,Enlazar Cotizacion con Cliente y Proyecto,,,,Medium,Joseph Flores,SQ Sprint 1,backend,Done
+43,Sub-task,39,Documentar acuerdo de modelos compartidos,,,,Medium,Joseph Flores,SQ Sprint 1,documentacion,Done
+44,Epic,,Módulo 1 - Layout solar (RF-01 a RF-03),"Definición del terreno con caminos, selección de equipo y generación automática de la distribución de paneles.",Modulo 1 Layout,,High,,,,To Do
+45,Story,44,RF-01 Definir terreno y caminos del proyecto,"Como Gerente General, quiero definir la geometría del terreno y sus caminos internos para que el sistema calcule el área útil disponible.
+
+Criterios de aceptación:
+- Se dibuja el terreno indicando sus vértices
+- Se pueden agregar y eliminar caminos internos
+- El sistema calcula y muestra el área total y el área útil
+- El terreno queda asociado a un proyecto",,13,High,Joseph Flores,SQ Sprint 2,"backend,frontend,RF-01",To Do
+46,Sub-task,45,Crear modelo de terreno y caminos,,,,Medium,Joseph Flores,,backend,To Do
+47,Sub-task,45,Crear endpoints de terreno,,,,Medium,Joseph Flores,,backend,To Do
+48,Sub-task,45,Implementar cálculo de área útil,,,,Medium,Joseph Flores,,backend,To Do
+49,Sub-task,45,Crear pantalla de definición de terreno,,,,Medium,Joseph Flores,,frontend,To Do
+50,Sub-task,45,Integrar canvas con Konva.js,,,,Medium,Joseph Flores,,frontend,To Do
+51,Sub-task,45,Escribir pruebas del cálculo de área,,,,Medium,Joseph Flores,,pruebas,To Do
+52,Story,44,RF-02 Seleccionar panel e inversor del proyecto,"Como Gerente General, quiero elegir el modelo de panel e inversor para que el sistema use sus dimensiones al generar el layout.
+
+Criterios de aceptación:
+- Se selecciona panel del catálogo con sus dimensiones
+- Se selecciona inversor con su potencia
+- El sistema valida la compatibilidad entre panel e inversor
+- La configuración queda asociada al proyecto",,8,High,Joseph Flores,SQ Sprint 2,"backend,frontend,RF-02",To Do
+53,Sub-task,52,Crear modelo de panel solar,,,,Medium,Joseph Flores,,backend,To Do
+54,Sub-task,52,Crear endpoints de configuración de equipo,,,,Medium,Joseph Flores,,backend,To Do
+55,Sub-task,52,Crear pantalla de selección de equipo,,,,Medium,Joseph Flores,,frontend,To Do
+56,Story,44,RF-03 Generar layout solar automáticamente,"Como Gerente General, quiero que el sistema distribuya los bloques de paneles sobre el terreno para no tener que diseñarlo manualmente.
+
+Criterios de aceptación:
+- El algoritmo distribuye bloques respetando terreno y caminos
+- Se valida la proporción antisísmica (ancho igual a tres veces el largo)
+- Los bloques fuera de proporción se marcan en ámbar
+- El layout generado se visualiza en el canvas
+- El resultado se guarda asociado al proyecto",,21,Highest,Joseph Flores,SQ Sprint 3,"backend,frontend,RF-03",To Do
+57,Sub-task,56,Diseñar el algoritmo de distribución,,,,Medium,Joseph Flores,,backend,To Do
+58,Sub-task,56,Implementar el algoritmo para terreno rectangular,,,,Medium,Joseph Flores,,backend,To Do
+59,Sub-task,56,Extender el algoritmo a geometría libre,,,,Medium,Joseph Flores,,backend,To Do
+60,Sub-task,56,Implementar validación de proporción antisísmica,,,,Medium,Joseph Flores,,backend,To Do
+61,Sub-task,56,Crear modelo de bloques generados,,,,Medium,Joseph Flores,,backend,To Do
+62,Sub-task,56,Visualizar el layout en el canvas,,,,Medium,Joseph Flores,,frontend,To Do
+63,Sub-task,56,Escribir pruebas del algoritmo,,,,Medium,Joseph Flores,,pruebas,To Do
+64,Story,44,Editar manualmente los bloques generados,"Como Gerente General, quiero ajustar los bloques que generó el sistema para corregir casos que el algoritmo no resuelve bien.
+
+Criterios de aceptación:
+- Se pueden mover, redimensionar y eliminar bloques
+- La validación de proporción se recalcula al editar
+- Los cambios se guardan en el proyecto",,13,Medium,Joseph Flores,SQ Sprint 4,"frontend,RF-03",To Do
+65,Sub-task,64,Implementar edición de bloques en el canvas,,,,Medium,Joseph Flores,,frontend,To Do
+66,Sub-task,64,Recalcular validaciones al editar,,,,Medium,Joseph Flores,,frontend,To Do
+67,Epic,,Módulo 3 - Cotización (RF-06 y RF-07),Cálculo automático de materiales a partir de la configuración de bloques y generación de la proforma comercial.,Modulo 3 Cotizacion,,High,,,,To Do
+68,Story,67,Modelar cotizaciones y catálogo de materiales,"Como equipo, necesitamos el modelo de datos de cotización con historial de precios para que las proformas emitidas no cambien al actualizar precios.
+
+Criterios de aceptación:
+- Cotización con ítems de configuración L, A y B
+- Catálogo de materiales con historial de precios versionado
+- Un solo precio vigente por material garantizado en base de datos",,8,High,Esteban Narvaez,SQ Sprint 1,"backend,RF-06",Done
+69,Sub-task,68,Crear modelos de Cotizacion e ItemCotizacion,,,,Medium,Esteban Narvaez,SQ Sprint 1,backend,Done
+70,Sub-task,68,Crear modelos de Material y PrecioMaterial,,,,Medium,Esteban Narvaez,SQ Sprint 1,backend,Done
+71,Sub-task,68,Sembrar catálogo inicial de materiales,,,,Medium,Esteban Narvaez,SQ Sprint 1,backend,Done
+72,Story,67,RF-06 Calcular materiales requeridos por proyecto,"Como Gerente General, quiero que el sistema calcule las cantidades de cada material para no hacerlo a mano en una hoja de cálculo.
+
+Criterios de aceptación:
+- Se aplican las diez fórmulas validadas con HEXtructure
+- Se rechaza un largo impar con mensaje claro
+- El IVA es configurable, no fijo en el código
+- La logística se suma como línea independiente
+- El total refleja subtotal, addendum e IVA",,13,Highest,Esteban Narvaez,SQ Sprint 2,"backend,RF-06",To Do
+73,Sub-task,72,Implementar las fórmulas de cálculo,,,,Medium,Esteban Narvaez,SQ Sprint 1,backend,Done
+74,Sub-task,72,Crear endpoint de cálculo en calc-service,,,,Medium,Esteban Narvaez,SQ Sprint 1,backend,Done
+75,Sub-task,72,Hacer configurable el porcentaje de IVA,,,,Medium,Esteban Narvaez,,backend,To Do
+76,Sub-task,72,Resolver el tratamiento de la logística en el total,,,,Medium,Esteban Narvaez,,backend,To Do
+77,Sub-task,72,Crear endpoint que orquesta precios y cálculo,,,,Medium,Esteban Narvaez,,backend,To Do
+78,Sub-task,72,Escribir pruebas del cálculo,,,,Medium,Esteban Narvaez,SQ Sprint 1,pruebas,Done
+79,Story,67,RF-07 Generar proforma en Word y Excel,"Como Gerente General, quiero descargar la cotización en un archivo editable para enviarla al cliente con ajustes propios.
+
+Criterios de aceptación:
+- Se genera documento Word con el detalle de materiales
+- Se genera hoja de cálculo Excel con las mismas cantidades
+- Ambos incluyen datos del cliente, subtotal, addendum, IVA y total
+- El número de proforma se asigna al emitir
+- Los archivos se descargan desde la interfaz",,13,High,Esteban Narvaez,SQ Sprint 3,"backend,frontend,RF-07",To Do
+80,Sub-task,79,Generar documento Word con python-docx,,,,Medium,Esteban Narvaez,,backend,To Do
+81,Sub-task,79,Generar hoja Excel con openpyxl,,,,Medium,Esteban Narvaez,,backend,To Do
+82,Sub-task,79,Implementar numeración de proformas,,,,Medium,Esteban Narvaez,,backend,To Do
+83,Sub-task,79,Crear endpoint de descarga,,,,Medium,Esteban Narvaez,,backend,To Do
+84,Sub-task,79,Crear pantalla de cotización,,,,Medium,Esteban Narvaez,,frontend,To Do
+85,Story,67,Alimentar la cotización desde el layout generado,"Como Gerente General, quiero que los bloques del layout pasen automáticamente a la cotización para no reescribir las configuraciones.
+
+Criterios de aceptación:
+- Los bloques del layout se convierten en ítems de cotización
+- Se puede ajustar manualmente antes de emitir
+- El flujo completo funciona de proyecto a proforma",,8,High,,SQ Sprint 4,"backend,frontend,integracion",To Do
+86,Sub-task,85,Mapear bloques de layout a ítems de cotización,,,,Medium,Joseph Flores,,backend,To Do
+87,Sub-task,85,Integrar el flujo en la interfaz,,,,Medium,Esteban Narvaez,,frontend,To Do
+88,Epic,,Módulo 4 - Administración (RF-08 a RF-13),"Gestión de catálogos, clientes, historial de cotizaciones y tablero de indicadores.",Modulo 4 Administracion,,High,,,,To Do
+89,Story,88,RF-12 Administrar clientes,"Como Gerente General, quiero registrar y mantener los datos de mis clientes para reutilizarlos al cotizar.
+
+Criterios de aceptación:
+- Alta, edición y búsqueda de clientes
+- Validación de cédula y RUC ecuatorianos
+- Baja lógica que conserva el historial de cotizaciones
+- No se permiten identificaciones duplicadas",,8,High,Esteban Narvaez,SQ Sprint 2,"backend,frontend,RF-12",To Do
+90,Sub-task,89,Crear endpoints CRUD de clientes,,,,Medium,Esteban Narvaez,,backend,To Do
+91,Sub-task,89,Implementar validación de cédula y RUC,,,,Medium,Esteban Narvaez,,backend,To Do
+92,Sub-task,89,Crear pantalla de administración de clientes,,,,Medium,Esteban Narvaez,,frontend,To Do
+93,Story,88,RF-09 Administrar precios de materiales,"Como Gerente General, quiero actualizar los precios de los materiales para que las cotizaciones nuevas reflejen los costos vigentes.
+
+Criterios de aceptación:
+- Se visualiza el precio vigente de cada material
+- Al cambiar un precio se cierra la vigencia del anterior
+- Se consulta el historial de precios de un material
+- Las cotizaciones emitidas conservan su precio original",,8,High,Esteban Narvaez,SQ Sprint 2,"backend,frontend,RF-09",To Do
+94,Sub-task,93,Crear endpoints de gestión de precios,,,,Medium,Esteban Narvaez,,backend,To Do
+95,Sub-task,93,Implementar cierre de vigencia al actualizar,,,,Medium,Esteban Narvaez,,backend,To Do
+96,Sub-task,93,Crear pantalla de precios con historial,,,,Medium,Esteban Narvaez,,frontend,To Do
+97,Story,88,RF-08 Administrar catálogo de inversores,"Como Gerente General, quiero mantener el catálogo de inversores para tenerlos disponibles al configurar un proyecto.
+
+Criterios de aceptación:
+- Alta, edición y desactivación de inversores
+- Registro de marca, modelo y potencia
+- Los inversores inactivos no aparecen al configurar proyectos",,5,Medium,Esteban Narvaez,SQ Sprint 3,"backend,frontend,RF-08",To Do
+98,Sub-task,97,Crear modelo y endpoints de inversores,,,,Medium,Esteban Narvaez,,backend,To Do
+99,Sub-task,97,Crear pantalla de catálogo de inversores,,,,Medium,Esteban Narvaez,,frontend,To Do
+100,Story,88,RF-10 Consultar historial de cotizaciones,"Como Gerente General, quiero consultar las cotizaciones emitidas para dar seguimiento y reutilizar información.
+
+Criterios de aceptación:
+- Listado con filtros por cliente, estado y rango de fechas
+- Detalle completo de cada cotización
+- Descarga nuevamente de la proforma generada
+- Paginación en el listado",,8,Medium,Esteban Narvaez,SQ Sprint 4,"backend,frontend,RF-10",To Do
+101,Sub-task,100,Crear endpoints de consulta con filtros,,,,Medium,Esteban Narvaez,,backend,To Do
+102,Sub-task,100,Crear pantalla de historial,,,,Medium,Esteban Narvaez,,frontend,To Do
+103,Story,88,RF-13 Visualizar tablero de indicadores,"Como Gerente General, quiero un tablero con los indicadores del negocio para tener visión rápida del estado de las operaciones.
+
+Criterios de aceptación:
+- Cotizaciones emitidas por periodo
+- Distribución por estado
+- Clientes más frecuentes
+- Materiales de mayor consumo",,8,Low,Esteban Narvaez,SQ Sprint 4,"backend,frontend,RF-13",To Do
+104,Sub-task,103,Crear endpoints de indicadores,,,,Medium,Esteban Narvaez,,backend,To Do
+105,Sub-task,103,Crear tablero con gráficos,,,,Medium,Esteban Narvaez,,frontend,To Do
+106,Epic,,Módulo 2 - Interpretación de bocetos (RF-04 y RF-05),Carga de bocetos en distintos formatos e interpretación mediante inteligencia artificial para extraer la configuración de bloques.,Modulo 2 Boceto,,High,,,,To Do
+107,Story,106,Configurar microservicio de inteligencia artificial,"Como equipo, necesitamos el microservicio de IA desplegado para procesar los bocetos cargados.
+
+Criterios de aceptación:
+- Servicio FastAPI con integración a la API de Claude
+- Manejo de archivos PDF, imagen y DXF
+- Desplegado en Railway con autenticación entre servicios",,8,Medium,Joseph Flores,SQ Sprint 5,"backend,infraestructura,RF-04",To Do
+108,Sub-task,107,Crear estructura del microservicio de IA,,,,Medium,Joseph Flores,,backend,To Do
+109,Sub-task,107,Integrar la API de Claude,,,,Medium,Joseph Flores,,backend,To Do
+110,Sub-task,107,Desplegar en Railway,,,,Medium,Joseph Flores,,despliegue,To Do
+111,Story,106,RF-04 Cargar y procesar boceto de distribución,"Como Gerente General, quiero subir el boceto del cliente para que el sistema extraiga la distribución de paneles automáticamente.
+
+Criterios de aceptación:
+- Acepta PDF, JPG, PNG, DWG y DXF hasta 10 MB
+- Extrae las configuraciones de bloques del boceto
+- Informa con claridad si no logra interpretar el archivo
+- El procesamiento no bloquea la interfaz",,21,High,Joseph Flores,SQ Sprint 5,"backend,frontend,RF-04",To Do
+112,Sub-task,111,Implementar carga y validación de archivos,,,,Medium,Joseph Flores,,backend,To Do
+113,Sub-task,111,Procesar PDF e imágenes con IA,,,,Medium,Joseph Flores,,backend,To Do
+114,Sub-task,111,Procesar DWG y DXF con ezdxf,,,,Medium,Joseph Flores,,backend,To Do
+115,Sub-task,111,Crear pantalla de carga de boceto,,,,Medium,Joseph Flores,,frontend,To Do
+116,Sub-task,111,Escribir pruebas de interpretación,,,,Medium,Joseph Flores,,pruebas,To Do
+117,Story,106,RF-05 Confirmar y editar el diseño interpretado,"Como Gerente General, quiero revisar y corregir lo que la IA interpretó antes de cotizar, porque el resultado puede no ser exacto.
+
+Criterios de aceptación:
+- Se muestra el diseño interpretado sobre el canvas
+- Se pueden corregir las configuraciones de bloques
+- Se marcan en ámbar los bloques fuera de proporción
+- Al confirmar, el diseño alimenta la cotización",,13,High,Joseph Flores,SQ Sprint 6,"frontend,RF-05",To Do
+118,Sub-task,117,Visualizar el diseño interpretado,,,,Medium,Joseph Flores,,frontend,To Do
+119,Sub-task,117,Implementar corrección de bloques,,,,Medium,Joseph Flores,,frontend,To Do
+120,Sub-task,117,Conectar la confirmación con la cotización,,,,Medium,Joseph Flores,,frontend,To Do
+121,Epic,,Módulo 5 - Validación de materiales (RF-14 a RF-16),"Control de despacho con conteo asistido por IA, recepción en terreno y seguimiento del estado de la propuesta.",Modulo 5 Validacion,,High,,,,To Do
+122,Story,121,RF-14 Registrar despacho con conteo de varillas por IA,"Como Personal de Producción, quiero fotografiar los bípodes despachados para que el sistema cuente las varillas y evitar errores manuales.
+
+Criterios de aceptación:
+- Se sube fotografía del bípode
+- La IA cuenta los extremos circulares visibles
+- El conteo detectado se puede confirmar o corregir
+- El despacho queda asociado a una cotización",,21,High,Esteban Narvaez,SQ Sprint 7,"backend,frontend,RF-14",To Do
+123,Sub-task,122,Crear modelo de despacho y conteos,,,,Medium,Esteban Narvaez,,backend,To Do
+124,Sub-task,122,Implementar conteo de varillas con IA,,,,Medium,Esteban Narvaez,,backend,To Do
+125,Sub-task,122,Crear pantalla de registro de despacho,,,,Medium,Esteban Narvaez,,frontend,To Do
+126,Sub-task,122,Escribir pruebas del conteo,,,,Medium,Esteban Narvaez,,pruebas,To Do
+127,Story,121,RF-15 Registrar recepción en terreno,"Como Personal de Producción, quiero registrar lo recibido en obra para contrastarlo contra lo despachado.
+
+Criterios de aceptación:
+- Lista de verificación de materiales recibidos
+- Se registran diferencias contra el despacho
+- Se adjuntan observaciones
+- Queda registro de quién y cuándo recibió",,13,Medium,Esteban Narvaez,SQ Sprint 7,"backend,frontend,RF-15",To Do
+128,Sub-task,127,Crear modelo de recepción,,,,Medium,Esteban Narvaez,,backend,To Do
+129,Sub-task,127,Crear pantalla de recepción con checklist,,,,Medium,Esteban Narvaez,,frontend,To Do
+130,Story,121,RF-16 Dar seguimiento al estado de la propuesta,"Como Gerente General, quiero ver en qué etapa está cada propuesta para saber el avance sin preguntar por teléfono.
+
+Criterios de aceptación:
+- Estados cotizada, despachada, recibida e instalada
+- El estado avanza según los eventos registrados
+- Historial de cambios de estado con fecha y responsable",,8,Medium,Esteban Narvaez,SQ Sprint 8,"backend,frontend,RF-16",To Do
+131,Sub-task,130,Implementar máquina de estados de la propuesta,,,,Medium,Esteban Narvaez,,backend,To Do
+132,Sub-task,130,Crear vista de seguimiento,,,,Medium,Esteban Narvaez,,frontend,To Do
+133,Epic,,Pruebas y aseguramiento de calidad,"Estrategia de pruebas, cobertura por niveles y trazabilidad entre requerimientos y casos de prueba.",Pruebas y calidad,,High,,,,To Do
+134,Story,133,Definir la estrategia de pruebas,"Como equipo, necesitamos una estrategia documentada para cubrir de forma sistemática los requisitos críticos.
+
+Criterios de aceptación:
+- Alcance, niveles y tipos de prueba definidos
+- Ambientes y datos de prueba establecidos
+- Herramientas seleccionadas y justificadas",,3,Medium,,SQ Sprint 2,"pruebas,documentacion",To Do
+135,Story,133,Construir la trazabilidad de requisitos a pruebas,"Como equipo, necesitamos una matriz que conecte cada requerimiento con sus casos de prueba para auditar la cobertura.
+
+Criterios de aceptación:
+- Cada RF tiene al menos un caso de prueba asociado
+- Se registra el estado de ejecución y la evidencia
+- La matriz se mantiene actualizada por sprint",,5,Medium,,SQ Sprint 6,"pruebas,documentacion",To Do
+136,Story,133,Cubrir con pruebas unitarias la lógica crítica,"Como equipo, necesitamos pruebas automatizadas de la lógica de negocio para detectar regresiones al modificar el código.
+
+Criterios de aceptación:
+- Cobertura de las fórmulas de cálculo de materiales
+- Cobertura del algoritmo de generación de layout
+- Cobertura de autenticación y autorización
+- Las pruebas se ejecutan en cada pull request",,13,Medium,,SQ Sprint 6,pruebas,To Do
+137,Story,133,Ejecutar pruebas de extremo a extremo del flujo principal,"Como equipo, necesitamos validar el recorrido completo del usuario para confirmar que los módulos se integran correctamente.
+
+Criterios de aceptación:
+- Flujo desde crear cliente hasta descargar proforma
+- Flujo de validación de materiales
+- Pruebas ejecutadas contra el ambiente desplegado
+- Resultados documentados por iteración",,13,High,,SQ Sprint 8,pruebas,To Do
+138,Story,133,Estabilizar y corregir defectos detectados,"Como equipo, necesitamos un periodo dedicado a corregir defectos para llegar a la entrega con el sistema estable.
+
+Criterios de aceptación:
+- Defectos clasificados por severidad
+- Los defectos críticos y altos quedan resueltos
+- Se verifica que lo corregido no vuelva a fallar",,13,High,,SQ Sprint 8,pruebas,To Do
+139,Epic,,Documentación del proyecto capstone,Redacción de las secciones del documento final y recopilación de evidencias del proceso de ingeniería.,Documentacion capstone,,High,,,,To Do
+140,Story,139,Documentar el diseño de la solución,"Como equipo, necesitamos documentar la arquitectura para cumplir la sección 7.1 del formato capstone.
+
+Criterios de aceptación:
+- Diagramas C4 de los cuatro niveles
+- Modelo entidad-relación de la base de datos
+- Patrones arquitectónicos y decisiones técnicas justificadas
+- Stack tecnológico documentado",,8,Medium,,SQ Sprint 5,documentacion,To Do
+141,Story,139,Recopilar evidencias de la metodología Scrum,"Como equipo, necesitamos evidencia auditable del proceso para cumplir la sección 7.2 del formato capstone.
+
+Criterios de aceptación:
+- Product Backlog priorizado exportado
+- Historias de usuario con criterios de aceptación
+- Capturas del tablero por sprint
+- Registro de pull requests y revisiones",,5,Medium,,SQ Sprint 7,documentacion,To Do
+142,Story,139,Documentar las pruebas y su evidencia,"Como equipo, necesitamos reportar el proceso de pruebas para cumplir la sección 7.3 del formato capstone.
+
+Criterios de aceptación:
+- Estrategia de pruebas documentada
+- Matriz de trazabilidad incluida
+- Casos de prueba críticos con resultados
+- Evidencia de ejecución en la canalización de CI",,8,Medium,,SQ Sprint 8,documentacion,To Do
+143,Story,139,"Redactar resultados, conclusiones y cierre","Como equipo, necesitamos cerrar el documento con los resultados obtenidos y las conclusiones del proyecto.
+
+Criterios de aceptación:
+- Resultados con métricas de calidad
+- Implicaciones éticas del sistema
+- Conclusiones derivadas de los objetivos
+- Trabajo futuro y anexos",,13,High,,SQ Sprint 9,documentacion,To Do
+144,Story,139,Dejar el sistema en estado de pre-producción,"Como equipo, necesitamos entregar el sistema desplegado y operable según el compromiso con el comité.
+
+Criterios de aceptación:
+- Sistema desplegado en infraestructura real
+- Datos de configuración cargados
+- Manual básico de operación entregado
+- Traspaso documentado a HEXtructure",,8,Highest,,SQ Sprint 9,"despliegue,documentacion",To Do

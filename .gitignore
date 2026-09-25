@@ -1,0 +1,69 @@
+# ─── Python ─────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# ─── Node / Frontend ────────────────────────────────────
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+coverage/
+
+# ─── Variables de entorno (NUNCA subir) ─────────────────
+.env
+.env.local
+.env.*.local
+*.env
+!.env.example
+
+# ─── Editores ───────────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ─── Archivos temporales de Office ──────────────────────
+~$*
+
+# ─── Logs ───────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ─── Uploads y archivos generados en runtime ────────────
+uploads/
+temp/
+*.docx
+*.xlsx
+!docs/**/*.docx
+!docs/**/*.xlsx
+
+# ─── Base de datos local ────────────────────────────────
+*.db
+*.sqlite3
+
+# ─── Documentación interna del equipo ───────────────────
+# Guías de configuración de herramientas y distribución de
+# carga entre integrantes. Material de trabajo, no del
+# entregable: se conserva en local, fuera del repositorio.
+01_documentacion/gestion/jira/SETUP-JIRA.md
