@@ -12,6 +12,7 @@ from app.models.cliente import Cliente, TipoIdentificacion
 from app.models.proyecto import EstadoProyecto, Proyecto
 from app.models.cotizacion import Cotizacion, EstadoCotizacion, ItemCotizacion
 from app.models.material import Material, PrecioMaterial
+from app.models.equipo import ConfiguracionEquipo
 from app.models.terreno import Camino, Terreno, TipoCamino
 from app.models.usuario import RolUsuario, Usuario
 
@@ -28,6 +29,7 @@ __all__ = [
     "Terreno",
     "Camino",
     "TipoCamino",
+    "ConfiguracionEquipo",
     # Cotización
     "Cotizacion",
     "ItemCotizacion",

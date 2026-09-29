@@ -12,7 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.routers import auth, health, proyectos, terreno
+from app.routers import auth, equipo, health, proyectos, terreno
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -42,6 +42,7 @@ app.include_router(proyectos.router)
 
 # Módulo 1 — Layout solar
 app.include_router(terreno.router)
+app.include_router(equipo.router)
 
 # A medida que avancemos, cada módulo registra su router aquí:
 # app.include_router(boceto.router,     prefix="/api/boceto",    tags=["Módulo 2 — Boceto"])
