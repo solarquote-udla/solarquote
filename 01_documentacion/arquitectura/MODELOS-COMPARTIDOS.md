@@ -90,8 +90,14 @@ compartido por algo que solo usa el Módulo 1.
 El Módulo 1 (Layout) agrega tablas propias colgando de `proyecto_id`:
 
 - Terreno y caminos (RF-01, Sprint 2) — **implementado**
-- Configuración de equipo (panel, inversor) — RF-02
+- Configuración de equipo: panel e inversor (RF-02, Sprint 2) — **implementado**
 - Bloques generados por el algoritmo — RF-03
+
+La configuración de equipo guarda los valores del panel y del inversor,
+no una referencia a un catálogo. Cuando exista la lista de inversores de
+RF-08 (Esteban), servirá para rellenar el formulario, pero corregir un
+inversor en esa lista no altera los proyectos ya configurados: es el
+mismo criterio de snapshot que usa la cotización con el cliente.
 
 Esas tablas son de Joseph y no están bajo la regla de modelos compartidos.
 
@@ -135,7 +141,7 @@ Cliente 1 ──── N Proyecto
    │                │
    │                │ (Módulo 1, de Joseph)
    │                ├── Terreno 1 ── N Camino
-   │                ├── ConfiguracionEquipo
+   │                ├── ConfiguracionEquipo (1:1)
    │                └── BloqueGenerado
    │                │
    └────────────────┴──── N Cotizacion ──── N ItemCotizacion
