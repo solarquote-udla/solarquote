@@ -10,10 +10,7 @@ from app.models.proyecto import EstadoProyecto, Proyecto
 from app.models.terreno import Camino, Terreno
 from app.schemas.terreno import CaminoCrear, TerrenoActualizar, TerrenoCrear
 from app.services.geometria import calcular_areas
-
-
-def obtener_proyecto(db: Session, proyecto_id: int) -> Proyecto | None:
-    return db.get(Proyecto, proyecto_id)
+from app.services.proyecto import obtener_proyecto  # noqa: F401 — lo usa el router
 
 
 def obtener_terreno(db: Session, proyecto_id: int) -> Terreno | None:
