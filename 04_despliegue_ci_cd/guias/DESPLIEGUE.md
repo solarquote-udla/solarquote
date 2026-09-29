@@ -2,15 +2,51 @@
 
 Guía para dejar SolarQuote corriendo en línea.
 
-| Servicio | Plataforma | Carpeta | Costo |
+| Servicio | Plataforma | Carpeta | Estado |
 |---|---|---|---|
-| Frontend | Vercel | `frontend/` | Gratis |
-| Backend principal | Railway | `backend/` | ~$5/mes |
-| Microservicio de cálculo | Railway | `calc-service/` | ~$5/mes |
-| Base de datos | Neon | — | Gratis |
+| Frontend | Vercel | `02_codigo_fuente/frontend` | Desplegado |
+| Backend principal | Railway | `02_codigo_fuente/backend` | Desplegado |
+| Microservicio de cálculo | Railway | `02_codigo_fuente/calc-service` | Pendiente (ver Parte 2) |
+| Base de datos | Neon | — | Desplegado |
 
 > **Orden importante:** primero el backend, después el frontend. El frontend
 > necesita conocer la URL del backend para construirse.
+
+---
+
+## Regla: bases de datos separadas
+
+**Desarrollo y producción no comparten base de datos.** Ambas viven en el
+mismo proyecto de Neon, como bases distintas:
+
+| Entorno | Base | Quién la usa |
+|---|---|---|
+| Desarrollo | `neondb` (la que Neon crea por defecto) | Los `.env` locales |
+| Producción | `solarquote_prod` | Railway |
+
+### Por qué
+
+Alembic guarda en la tabla `alembic_version` la última migración aplicada.
+Si desarrollo y producción comparten base, probar una migración en local la
+marca como aplicada también para producción, y el siguiente despliegue de
+una rama que no la contiene falla con:
+
+```
+Can't locate revision identified by 'xxxxx'
+```
+
+Ocurrió en el Sprint 2 y costó una tarde. Además, un despliegue podría
+alterar los datos con los que se está trabajando en local.
+
+### Cómo se creó la base de producción
+
+Neon → **Databases** → **New Database** → `solarquote_prod`. El connection
+string es el mismo que el de desarrollo cambiando el nombre de la base al
+final:
+
+```
+postgresql://usuario:password@host.neon.tech/solarquote_prod?sslmode=require
+```
 
 ---
 
@@ -47,7 +83,7 @@ Renombra el servicio a `solarquote-backend` en **Settings → General**.
 
 | Variable | Valor |
 |---|---|
-| `DATABASE_URL` | El connection string de Neon (el mismo de tu `.env`) |
+| `DATABASE_URL` | El de **`solarquote_prod`** — nunca el de tu `.env` (ver la regla de bases separadas) |
 | `SECRET_KEY` | **Genera una nueva**, distinta a la de desarrollo |
 | `ALGORITHM` | `HS256` |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `480` |
@@ -88,6 +124,16 @@ Los tres deben responder. `/health/db` confirma que Railway alcanza a Neon.
 ---
 
 ## Parte 2 — calc-service en Railway
+
+> **Todavía no se despliega**, a propósito:
+>
+> - El backend aún no lo llama: falta el endpoint de orquestación de RF-06.
+> - DS-05 (autenticación entre servicios) sigue abierto.
+> - Un segundo servicio consume el crédito de Railway sin aportar nada
+>   mientras nadie lo invoque.
+>
+> Se despliega cuando se integre RF-06 y se cierre DS-05. Los pasos quedan
+> documentados para ese momento.
 
 ### 2.1 Segundo servicio, mismo proyecto
 
@@ -158,20 +204,37 @@ generes dominio — así queda inaccesible desde fuera.
 > Sin barra al final. Las variables `VITE_*` se incrustan en el build:
 > si la cambias, hay que volver a desplegar.
 
-**Deploy**. Te da una URL tipo `solarquote.vercel.app`.
+**Deploy**. Vercel asigna un dominio a partir del nombre del proyecto.
+
+El dominio de producción actual es **`solarquote-hextructure.vercel.app`**.
+`solarquote.vercel.app` estaba tomado: los subdominios `.vercel.app` son
+globales entre todos los usuarios de Vercel.
 
 ### 3.4 Cerrar el círculo: CORS
 
 Vuelve a Railway, servicio **backend**, y actualiza:
 
 ```
-CORS_ORIGINS=https://solarquote.vercel.app
+CORS_ORIGINS=https://solarquote-hextructure.vercel.app
 ```
 
 Sin esto el navegador bloquea todas las peticiones. Railway redespliega solo.
 
-> Para permitir también las URLs de previsualización de Vercel, sepáralas
-> por coma. En producción conviene ser restrictivo.
+> **Para cambiar el dominio sin cortar el servicio:** agrega el nuevo en
+> Vercel sin quitar el viejo, pon ambos en `CORS_ORIGINS` separados por
+> coma, verifica el login en el nuevo, y recién entonces quita el viejo de
+> los dos lados.
+
+### 3.5 URLs de cada despliegue
+
+Además del dominio de producción, cada despliegue tiene su propia URL
+(`solarquote-<hash>-<equipo>.vercel.app`). **Esas URLs no pasan CORS** y
+el login falla con "No se pudo conectar con el servidor", un mensaje
+engañoso porque el backend está bien: es el navegador el que bloquea.
+
+Para probar, usa siempre el dominio de producción. Habilitar las
+previsualizaciones de PR requiere `allow_origin_regex` en el middleware de
+CORS; está pendiente.
 
 ---
 
@@ -188,7 +251,13 @@ Durante el Sprint 2 esa rama es `develop`; a partir del cierre del sprint,
 `main`.
 
 Cada PR hacia `develop` genera además una previsualización en Vercel con URL
-propia, útil para que se revisen los cambios entre ustedes antes de mergear.
+propia. Por ahora solo sirve para revisar pantallas que no llaman a la API
+(ver 3.5).
+
+`develop` está protegida: todo cambio entra por pull request con una
+aprobación. Para forzar un despliegue sin push existe un **Deploy Hook** en
+Vercel (Settings → Git → Deploy Hooks). Su URL es un secreto: quien la tenga
+puede disparar builds en la cuenta.
 
 ---
 
@@ -196,7 +265,7 @@ propia, útil para que se revisen los cambios entre ustedes antes de mergear.
 
 - [ ] `https://backend.up.railway.app/health` responde `ok`
 - [ ] `https://backend.up.railway.app/health/db` responde `conectada`
-- [ ] `https://solarquote.vercel.app` carga la pantalla de login
+- [ ] `https://solarquote-hextructure.vercel.app` carga la pantalla de login
 - [ ] El login funciona con un usuario real
 - [ ] Tras iniciar sesión se ve el shell con la barra lateral
 - [ ] Recargar la página en `/validacion` no da 404 (lo resuelve `vercel.json`)
@@ -213,9 +282,15 @@ El Root Directory no está configurado. Debe ser `02_codigo_fuente/backend` o `0
 Falta `--host 0.0.0.0` en el comando de arranque. Sin eso, uvicorn solo
 escucha en localhost y Railway no lo alcanza. Ya viene en `railway.json`.
 
-**CORS: `blocked by CORS policy`**
-`CORS_ORIGINS` no incluye el dominio de Vercel, o lo escribiste con barra
-final. Debe ser exactamente `https://solarquote.vercel.app`.
+**CORS: `blocked by CORS policy`, o "No se pudo conectar con el servidor"**
+`CORS_ORIGINS` no incluye el dominio desde el que estás entrando, o lo
+escribiste con barra final. Debe ser exactamente
+`https://solarquote-hextructure.vercel.app`. Si entraste por la URL de un
+despliegue concreto (con hash), ver 3.5.
+
+**`Can't locate revision identified by '...'`**
+Railway apunta a la base de desarrollo. `DATABASE_URL` en Railway debe
+terminar en `/solarquote_prod`. Ver la regla de bases separadas.
 
 **Refrescar una ruta da 404 en Vercel**
 Falta el rewrite de `vercel.json`. Verifica que el archivo esté en

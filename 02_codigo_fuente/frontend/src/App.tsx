@@ -15,7 +15,9 @@ import { AuthProvider } from "@/context/AuthProvider";
 import { EnConstruccionPage } from "@/pages/EnConstruccionPage";
 import { InicioPage } from "@/pages/InicioPage";
 import { LoginPage } from "@/pages/LoginPage";
+import { ProyectosPage } from "@/pages/ProyectosPage";
 import { SinPermisosPage } from "@/pages/SinPermisosPage";
+import { TerrenoPage } from "@/pages/TerrenoPage";
 import { RolUsuario } from "@/types/api";
 
 export default function App() {
@@ -49,17 +51,8 @@ export default function App() {
           {/* ─── Solo Gerente General ───────────────── */}
           <Route element={<RutaProtegida rolesPermitidos={[RolUsuario.GERENTE_GENERAL]} />}>
             <Route element={<AppLayout />}>
-              <Route
-                path="proyectos"
-                element={
-                  <EnConstruccionPage
-                    titulo="Proyectos y layout"
-                    modulo="Módulo 1"
-                    requerimientos="RF-01 a RF-03"
-                    sprint="Sprint 3–4"
-                  />
-                }
-              />
+              <Route path="proyectos" element={<ProyectosPage />} />
+              <Route path="proyectos/:proyectoId/terreno" element={<TerrenoPage />} />
               <Route
                 path="bocetos"
                 element={

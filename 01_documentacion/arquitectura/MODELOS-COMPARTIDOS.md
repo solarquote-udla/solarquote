@@ -36,6 +36,28 @@ Tabla `clientes`. Datos maestros del cliente.
 **Por qué baja lógica:** un cliente con cotizaciones históricas no se puede
 eliminar sin romper el historial.
 
+### Contrato de `GET /api/clientes`
+
+El alta de proyectos (Joseph) elige el cliente de este listado, que
+implementa RF-12 (Esteban). Lo único que se consume es:
+
+| Campo | Obligatorio | Uso |
+|---|---|---|
+| `id` | Sí | Se envía como `cliente_id` al crear el proyecto |
+| `nombre` | Sí | Texto de la opción en el selector |
+| `identificacion` | Sí | Se muestra junto al nombre para distinguir homónimos |
+| `activo` | No | Si viene en `false`, el cliente se oculta del selector |
+
+La respuesta es un **arreglo** de clientes, no un objeto paginado. Si más
+adelante se pagina, hay que acordarlo antes: el selector dejaría de ver a
+los clientes que no estén en la primera página.
+
+Cualquier campo adicional que devuelva RF-12 se ignora sin romper nada.
+
+El backend de proyectos rechaza con 422 un `cliente_id` inexistente o dado
+de baja, así que el filtro de `activo` en el frontend es comodidad, no
+seguridad.
+
 ---
 
 ## Proyecto
@@ -53,16 +75,29 @@ Tabla `proyectos`. Raíz del trabajo técnico.
 | `estado` | enum | `borrador` → `en_diseno` → `disenado` → `cotizado` |
 | `notas` | str(500)? | |
 
+### Gestión de proyectos
+
+Endpoints mínimos, de Joseph, bajo `/api/proyectos` (solo Gerente General):
+alta, listado y detalle. Consumen el modelo sin modificarlo.
+
+Un detalle de diseño: el listado indica si cada proyecto ya tiene terreno
+(`tiene_terreno`). Se resuelve con una consulta aparte en el servicio y no
+con una relación en `Proyecto`, justamente para no tocar el modelo
+compartido por algo que solo usa el Módulo 1.
+
 ### Lo que NO va en Proyecto
 
-El Módulo 1 (Layout) agregará en el Sprint 3 tablas propias colgando de
-`proyecto_id`:
+El Módulo 1 (Layout) agrega tablas propias colgando de `proyecto_id`:
 
-- Terreno (geometría, caminos)
-- Configuración de equipo (panel, inversor)
-- Bloques generados por el algoritmo
+- Terreno y caminos (RF-01, Sprint 2) — **implementado**
+- Configuración de equipo (panel, inversor) — RF-02
+- Bloques generados por el algoritmo — RF-03
 
 Esas tablas son de Joseph y no están bajo la regla de modelos compartidos.
+
+Al definir el terreno, el proyecto pasa de `borrador` a `en_diseno`. Solo
+avanza desde `borrador`: redefinir el terreno de un proyecto ya diseñado o
+cotizado no lo hace retroceder.
 
 ---
 
@@ -98,8 +133,8 @@ puede asociar después.
 ```
 Cliente 1 ──── N Proyecto
    │                │
-   │                │ (Sprint 3, de Joseph)
-   │                ├── Terreno
+   │                │ (Módulo 1, de Joseph)
+   │                ├── Terreno 1 ── N Camino
    │                ├── ConfiguracionEquipo
    │                └── BloqueGenerado
    │                │

@@ -17,6 +17,11 @@ PyJWT==2.10.1
 bcrypt==4.2.1
 python-multipart==0.0.20
 
+# ─── Geometría (Módulo 1 — layout solar) ────────────────
+# Unión y diferencia de polígonos para el cálculo de área útil.
+# Restar cada camino por separado duplicaría las intersecciones.
+shapely==2.0.6
+
 # ─── Utilidades ─────────────────────────────────────────
 httpx==0.28.1
 
