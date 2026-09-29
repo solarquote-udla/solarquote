@@ -12,6 +12,7 @@ from app.models.cliente import Cliente, TipoIdentificacion
 from app.models.proyecto import EstadoProyecto, Proyecto
 from app.models.cotizacion import Cotizacion, EstadoCotizacion, ItemCotizacion
 from app.models.material import Material, PrecioMaterial
+from app.models.terreno import Camino, Terreno, TipoCamino
 from app.models.usuario import RolUsuario, Usuario
 
 __all__ = [
@@ -23,6 +24,10 @@ __all__ = [
     "TipoIdentificacion",
     "Proyecto",
     "EstadoProyecto",
+    # Módulo 1 — Layout solar
+    "Terreno",
+    "Camino",
+    "TipoCamino",
     # Cotización
     "Cotizacion",
     "ItemCotizacion",
