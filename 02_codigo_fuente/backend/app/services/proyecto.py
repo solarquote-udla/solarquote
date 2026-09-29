@@ -8,7 +8,7 @@ servicio solo lo lee y lo crea; no altera su estructura.
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.cliente import Cliente
-from app.models.proyecto import Proyecto
+from app.models.proyecto import EstadoProyecto, Proyecto
 from app.models.terreno import Terreno
 from app.models.usuario import Usuario
 from app.schemas.proyecto import ProyectoCrear
@@ -25,6 +25,22 @@ def obtener_proyecto(db: Session, proyecto_id: int) -> Proyecto | None:
         .filter(Proyecto.id == proyecto_id)
         .one_or_none()
     )
+
+
+def avanzar_a_en_diseno(proyecto: Proyecto) -> None:
+    """
+    Un proyecto pasa de borrador a en_diseño cuando se le define terreno
+    o equipo, lo que ocurra primero.
+
+    Solo avanza desde BORRADOR: si el proyecto ya estaba diseñado o
+    cotizado, reconfigurarlo no lo hace retroceder. Qué pasa con un
+    layout ya generado cuando cambian terreno o equipo es una decisión
+    de RF-03 y se resuelve allí.
+
+    No hace commit: lo hace quien llama, junto con el resto del cambio.
+    """
+    if proyecto.estado == EstadoProyecto.BORRADOR:
+        proyecto.estado = EstadoProyecto.EN_DISENO
 
 
 def listar_proyectos(db: Session) -> list[Proyecto]:
