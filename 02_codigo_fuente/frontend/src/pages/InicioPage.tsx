@@ -55,7 +55,11 @@ export function InicioPage() {
         <h2 className="text-sm font-semibold text-acero-700">Próximos módulos</h2>
         <p className="mt-2 text-sm text-acero-500">
           Las pantallas de cada módulo se irán habilitando conforme avancen los sprints.
-          Puedes seguir el plan en <code className="rounded bg-acero-100 px-1.5 py-0.5 text-xs">docs/ROADMAP.md</code>.
+          Puedes seguir el plan en{" "}
+          <code className="rounded bg-acero-100 px-1.5 py-0.5 text-xs">
+            01_documentacion/gestion/ROADMAP.md
+          </code>
+          .
         </p>
       </div>
     </div>
