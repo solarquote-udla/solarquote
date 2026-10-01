@@ -227,14 +227,51 @@ Sin esto el navegador bloquea todas las peticiones. Railway redespliega solo.
 
 ### 3.5 URLs de cada despliegue
 
-Además del dominio de producción, cada despliegue tiene su propia URL
-(`solarquote-<hash>-<equipo>.vercel.app`). **Esas URLs no pasan CORS** y
-el login falla con "No se pudo conectar con el servidor", un mensaje
-engañoso porque el backend está bien: es el navegador el que bloquea.
+Además del dominio de producción, Vercel genera dos clases de URL:
 
-Para probar, usa siempre el dominio de producción. Habilitar las
-previsualizaciones de PR requiere `allow_origin_regex` en el middleware de
-CORS; está pendiente.
+| Clase | Formato |
+|---|---|
+| Por despliegue | `solarquote-<hash>-<scope>.vercel.app` |
+| Por rama | `solarquote-git-<rama>-<scope>.vercel.app` |
+
+`<scope>` es el slug de la cuenta o equipo de Vercel y es igual en todas.
+Se ve en el link **Preview** que deja el bot de Vercel en cada PR: es lo que
+va entre el último guion y `.vercel.app`.
+
+Como cambian en cada despliegue, no se pueden listar en `CORS_ORIGINS`. Se
+cubren con un patrón en Railway, servicio **backend**:
+
+```
+CORS_ORIGIN_REGEX=^https://solarquote-[a-z0-9-]+-<scope>\.vercel\.app$
+```
+
+Reglas del patrón:
+
+- **Terminar en `-<scope>\.vercel\.app$`**. Sin el scope, cualquiera que
+  cree en Vercel un proyecto llamado `solarquote-algo` pasaría el CORS.
+- **Escapar los puntos (`\.`)**. Un `.` suelto calza con cualquier carácter.
+- Un patrón con error de sintaxis impide que el backend arranque. Es a
+  propósito: mejor un deploy fallido que un CORS roto en silencio.
+- El formato está cubierto por `backend/tests/test_cors.py`.
+
+El patrón no reemplaza a `CORS_ORIGINS`: producción y `localhost` siguen en
+la lista fija.
+
+**Qué tan seguro es.** El token viaja en el header `Authorization`, no en
+cookies, así que el CORS no es lo que protege la sesión: un sitio ajeno no
+puede leer el token guardado en otro dominio. El patrón estricto es una
+segunda capa, no la principal.
+
+**Límite importante.** Las previews usan el **mismo backend y la misma base**
+que producción. Sirven para revisar cambios de pantalla. Si el PR trae
+endpoints o migraciones nuevas, la preview los llama antes de que existan y
+falla con 404 hasta que se haga el merge. Y lo que se guarde desde una
+preview queda en la base real.
+
+Si el login falla con "No se pudo conectar con el servidor" desde una URL
+de Vercel, casi siempre es CORS (el mensaje engaña: el backend está bien,
+es el navegador el que bloquea). Revisar que el scope del patrón coincida
+con la URL.
 
 ---
 
@@ -251,8 +288,12 @@ Durante el Sprint 2 esa rama es `develop`; a partir del cierre del sprint,
 `main`.
 
 Cada PR hacia `develop` genera además una previsualización en Vercel con URL
-propia. Por ahora solo sirve para revisar pantallas que no llaman a la API
-(ver 3.5).
+propia, que pasa el CORS gracias a `CORS_ORIGIN_REGEX` (ver 3.5 y sus
+límites).
+
+Antes del merge, cada PR debe pasar los checks `backend`, `calc-service` y
+`frontend` del workflow `.github/workflows/ci.yml`. Son obligatorios en los
+rulesets de `develop` y `main`, junto con tener la rama al día con la base.
 
 `develop` está protegida: todo cambio entra por pull request con una
 aprobación. Para forzar un despliegue sin push existe un **Deploy Hook** en
@@ -285,8 +326,8 @@ escucha en localhost y Railway no lo alcanza. Ya viene en `railway.json`.
 **CORS: `blocked by CORS policy`, o "No se pudo conectar con el servidor"**
 `CORS_ORIGINS` no incluye el dominio desde el que estás entrando, o lo
 escribiste con barra final. Debe ser exactamente
-`https://solarquote-hextructure.vercel.app`. Si entraste por la URL de un
-despliegue concreto (con hash), ver 3.5.
+`https://solarquote-hextructure.vercel.app`. Si entraste por la URL de una
+preview, revisa `CORS_ORIGIN_REGEX` (ver 3.5).
 
 **`Can't locate revision identified by '...'`**
 Railway apunta a la base de desarrollo. `DATABASE_URL` en Railway debe
