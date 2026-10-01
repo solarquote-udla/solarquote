@@ -131,3 +131,57 @@ def test_rechaza_precios_incompletos():
 
     assert respuesta.status_code == 422
     assert "VAR1350" in respuesta.json()["detail"]
+
+
+def test_suma_cargo_fijo_de_logistica_al_subtotal():
+    precios_con_log = {**PRECIOS, "LOG": "35.00"}
+
+    respuesta = client.post(
+        "/api/cotizacion/calcular",
+        json={
+            "items": [{"paneles_largo": 4, "paneles_ancho": 3, "bloques": 1}],
+            "precios": precios_con_log,
+            "cargos_fijos": {"LOG": 1},
+        },
+    )
+
+    assert respuesta.status_code == 200
+    cuerpo = respuesta.json()
+
+    assert cuerpo["cantidades_totales"]["LOG"] == 1
+    # LOG no depende de L/A/B: no aparece en las cantidades por ítem.
+    assert "LOG" not in cuerpo["items"][0]["cantidades"]
+
+    subtotal_esperado = sum(Decimal(precios_con_log[c]) * q for c, q in cuerpo["cantidades_totales"].items())
+    assert Decimal(cuerpo["subtotal"]) == subtotal_esperado.quantize(Decimal("0.01"))
+
+
+def test_cargo_fijo_sin_items_de_logistica_no_escala_con_bloques():
+    respuesta = client.post(
+        "/api/cotizacion/calcular",
+        json={
+            "items": [
+                {"paneles_largo": 4, "paneles_ancho": 3, "bloques": 5},
+                {"paneles_largo": 4, "paneles_ancho": 3, "bloques": 5},
+            ],
+            "precios": {**PRECIOS, "LOG": "35.00"},
+            "cargos_fijos": {"LOG": 1},
+        },
+    )
+
+    assert respuesta.status_code == 200
+    assert respuesta.json()["cantidades_totales"]["LOG"] == 1
+
+
+def test_rechaza_precio_faltante_para_cargo_fijo():
+    respuesta = client.post(
+        "/api/cotizacion/calcular",
+        json={
+            "items": [{"paneles_largo": 4, "paneles_ancho": 3, "bloques": 1}],
+            "precios": PRECIOS,
+            "cargos_fijos": {"LOG": 1},
+        },
+    )
+
+    assert respuesta.status_code == 422
+    assert "LOG" in respuesta.json()["detail"]

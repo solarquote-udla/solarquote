@@ -2,7 +2,7 @@
 
 from decimal import Decimal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, PositiveInt, field_validator
 
 
 class ItemEntrada(BaseModel):
@@ -26,6 +26,12 @@ class CalcularCotizacionEntrada(BaseModel):
     # Precio unitario vigente de cada material, por código (VAR1650, VAR1350, ...).
     # Lo resuelve el backend contra PrecioMaterial antes de llamar a este endpoint.
     precios: dict[str, Decimal]
+
+    # Cantidad fija por código de material, a nivel de toda la cotización
+    # (no por ítem ni escalada por L/A/B). Es el caso de LOG: el backend
+    # decide la cantidad (hoy siempre 1) y este servicio solo la suma como
+    # un material más, usando su precio vigente igual que los demás.
+    cargos_fijos: dict[str, PositiveInt] = Field(default_factory=dict)
 
     addendum_porcentaje: Decimal = Field(default=Decimal("0"), ge=0, le=100)
 
