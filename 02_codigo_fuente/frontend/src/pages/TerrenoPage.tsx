@@ -17,6 +17,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { EditorPoligonos, type CaminoDibujo } from "@/components/EditorPoligonos";
 import { EstadoProyectoBadge } from "@/components/EstadoProyectoBadge";
+import { PestanasProyecto } from "@/components/PestanasProyecto";
 import { mensajeDeError } from "@/services/api";
 import { obtenerProyecto } from "@/services/proyectos";
 import {
@@ -395,6 +396,8 @@ export function TerrenoPage() {
         {proyecto.cliente.nombre}
         {proyecto.ubicacion ? ` · ${proyecto.ubicacion}` : ""}
       </p>
+
+      <PestanasProyecto proyectoId={proyecto.id} />
 
       {(error || aviso) && (
         <div

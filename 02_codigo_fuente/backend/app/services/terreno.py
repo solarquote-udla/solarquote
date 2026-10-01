@@ -6,10 +6,11 @@ El router se limita a traducir HTTP; las reglas viven aquí.
 
 from sqlalchemy.orm import Session
 
-from app.models.proyecto import EstadoProyecto, Proyecto
+from app.models.proyecto import Proyecto
 from app.models.terreno import Camino, Terreno
 from app.schemas.terreno import CaminoCrear, TerrenoActualizar, TerrenoCrear
 from app.services.geometria import calcular_areas
+from app.services.proyecto import avanzar_a_en_diseno
 from app.services.proyecto import obtener_proyecto  # noqa: F401 — lo usa el router
 
 
@@ -37,19 +38,6 @@ def areas_de(terreno: Terreno) -> dict[str, float]:
     )
 
 
-def _avanzar_estado_si_corresponde(proyecto: Proyecto) -> None:
-    """
-    Un proyecto pasa de borrador a en_diseño cuando adquiere terreno.
-
-    Solo avanza desde BORRADOR: si el proyecto ya estaba diseñado o
-    cotizado, redefinir el terreno no debe hacerlo retroceder. Esa
-    decisión —qué pasa con un layout ya generado cuando cambia el
-    terreno— es de RF-03 y se resuelve allí.
-    """
-    if proyecto.estado == EstadoProyecto.BORRADOR:
-        proyecto.estado = EstadoProyecto.EN_DISENO
-
-
 def crear_terreno(db: Session, proyecto: Proyecto, datos: TerrenoCrear) -> Terreno:
     """Crea el terreno de un proyecto junto con sus caminos iniciales."""
     terreno = Terreno(
@@ -69,7 +57,7 @@ def crear_terreno(db: Session, proyecto: Proyecto, datos: TerrenoCrear) -> Terre
         )
 
     db.add(terreno)
-    _avanzar_estado_si_corresponde(proyecto)
+    avanzar_a_en_diseno(proyecto)
     db.commit()
     db.refresh(terreno)
     return terreno

@@ -13,6 +13,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { RutaProtegida } from "@/components/RutaProtegida";
 import { AuthProvider } from "@/context/AuthProvider";
 import { EnConstruccionPage } from "@/pages/EnConstruccionPage";
+import { EquipoPage } from "@/pages/EquipoPage";
 import { InicioPage } from "@/pages/InicioPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { ProyectosPage } from "@/pages/ProyectosPage";
@@ -53,6 +54,7 @@ export default function App() {
             <Route element={<AppLayout />}>
               <Route path="proyectos" element={<ProyectosPage />} />
               <Route path="proyectos/:proyectoId/terreno" element={<TerrenoPage />} />
+              <Route path="proyectos/:proyectoId/equipo" element={<EquipoPage />} />
               <Route
                 path="bocetos"
                 element={

@@ -93,8 +93,25 @@ export function mensajeDeError(error: unknown, porDefecto = "Ocurrió un error i
   }
 
   if (Array.isArray(detalle) && detalle.length > 0) {
-    return detalle.map((d) => d.msg).join(". ");
+    return detalle.map(traducirErrorValidacion).join(". ");
   }
 
   return porDefecto;
+}
+
+/**
+ * Pydantic entrega dos tipos de mensaje:
+ *   - Los validadores propios del backend, ya en español, con el prefijo
+ *     "Value error, " que Pydantic agrega: se quita el prefijo.
+ *   - Las restricciones de campo (gt, le, min_length…), en inglés y sin
+ *     decir de qué campo se trata: se antepone la ruta del campo.
+ */
+function traducirErrorValidacion(error: { msg: string; loc: (string | number)[] }): string {
+  const propio = error.msg.replace(/^Value error, /, "");
+  if (propio !== error.msg) {
+    return propio;
+  }
+
+  const campo = error.loc.filter((parte) => parte !== "body").join(" › ");
+  return campo ? `${campo}: ${error.msg}` : error.msg;
 }
