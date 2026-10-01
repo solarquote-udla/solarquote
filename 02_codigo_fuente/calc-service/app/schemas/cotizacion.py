@@ -35,6 +35,10 @@ class CalcularCotizacionEntrada(BaseModel):
 
     addendum_porcentaje: Decimal = Field(default=Decimal("0"), ge=0, le=100)
 
+    # Lo resuelve el backend (configurable, no hardcodeado acá): este
+    # servicio no asume ninguna tasa por su cuenta.
+    iva_porcentaje: Decimal = Field(ge=0, le=100)
+
 
 class ItemCalculado(BaseModel):
     paneles_largo: int
