@@ -41,3 +41,12 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_usuarios_email'), table_name='usuarios')
     op.drop_table('usuarios')
     # ### end Alembic commands ###
+
+    # Postgres conserva el tipo ENUM aunque se elimine la tabla que lo usa.
+    # Sin esto, un `upgrade` posterior falla con:
+    #   DuplicateObject: type "rol_usuario" already exists
+    # Lo detectó el ciclo upgrade → downgrade base → upgrade del CI.
+    #
+    # Corregir el downgrade de una migración ya aplicada es seguro: Alembic
+    # no guarda huella del contenido del archivo, y el upgrade no cambia.
+    sa.Enum(name='rol_usuario').drop(op.get_bind(), checkfirst=False)
