@@ -6,9 +6,11 @@ tipado. Si falta una variable obligatoria, la app falla al arrancar en vez de
 romperse a mitad de una petición.
 """
 
+import re
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -38,6 +40,23 @@ class Settings(BaseSettings):
     # ─── CORS ───────────────────────────────────────────
     # Orígenes permitidos, separados por coma en el .env
     CORS_ORIGINS: str = "http://localhost:5173"
+
+    # Opcional. Acepta además los orígenes que calcen COMPLETOS con este
+    # patrón (Starlette usa fullmatch). Sirve para las URLs de preview de
+    # Vercel, que cambian en cada despliegue. Ver DESPLIEGUE.md.
+    CORS_ORIGIN_REGEX: str | None = None
+
+    @field_validator("CORS_ORIGIN_REGEX")
+    @classmethod
+    def _validar_regex_cors(cls, valor: str | None) -> str | None:
+        """Un patrón mal escrito debe tumbar el arranque, no fallar en silencio."""
+        if valor is None or not valor.strip():
+            return None
+        try:
+            re.compile(valor)
+        except re.error as error:
+            raise ValueError(f"CORS_ORIGIN_REGEX no es un patrón válido: {error}") from error
+        return valor.strip()
 
     # ─── Microservicios ─────────────────────────────────
     IA_SERVICE_URL: str = "http://localhost:8001"
