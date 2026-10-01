@@ -24,9 +24,11 @@ app = FastAPI(
 
 # ─── CORS ───────────────────────────────────────────────
 # Permite que el frontend (otro dominio) consuma esta API.
+# Lista fija para producción y local; el regex cubre las previews de Vercel.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
+    allow_origin_regex=settings.CORS_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
