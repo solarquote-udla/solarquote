@@ -1,0 +1,144 @@
+# Integración continua de SolarQuote.
+#
+# Corre en cada PR hacia develop o main y en cada push a esas ramas.
+# Los tres jobs son independientes: si uno falla, los otros igual reportan.
+#
+# Una vez que aparezcan en un PR, los nombres de los jobs ("backend",
+# "calc-service", "frontend") se marcan como checks obligatorios en los
+# rulesets proteger-develop y proteger-main.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+# Un push nuevo al mismo PR cancela la corrida anterior, que ya es obsoleta.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: 02_codigo_fuente/backend
+
+    # Postgres desechable, solo vive durante el job. Nada que ver con Neon.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: solarquote_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d solarquote_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    # Valores ficticios: esta base y esta clave se destruyen al terminar.
+    # No son secretos y no deben usarse en ningún otro lado.
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/solarquote_ci
+      SECRET_KEY: ci-clave-ficticia-no-usar-fuera-del-ci
+      ENVIRONMENT: development
+      DEBUG: "False"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: 02_codigo_fuente/backend/requirements.txt
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Pruebas unitarias
+        run: pytest
+
+      # Si dos ramas crean migraciones en paralelo, Alembic queda con dos
+      # "heads" y el deploy falla. Mejor enterarse en el PR.
+      - name: Una sola head de migraciones
+        run: |
+          heads=$(alembic heads | wc -l)
+          alembic heads
+          if [ "$heads" -ne 1 ]; then
+            echo "::error::Hay $heads heads de Alembic. Crear una migración de merge (alembic merge heads)."
+            exit 1
+          fi
+
+      # Ciclo completo: aplicar, revertir todo y volver a aplicar.
+      # Detecta downgrades rotos y tipos ENUM que quedan huérfanos.
+      - name: Migraciones (upgrade → downgrade → upgrade)
+        run: |
+          alembic upgrade head
+          alembic downgrade base
+          alembic upgrade head
+
+  calc-service:
+    name: calc-service
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: 02_codigo_fuente/calc-service
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: 02_codigo_fuente/calc-service/requirements.txt
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Pruebas unitarias
+        run: pytest
+
+  frontend:
+    name: frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: 02_codigo_fuente/frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: 02_codigo_fuente/frontend/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      # tsc -b + vite build: atrapa errores de tipos que Vite solo no ve.
+      - name: Build
+        run: npm run build
