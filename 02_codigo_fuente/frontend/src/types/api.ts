@@ -182,3 +182,74 @@ export interface TerrenoActualizar {
   orientacion_norte?: number | null;
   notas?: string | null;
 }
+
+// ─── Equipo (Módulo 1 — RF-02) ──────────────────────────
+
+/** Espejo de `Panel` (backend/app/schemas/equipo.py). Valores en STC. */
+export interface Panel {
+  marca: string;
+  modelo: string;
+  potencia_wp: number;
+  largo_mm: number;
+  ancho_mm: number;
+  voc_v: number;
+  vmp_v: number;
+}
+
+/** Espejo de `Inversor`. Los datos eléctricos son opcionales. */
+export interface Inversor {
+  marca: string;
+  modelo: string;
+  potencia_kw: number;
+  vmax_v: number | null;
+  vmin_v: number | null;
+  mppts: number | null;
+  strings_por_mppt: number | null;
+}
+
+/** Espejo de `ConfiguracionEquipoGuardar` */
+export interface ConfiguracionEquipoGuardar {
+  panel: Panel;
+  angulo_montaje: number;
+  inversor: Inversor;
+}
+
+/** Espejo de `SeparacionFilas`. Metros, para un panel en vertical. */
+export interface SeparacionFilas {
+  elevacion_solar_grados: number;
+  altura_m: number;
+  proyeccion_m: number;
+  sombra_m: number;
+  paso_minimo_m: number;
+  factor_sombra: number;
+}
+
+/** Espejo de `LimitesStringLeer` */
+export interface LimitesString {
+  paneles_min: number;
+  paneles_max: number;
+  compatible: boolean;
+  motivo: string | null;
+}
+
+/** Espejo de `CalculosEquipo` */
+export interface CalculosEquipo {
+  area_panel_m2: number;
+  separacion: SeparacionFilas | null;
+  strings: LimitesString | null;
+  advertencias: string[];
+}
+
+/** Espejo de `ConfiguracionEquipoLeer` */
+export interface ConfiguracionEquipo extends ConfiguracionEquipoGuardar {
+  proyecto_id: number;
+  calculos: CalculosEquipo;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Espejo de `PanelReferenciaLeer` */
+export interface PanelReferencia extends Panel {
+  clave: string;
+  fuente: string;
+}
