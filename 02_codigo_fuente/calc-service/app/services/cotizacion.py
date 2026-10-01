@@ -4,6 +4,10 @@ Arma el total de una cotización a partir de sus ítems (RF-06).
 No toca base de datos: recibe los precios vigentes ya resueltos (el
 backend los busca en PrecioMaterial) y solo calcula cantidades, subtotal,
 addendum y IVA. Guardar la Cotización queda del lado del backend.
+
+Los `cargos_fijos` (ej. LOG) se suman a `cantidades_totales` tal cual
+los manda el backend, sin pasar por `calcular_materiales`: son cantidad
+fija por cotización, no función de L/A/B.
 """
 
 from decimal import ROUND_HALF_UP, Decimal
@@ -44,6 +48,9 @@ def armar_cotizacion(entrada: CalcularCotizacionEntrada) -> CalcularCotizacionSa
         )
         for codigo, cantidad in cantidades.items():
             cantidades_totales[codigo] = cantidades_totales.get(codigo, 0) + cantidad
+
+    for codigo, cantidad in entrada.cargos_fijos.items():
+        cantidades_totales[codigo] = cantidades_totales.get(codigo, 0) + cantidad
 
     faltantes = sorted(set(cantidades_totales) - set(entrada.precios))
     if faltantes:
