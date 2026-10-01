@@ -27,6 +27,7 @@ def test_calcula_total_de_un_item_sin_addendum():
             "items": [{"paneles_largo": 4, "paneles_ancho": 3, "bloques": 1}],
             "precios": PRECIOS,
             "addendum_porcentaje": "0",
+            "iva_porcentaje": "15",
         },
     )
 
@@ -66,6 +67,7 @@ def test_suma_cantidades_de_varios_items():
             ],
             "precios": PRECIOS,
             "addendum_porcentaje": "0",
+            "iva_porcentaje": "15",
         },
     )
 
@@ -82,6 +84,7 @@ def test_aplica_addendum_antes_del_iva():
             "items": [{"paneles_largo": 2, "paneles_ancho": 1, "bloques": 1}],
             "precios": PRECIOS,
             "addendum_porcentaje": "10",
+            "iva_porcentaje": "15",
         },
     )
 
@@ -105,6 +108,7 @@ def test_rechaza_l_impar():
         json={
             "items": [{"paneles_largo": 3, "paneles_ancho": 2, "bloques": 1}],
             "precios": PRECIOS,
+            "iva_porcentaje": "15",
         },
     )
 
@@ -114,7 +118,7 @@ def test_rechaza_l_impar():
 def test_rechaza_lista_de_items_vacia():
     respuesta = client.post(
         "/api/cotizacion/calcular",
-        json={"items": [], "precios": PRECIOS},
+        json={"items": [], "precios": PRECIOS, "iva_porcentaje": "15"},
     )
 
     assert respuesta.status_code == 422
@@ -126,11 +130,56 @@ def test_rechaza_precios_incompletos():
         json={
             "items": [{"paneles_largo": 4, "paneles_ancho": 3, "bloques": 1}],
             "precios": {"VAR1650": "7.20"},
+            "iva_porcentaje": "15",
         },
     )
 
     assert respuesta.status_code == 422
     assert "VAR1350" in respuesta.json()["detail"]
+
+
+def test_rechaza_si_falta_el_porcentaje_de_iva():
+    respuesta = client.post(
+        "/api/cotizacion/calcular",
+        json={
+            "items": [{"paneles_largo": 4, "paneles_ancho": 3, "bloques": 1}],
+            "precios": PRECIOS,
+        },
+    )
+
+    assert respuesta.status_code == 422
+
+
+def test_rechaza_porcentaje_de_iva_fuera_de_rango():
+    respuesta = client.post(
+        "/api/cotizacion/calcular",
+        json={
+            "items": [{"paneles_largo": 4, "paneles_ancho": 3, "bloques": 1}],
+            "precios": PRECIOS,
+            "iva_porcentaje": "101",
+        },
+    )
+
+    assert respuesta.status_code == 422
+
+
+def test_aplica_un_iva_distinto_al_15_por_ciento():
+    respuesta = client.post(
+        "/api/cotizacion/calcular",
+        json={
+            "items": [{"paneles_largo": 2, "paneles_ancho": 1, "bloques": 1}],
+            "precios": PRECIOS,
+            "iva_porcentaje": "12",
+        },
+    )
+
+    assert respuesta.status_code == 200
+    cuerpo = respuesta.json()
+
+    subtotal = Decimal(cuerpo["subtotal"])
+    iva_esperado = (subtotal * Decimal("12") / Decimal("100")).quantize(Decimal("0.01"))
+    assert Decimal(cuerpo["iva_porcentaje"]) == Decimal("12")
+    assert Decimal(cuerpo["iva_monto"]) == iva_esperado
 
 
 def test_suma_cargo_fijo_de_logistica_al_subtotal():
@@ -142,6 +191,7 @@ def test_suma_cargo_fijo_de_logistica_al_subtotal():
             "items": [{"paneles_largo": 4, "paneles_ancho": 3, "bloques": 1}],
             "precios": precios_con_log,
             "cargos_fijos": {"LOG": 1},
+            "iva_porcentaje": "15",
         },
     )
 
@@ -166,6 +216,7 @@ def test_cargo_fijo_sin_items_de_logistica_no_escala_con_bloques():
             ],
             "precios": {**PRECIOS, "LOG": "35.00"},
             "cargos_fijos": {"LOG": 1},
+            "iva_porcentaje": "15",
         },
     )
 
@@ -180,6 +231,7 @@ def test_rechaza_precio_faltante_para_cargo_fijo():
             "items": [{"paneles_largo": 4, "paneles_ancho": 3, "bloques": 1}],
             "precios": PRECIOS,
             "cargos_fijos": {"LOG": 1},
+            "iva_porcentaje": "15",
         },
     )
 
