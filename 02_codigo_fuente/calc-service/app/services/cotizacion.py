@@ -4,6 +4,9 @@ Arma el total de una cotización a partir de sus ítems (RF-06).
 No toca base de datos: recibe los precios vigentes ya resueltos (el
 backend los busca en PrecioMaterial) y solo calcula cantidades, subtotal,
 addendum y IVA. Guardar la Cotización queda del lado del backend.
+
+El % de IVA tampoco vive acá: lo manda el backend en cada request
+(configurable desde ahí), este servicio solo lo aplica.
 """
 
 from decimal import ROUND_HALF_UP, Decimal
@@ -14,8 +17,6 @@ from app.schemas.cotizacion import (
     ItemCalculado,
 )
 from app.services.calculo_materiales import calcular_materiales
-
-IVA_PORCENTAJE = Decimal("15")
 
 CENTAVOS = Decimal("0.01")
 
@@ -56,7 +57,7 @@ def armar_cotizacion(entrada: CalcularCotizacionEntrada) -> CalcularCotizacionSa
 
     addendum_monto = subtotal * entrada.addendum_porcentaje / Decimal("100")
     base_con_addendum = subtotal + addendum_monto
-    iva_monto = base_con_addendum * IVA_PORCENTAJE / Decimal("100")
+    iva_monto = base_con_addendum * entrada.iva_porcentaje / Decimal("100")
     total = base_con_addendum + iva_monto
 
     return CalcularCotizacionSalida(
@@ -65,7 +66,7 @@ def armar_cotizacion(entrada: CalcularCotizacionEntrada) -> CalcularCotizacionSa
         subtotal=_redondear(subtotal),
         addendum_porcentaje=entrada.addendum_porcentaje,
         addendum_monto=_redondear(addendum_monto),
-        iva_porcentaje=IVA_PORCENTAJE,
+        iva_porcentaje=entrada.iva_porcentaje,
         iva_monto=_redondear(iva_monto),
         total=_redondear(total),
     )

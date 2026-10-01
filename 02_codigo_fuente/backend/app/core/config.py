@@ -7,10 +7,11 @@ romperse a mitad de una petición.
 """
 
 import re
+from decimal import Decimal
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -61,6 +62,11 @@ class Settings(BaseSettings):
     # ─── Microservicios ─────────────────────────────────
     IA_SERVICE_URL: str = "http://localhost:8001"
     CALC_SERVICE_URL: str = "http://localhost:8002"
+
+    # ─── Cotización (RF-06) ─────────────────────────────
+    # calc-service no asume ninguna tasa: la resuelve este valor y se la
+    # manda en cada request a /api/cotizacion/calcular.
+    IVA_PORCENTAJE: Decimal = Field(default=Decimal("15"), ge=0, le=100)
 
     @property
     def cors_origins_list(self) -> list[str]:
