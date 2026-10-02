@@ -4,6 +4,7 @@ from decimal import Decimal
 
 import httpx
 import pytest
+from pydantic import ValidationError
 
 from app.schemas.cotizacion import ItemCalculoEntrada
 from app.services.calc_service import CalcServiceError, calcular_via_calc_service
@@ -88,3 +89,8 @@ def test_lanza_calc_service_error_si_la_respuesta_no_es_200(monkeypatch: pytest.
             addendum_porcentaje=Decimal("0"),
             iva_porcentaje=Decimal("15"),
         )
+
+
+def test_item_calculo_entrada_rechaza_l_impar() -> None:
+    with pytest.raises(ValidationError, match="número par"):
+        ItemCalculoEntrada(paneles_largo=3, paneles_ancho=2, bloques=1)
