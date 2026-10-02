@@ -114,6 +114,18 @@ export interface ProyectoCrear {
   notas: string | null;
 }
 
+/**
+ * Espejo de `ProyectoActualizar` (PATCH parcial). Omitir un campo lo deja
+ * igual; enviarlo en null lo borra. Cliente y estado no se editan.
+ */
+export interface ProyectoActualizar {
+  nombre?: string;
+  ubicacion?: string | null;
+  latitud?: number | null;
+  longitud?: number | null;
+  notas?: string | null;
+}
+
 // ─── Terreno (Módulo 1 — RF-01) ─────────────────────────
 
 /** Un vértice [x, y] en metros, relativo al origen local del terreno. */
