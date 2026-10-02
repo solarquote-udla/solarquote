@@ -20,23 +20,30 @@ from app.services.proyecto import ClienteNoDisponible
 
 AYER = datetime.now(timezone.utc) - timedelta(days=1)
 
-RESPUESTA_CALC_SERVICE = {
-    "items": [
-        {
-            "paneles_largo": 4,
-            "paneles_ancho": 3,
-            "bloques": 1,
-            "cantidades": {"VAR1650": 8},
-        }
-    ],
-    "cantidades_totales": {"VAR1650": 8, "LOG": 1},
-    "subtotal": "93.60",
-    "addendum_porcentaje": "0",
-    "addendum_monto": "0.00",
-    "iva_porcentaje": "15",
-    "iva_monto": "14.04",
-    "total": "107.64",
-}
+def _respuesta_calc_service(cargos_fijos: dict[str, int]) -> dict:
+    """
+    Cantidades_totales = VAR1650 (siempre, de los ítems) + lo que venga
+    en cargos_fijos — igual que haría calc-service de verdad. Si el
+    mock ignorara `cargos_fijos` y devolviera LOG fijo, un test que no
+    creó el material LOG reventaría al armar MaterialCotizado.
+    """
+    return {
+        "items": [
+            {
+                "paneles_largo": 4,
+                "paneles_ancho": 3,
+                "bloques": 1,
+                "cantidades": {"VAR1650": 8},
+            }
+        ],
+        "cantidades_totales": {"VAR1650": 8, **cargos_fijos},
+        "subtotal": "93.60",
+        "addendum_porcentaje": "0",
+        "addendum_monto": "0.00",
+        "iva_porcentaje": "15",
+        "iva_monto": "14.04",
+        "total": "107.64",
+    }
 
 
 def _crear_material_con_precio(db: Session, codigo: str, precio: Decimal, activo: bool = True) -> Material:
@@ -65,7 +72,7 @@ def _mock_calc_service_ok(monkeypatch: pytest.MonkeyPatch) -> dict:
 
     def _post_falso(url, *, json, timeout):
         llamada["json"] = json
-        return httpx.Response(200, json=RESPUESTA_CALC_SERVICE)
+        return httpx.Response(200, json=_respuesta_calc_service(json["cargos_fijos"]))
 
     monkeypatch.setattr(httpx, "post", _post_falso)
     return llamada
@@ -102,6 +109,38 @@ def test_crea_la_cotizacion_y_persiste_los_items(db: Session, monkeypatch: pytes
     # LOG estaba activo con precio: se manda como cargo fijo de cantidad 1.
     assert llamada["json"]["cargos_fijos"] == {"LOG": 1}
     assert llamada["json"]["iva_porcentaje"] == "15"  # IVA_PORCENTAJE por defecto de settings
+
+
+def test_persiste_el_desglose_en_la_cotizacion(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    _crear_material_con_precio(db, "VAR1650", Decimal("7.20"))
+    _crear_material_con_precio(db, "LOG", Decimal("35.00"))
+    usuario = _crear_usuario(db)
+    _mock_calc_service_ok(monkeypatch)
+
+    cotizacion, calculo = crear_cotizacion(db, _datos_minimos(), usuario)
+
+    assert cotizacion.subtotal == calculo.subtotal
+    assert cotizacion.addendum_monto == calculo.addendum_monto
+    assert cotizacion.iva_porcentaje == calculo.iva_porcentaje
+    assert cotizacion.iva_monto == calculo.iva_monto
+    assert cotizacion.total == calculo.total
+
+
+def test_persiste_la_cantidad_y_precio_unitario_de_cada_material(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _crear_material_con_precio(db, "VAR1650", Decimal("7.20"))
+    _crear_material_con_precio(db, "LOG", Decimal("35.00"))
+    usuario = _crear_usuario(db)
+    _mock_calc_service_ok(monkeypatch)
+
+    cotizacion, _ = crear_cotizacion(db, _datos_minimos(), usuario)
+
+    materiales = {m.material.codigo: m for m in cotizacion.materiales}
+    assert materiales["VAR1650"].cantidad == 8
+    assert materiales["VAR1650"].precio_unitario == Decimal("7.20")
+    assert materiales["LOG"].cantidad == 1
+    assert materiales["LOG"].precio_unitario == Decimal("35.00")
 
 
 def test_no_manda_cargo_fijo_de_logistica_si_no_esta_activo(
