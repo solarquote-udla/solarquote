@@ -25,8 +25,10 @@ from app.models.cliente import Cliente, TipoIdentificacion  # noqa: E402
 from app.models.proyecto import Proyecto  # noqa: E402
 from app.models.usuario import RolUsuario, Usuario  # noqa: E402
 
-# RUC de trece nueves: imposible de confundir con un cliente real.
-IDENTIFICACION_DEMO = "9999999999999"
+# RUC válido (pasa la validación de RF-12) de una cédula de ejemplo
+# documentada en CONTRATO-CLIENTES.md, para que este cliente demo se
+# pueda editar desde la interfaz sin que el formulario lo rechace.
+IDENTIFICACION_DEMO = "1710034065001"
 NOMBRE_PROYECTO_DEMO = "Proyecto demo — Planta fotovoltaica Imbabura"
 
 
