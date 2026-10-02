@@ -5,14 +5,16 @@ from decimal import Decimal
 
 import httpx
 import pytest
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.models.cliente import Cliente, TipoIdentificacion
 from app.models.cotizacion import EstadoCotizacion
 from app.models.material import Material, PrecioMaterial
+from app.models.proyecto import Proyecto
 from app.models.usuario import RolUsuario, Usuario
 from app.schemas.cotizacion import CotizacionCrear, ItemCalculoEntrada
-from app.services.cotizacion import crear_cotizacion
+from app.services.cotizacion import ProyectoNoDisponible, crear_cotizacion
 from app.services.material import PrecioVigenteFaltante
 from app.services.proyecto import ClienteNoDisponible
 
@@ -74,6 +76,11 @@ def _datos_minimos() -> CotizacionCrear:
         cliente_nombre="Cliente de prueba",
         items=[ItemCalculoEntrada(paneles_largo=4, paneles_ancho=3, bloques=1)],
     )
+
+
+def test_cliente_nombre_es_obligatorio_sin_cliente_id() -> None:
+    with pytest.raises(ValidationError, match="cliente_nombre"):
+        CotizacionCrear(items=[ItemCalculoEntrada(paneles_largo=4, paneles_ancho=3, bloques=1)])
 
 
 def test_crea_la_cotizacion_y_persiste_los_items(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -151,6 +158,36 @@ def test_cliente_id_existente_se_asocia_a_la_cotizacion(
         nombre="Cliente catalogado",
         tipo_identificacion=TipoIdentificacion.CEDULA,
         identificacion="1234567890",
+        email="cliente@example.com",
+    )
+    db.add(cliente)
+    db.flush()
+    _mock_calc_service_ok(monkeypatch)
+
+    # No manda cliente_nombre: con cliente_id alcanza.
+    datos = CotizacionCrear(
+        cliente_id=cliente.id,
+        items=[ItemCalculoEntrada(paneles_largo=4, paneles_ancho=3, bloques=1)],
+    )
+
+    cotizacion, _ = crear_cotizacion(db, datos, usuario)
+
+    assert cotizacion.cliente_id == cliente.id
+    assert cotizacion.cliente_nombre == "Cliente catalogado"
+    assert cotizacion.cliente_email == "cliente@example.com"
+
+
+def test_snapshot_del_cliente_viene_de_la_base_y_no_del_request(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Si mandan cliente_id, lo que venga en cliente_nombre/email se ignora."""
+    _crear_material_con_precio(db, "VAR1650", Decimal("7.20"))
+    usuario = _crear_usuario(db)
+    cliente = Cliente(
+        nombre="Nombre real en el catálogo",
+        tipo_identificacion=TipoIdentificacion.CEDULA,
+        identificacion="1234567890",
+        email="real@example.com",
     )
     db.add(cliente)
     db.flush()
@@ -158,10 +195,81 @@ def test_cliente_id_existente_se_asocia_a_la_cotizacion(
 
     datos = CotizacionCrear(
         cliente_id=cliente.id,
-        cliente_nombre=cliente.nombre,
+        cliente_nombre="Nombre inventado por quien llena el formulario",
+        cliente_email="otro@example.com",
         items=[ItemCalculoEntrada(paneles_largo=4, paneles_ancho=3, bloques=1)],
     )
 
     cotizacion, _ = crear_cotizacion(db, datos, usuario)
 
-    assert cotizacion.cliente_id == cliente.id
+    assert cotizacion.cliente_nombre == "Nombre real en el catálogo"
+    assert cotizacion.cliente_email == "real@example.com"
+
+
+def test_cliente_dado_de_baja_lanza_cliente_no_disponible(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _crear_material_con_precio(db, "VAR1650", Decimal("7.20"))
+    usuario = _crear_usuario(db)
+    cliente = Cliente(
+        nombre="Cliente de baja",
+        tipo_identificacion=TipoIdentificacion.CEDULA,
+        identificacion="1234567890",
+        activo=False,
+    )
+    db.add(cliente)
+    db.flush()
+    _mock_calc_service_ok(monkeypatch)
+
+    datos = CotizacionCrear(
+        cliente_id=cliente.id,
+        items=[ItemCalculoEntrada(paneles_largo=4, paneles_ancho=3, bloques=1)],
+    )
+
+    with pytest.raises(ClienteNoDisponible):
+        crear_cotizacion(db, datos, usuario)
+
+
+def test_proyecto_id_inexistente_lanza_proyecto_no_disponible(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _crear_material_con_precio(db, "VAR1650", Decimal("7.20"))
+    usuario = _crear_usuario(db)
+    _mock_calc_service_ok(monkeypatch)
+
+    datos = CotizacionCrear(
+        proyecto_id=999999,
+        cliente_nombre="Cliente de prueba",
+        items=[ItemCalculoEntrada(paneles_largo=4, paneles_ancho=3, bloques=1)],
+    )
+
+    with pytest.raises(ProyectoNoDisponible):
+        crear_cotizacion(db, datos, usuario)
+
+
+def test_proyecto_id_existente_se_asocia_a_la_cotizacion(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _crear_material_con_precio(db, "VAR1650", Decimal("7.20"))
+    usuario = _crear_usuario(db)
+    cliente = Cliente(
+        nombre="Cliente del proyecto",
+        tipo_identificacion=TipoIdentificacion.CEDULA,
+        identificacion="1234567890",
+    )
+    db.add(cliente)
+    db.flush()
+    proyecto = Proyecto(nombre="Proyecto de prueba", cliente_id=cliente.id, usuario_id=usuario.id)
+    db.add(proyecto)
+    db.flush()
+    _mock_calc_service_ok(monkeypatch)
+
+    datos = CotizacionCrear(
+        proyecto_id=proyecto.id,
+        cliente_nombre="Cliente de prueba",
+        items=[ItemCalculoEntrada(paneles_largo=4, paneles_ancho=3, bloques=1)],
+    )
+
+    cotizacion, _ = crear_cotizacion(db, datos, usuario)
+
+    assert cotizacion.proyecto_id == proyecto.id

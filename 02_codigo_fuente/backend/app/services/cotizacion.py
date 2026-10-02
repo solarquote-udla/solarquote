@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.models.cliente import Cliente
 from app.models.cotizacion import Cotizacion, ItemCotizacion
 from app.models.material import Material
+from app.models.proyecto import Proyecto
 from app.models.usuario import Usuario
 from app.schemas.cotizacion import CotizacionCrear, ItemCalculoEntrada, ResultadoCalculoCotizacion
 from app.services.calc_service import calcular_via_calc_service
@@ -24,15 +25,29 @@ CODIGO_LOGISTICA = "LOG"
 CANTIDAD_LOGISTICA = 1
 
 
+class ProyectoNoDisponible(ValueError):
+    """El proyecto indicado no existe."""
+
+
 def crear_cotizacion(
     db: Session,
     datos: CotizacionCrear,
     usuario: Usuario,
 ) -> tuple[Cotizacion, ResultadoCalculoCotizacion]:
+    cliente: Cliente | None = None
     if datos.cliente_id is not None:
         cliente = db.get(Cliente, datos.cliente_id)
         if cliente is None:
             raise ClienteNoDisponible(f"No existe el cliente {datos.cliente_id}")
+        if not cliente.activo:
+            raise ClienteNoDisponible(
+                f"El cliente {cliente.nombre} está dado de baja y no admite cotizaciones nuevas"
+            )
+
+    if datos.proyecto_id is not None:
+        proyecto = db.get(Proyecto, datos.proyecto_id)
+        if proyecto is None:
+            raise ProyectoNoDisponible(f"No existe el proyecto {datos.proyecto_id}")
 
     filas = db.query(Material.codigo).filter(Material.activo.is_(True)).all()
     codigos_activos = [fila.codigo for fila in filas]
@@ -55,14 +70,25 @@ def crear_cotizacion(
         iva_porcentaje=settings.IVA_PORCENTAJE,
     )
 
+    if cliente is not None:
+        cliente_nombre = cliente.nombre
+        cliente_empresa = cliente.empresa
+        cliente_email = cliente.email
+        cliente_telefono = cliente.telefono
+    else:
+        cliente_nombre = datos.cliente_nombre
+        cliente_empresa = datos.cliente_empresa
+        cliente_email = datos.cliente_email
+        cliente_telefono = datos.cliente_telefono
+
     cotizacion = Cotizacion(
         usuario_id=usuario.id,
         cliente_id=datos.cliente_id,
         proyecto_id=datos.proyecto_id,
-        cliente_nombre=datos.cliente_nombre,
-        cliente_empresa=datos.cliente_empresa,
-        cliente_email=datos.cliente_email,
-        cliente_telefono=datos.cliente_telefono,
+        cliente_nombre=cliente_nombre,
+        cliente_empresa=cliente_empresa,
+        cliente_email=cliente_email,
+        cliente_telefono=cliente_telefono,
         proyecto_nombre=datos.proyecto_nombre,
         addendum_porcentaje=datos.addendum_porcentaje,
         items=[
