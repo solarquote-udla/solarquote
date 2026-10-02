@@ -8,6 +8,8 @@ validar más estricto que el propio SRI bloquearía clientes reales.
 
 import re
 
+from app.models.cliente import TipoIdentificacion
+
 PROVINCIAS_VALIDAS = {*range(1, 25), 30}
 
 
@@ -63,3 +65,29 @@ def validar_telefono(valor: str) -> bool:
         return False
     digitos = re.sub(r"\D", "", valor)
     return 7 <= len(digitos) <= 15
+
+
+def validar_identificacion(tipo: TipoIdentificacion, valor: str) -> str:
+    """
+    Valida `valor` según `tipo` y devuelve la forma normalizada que se
+    guarda (sin espacios ni guiones para cédula/RUC). Lanza ValueError
+    con un mensaje en español si no es válida — pensado para usarse
+    directo desde un `field_validator`/`model_validator` de Pydantic.
+    """
+    if tipo == TipoIdentificacion.CEDULA:
+        normalizada = normalizar_identificacion(valor)
+        if not validar_cedula(normalizada):
+            raise ValueError(f"'{valor}' no es una cédula válida")
+        return normalizada
+
+    if tipo == TipoIdentificacion.RUC:
+        normalizada = normalizar_identificacion(valor)
+        if not validar_ruc(normalizada):
+            raise ValueError(f"'{valor}' no es un RUC válido")
+        return normalizada
+
+    # PASAPORTE
+    valor = valor.strip()
+    if not re.fullmatch(r"[A-Za-z0-9]{5,20}", valor):
+        raise ValueError("El pasaporte debe tener entre 5 y 20 caracteres alfanuméricos")
+    return valor
