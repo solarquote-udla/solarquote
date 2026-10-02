@@ -11,7 +11,7 @@ from app.models.cliente import Cliente
 from app.models.proyecto import EstadoProyecto, Proyecto
 from app.models.terreno import Terreno
 from app.models.usuario import Usuario
-from app.schemas.proyecto import ProyectoCrear
+from app.schemas.proyecto import ProyectoActualizar, ProyectoCrear
 
 
 class ClienteNoDisponible(ValueError):
@@ -100,4 +100,21 @@ def crear_proyecto(db: Session, datos: ProyectoCrear, usuario: Usuario) -> Proye
     db.commit()
 
     # Se vuelve a leer con el cliente cargado para armar la respuesta.
+    return obtener_proyecto(db, proyecto.id)
+
+
+def actualizar_proyecto(db: Session, proyecto: Proyecto, datos: ProyectoActualizar) -> Proyecto:
+    """
+    Aplica solo los campos enviados.
+
+    Si cambia la latitud, el layout generado queda marcado como
+    desactualizado por su huella (ver services/layout.py): no hay que
+    avisarle desde aquí.
+    """
+    for campo, valor in datos.model_dump(exclude_unset=True).items():
+        if isinstance(valor, str):
+            valor = valor.strip() or None
+        setattr(proyecto, campo, valor)
+
+    db.commit()
     return obtener_proyecto(db, proyecto.id)
