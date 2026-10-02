@@ -3,15 +3,16 @@ Orquestación de cotizaciones — RF-06, SQ-77 parte 3/3.
 
 Junta las dos partes anteriores: resuelve el precio vigente de cada
 material activo, llama a calc-service, y persiste la Cotización con
-sus ítems (L, A, B). El desglose de calc-service no se guarda — ver
-`CotizacionLeer.calculo` en el schema.
+sus ítems (L, A, B) y el desglose (subtotal, IVA, total, y la cantidad
++ precio unitario de cada material) tal como salió de calc-service en
+ese momento — es un snapshot, no se recalcula después.
 """
 
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.cliente import Cliente
-from app.models.cotizacion import Cotizacion, ItemCotizacion
+from app.models.cotizacion import Cotizacion, ItemCotizacion, MaterialCotizado
 from app.models.material import Material
 from app.models.proyecto import Proyecto
 from app.models.usuario import Usuario
@@ -49,8 +50,9 @@ def crear_cotizacion(
         if proyecto is None:
             raise ProyectoNoDisponible(f"No existe el proyecto {datos.proyecto_id}")
 
-    filas = db.query(Material.codigo).filter(Material.activo.is_(True)).all()
-    codigos_activos = [fila.codigo for fila in filas]
+    filas = db.query(Material.id, Material.codigo).filter(Material.activo.is_(True)).all()
+    material_id_por_codigo = {fila.codigo: fila.id for fila in filas}
+    codigos_activos = list(material_id_por_codigo)
     precios = obtener_precios_vigentes(db, codigos_activos)
 
     cargos_fijos = {CODIGO_LOGISTICA: CANTIDAD_LOGISTICA} if CODIGO_LOGISTICA in precios else {}
@@ -91,6 +93,11 @@ def crear_cotizacion(
         cliente_telefono=cliente_telefono,
         proyecto_nombre=datos.proyecto_nombre,
         addendum_porcentaje=datos.addendum_porcentaje,
+        subtotal=resultado.subtotal,
+        addendum_monto=resultado.addendum_monto,
+        iva_porcentaje=resultado.iva_porcentaje,
+        iva_monto=resultado.iva_monto,
+        total=resultado.total,
         items=[
             ItemCotizacion(
                 paneles_largo=item.paneles_largo,
@@ -98,6 +105,14 @@ def crear_cotizacion(
                 bloques=item.bloques,
             )
             for item in datos.items
+        ],
+        materiales=[
+            MaterialCotizado(
+                material_id=material_id_por_codigo[codigo],
+                cantidad=cantidad,
+                precio_unitario=precios[codigo],
+            )
+            for codigo, cantidad in resultado.cantidades_totales.items()
         ],
     )
     db.add(cotizacion)
