@@ -2,7 +2,7 @@
  * Navegación entre las pantallas de configuración de un proyecto.
  *
  * Terreno (RF-01) y equipo (RF-02) son los dos insumos que RF-03 necesita
- * para generar el layout. Cuando exista RF-03, se agrega aquí su pestaña.
+ * para generar el layout; por eso van en ese orden.
  */
 
 import { NavLink } from "react-router-dom";
@@ -10,6 +10,7 @@ import { NavLink } from "react-router-dom";
 const PESTANAS = [
   { ruta: "terreno", etiqueta: "Terreno y caminos", rf: "RF-01" },
   { ruta: "equipo", etiqueta: "Panel e inversor", rf: "RF-02" },
+  { ruta: "layout", etiqueta: "Layout", rf: "RF-03" },
 ];
 
 export function PestanasProyecto({ proyectoId }: { proyectoId: number }) {

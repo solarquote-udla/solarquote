@@ -633,6 +633,9 @@ export function TerrenoPage() {
                   value={orientacion}
                   onChange={(e) => setOrientacion(e.target.value)}
                 />
+                <span className="mt-1 block font-normal text-acero-400">
+                  0 = arriba del plano; sentido horario
+                </span>
               </label>
             </div>
 
