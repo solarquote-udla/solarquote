@@ -12,7 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.routers import auth, cliente, cotizacion, equipo, health, proyectos, terreno
+from app.routers import auth, cliente, cotizacion, equipo, health, layout, proyectos, terreno
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -49,6 +49,7 @@ app.include_router(proyectos.router)
 # Módulo 1 — Layout solar
 app.include_router(terreno.router)
 app.include_router(equipo.router)
+app.include_router(layout.router)
 
 # Módulo 3 — Cotización
 app.include_router(cotizacion.router)
