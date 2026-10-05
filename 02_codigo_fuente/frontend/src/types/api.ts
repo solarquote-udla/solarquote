@@ -253,3 +253,84 @@ export interface PanelReferencia extends Panel {
   clave: string;
   fuente: string;
 }
+
+// ─── Layout (Módulo 1 — RF-03) ──────────────────────────
+
+/** Espejo de `LayoutGenerar` (backend/app/schemas/layout.py) */
+export interface LayoutGenerar {
+  /** L: paneles en la dirección de la pendiente. Siempre par. */
+  paneles_largo: number;
+  pasillo_m: number;
+  /** 0.2 = ±20 % respecto a ancho = 3 × largo */
+  tolerancia_proporcion: number;
+  capacidad_deseada_kwp: number | null;
+}
+
+/** Espejo de `BloqueLeer`. Vértices en metros, coordenadas del terreno. */
+export interface BloqueLayout {
+  vertices: Punto[];
+  paneles_largo: number;
+  paneles_ancho: number;
+  paneles: number;
+  proporcion: number;
+  en_proporcion: boolean;
+  tipo: string;
+}
+
+/** Espejo de `TipoBloqueLeer`: notación "Bloque A × N" */
+export interface TipoBloque {
+  tipo: string;
+  paneles_largo: number;
+  paneles_ancho: number;
+  repeticiones: number;
+  paneles: number;
+  proporcion: number;
+  en_proporcion: boolean;
+}
+
+/** Espejo de `CapacidadLeer` */
+export interface CapacidadLayout {
+  deseada_kwp: number;
+  paneles_necesarios: number;
+  cabe: boolean;
+  maxima_kwp: number;
+  instalada_kwp: number;
+  remanente_kwp: number;
+}
+
+/** Espejo de `ElectricaLeer`. Nulos cuando faltan datos del inversor. */
+export interface ElectricaLayout {
+  paneles_por_string_min: number | null;
+  paneles_por_string_max: number | null;
+  paneles_por_string: number | null;
+  strings_totales: number | null;
+  paneles_sin_string: number | null;
+  inversores: number;
+  strings_por_mppt: number | null;
+  compatible: boolean | null;
+  motivo: string | null;
+}
+
+/** Espejo de `LayoutLeer` */
+export interface Layout {
+  proyecto_id: number;
+  parametros: LayoutGenerar;
+  bloques: BloqueLayout[];
+  tipos: TipoBloque[];
+  total_paneles: number;
+  potencia_kwp: number;
+  paneles_ancho_ideal: number;
+  largo_bloque_m: number;
+  ancho_bloque_m: number;
+  separacion_este_oeste_m: number;
+  separacion_norte_sur_m: number;
+  area_util_m2: number;
+  area_ocupada_m2: number;
+  capacidad: CapacidadLayout | null;
+  electrica: ElectricaLayout;
+  advertencias: string[];
+  /** Terreno, caminos, equipo o latitud cambiaron después de generar */
+  desactualizado: boolean;
+  created_at: string;
+  updated_at: string;
+}
