@@ -79,7 +79,10 @@ class TerrenoBase(BaseModel):
         default=None,
         ge=0,
         lt=360,
-        description="Grados del norte respecto al eje Y positivo",
+        description=(
+            "Grados del norte respecto al eje Y positivo, en sentido horario "
+            "(0 = arriba del plano, 90 = hacia +X). Lo usa RF-03 para orientar los bloques."
+        ),
     )
     notas: str | None = Field(default=None, max_length=500)
 
