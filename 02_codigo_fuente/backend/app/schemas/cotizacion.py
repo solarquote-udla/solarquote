@@ -108,10 +108,8 @@ class CotizacionLeer(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    # Resultado de calc-service en el momento de crear la cotización. No
-    # se persiste (ItemCotizacion solo guarda L/A/B): por ahora este
-    # desglose solo viaja en la respuesta de creación. Reconstruirlo más
-    # adelante (ej. un GET) tiene que resolver el precio vigente EN LA
-    # FECHA de la cotización, no el actual — una proforma no puede
-    # cambiar de total porque el precio de un material cambió después.
+    # Resultado de calc-service en el momento de crear la cotización.
+    # Igual que subtotal/iva_monto/total, que ya quedaron persistidos en
+    # la Cotización: esto es la misma información, con el detalle por
+    # ítem y por material que no amerita columnas propias.
     calculo: ResultadoCalculoCotizacion
