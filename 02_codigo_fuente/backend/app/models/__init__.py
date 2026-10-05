@@ -10,7 +10,7 @@ Proyecto) van primero porque Cotizacion los referencia.
 
 from app.models.cliente import Cliente, TipoIdentificacion
 from app.models.proyecto import EstadoProyecto, Proyecto
-from app.models.cotizacion import Cotizacion, EstadoCotizacion, ItemCotizacion
+from app.models.cotizacion import Cotizacion, EstadoCotizacion, ItemCotizacion, MaterialCotizado
 from app.models.material import Material, PrecioMaterial
 from app.models.equipo import ConfiguracionEquipo
 from app.models.layout import BloqueLayout, Layout
@@ -36,6 +36,7 @@ __all__ = [
     # Cotización
     "Cotizacion",
     "ItemCotizacion",
+    "MaterialCotizado",
     "EstadoCotizacion",
     # Materiales y precios
     "Material",
