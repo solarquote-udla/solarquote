@@ -13,7 +13,7 @@ con los mismos nombres de campo, sin traducir nada de por medio.
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 from app.models.cotizacion import EstadoCotizacion
 
@@ -59,9 +59,13 @@ class ResultadoCalculoCotizacion(BaseModel):
 
 class CotizacionCrear(BaseModel):
     # Nullable a propósito, igual que en el modelo: permite cotizar a un
-    # cliente que todavía no está en el catálogo (RF-12).
+    # cliente que todavía no está en el catálogo (RF-12). Si se manda
+    # cliente_id, el snapshot (nombre, empresa, email, teléfono) se toma
+    # del registro de Cliente y estos campos se ignoran — no tendría
+    # sentido que el cliente #7 quede guardado con el nombre que alguien
+    # tipeó en el formulario. Solo se usan cuando NO hay cliente_id.
     cliente_id: int | None = Field(default=None, gt=0)
-    cliente_nombre: str = Field(min_length=1, max_length=150)
+    cliente_nombre: str | None = Field(default=None, min_length=1, max_length=150)
     cliente_empresa: str | None = Field(default=None, max_length=150)
     cliente_email: EmailStr | None = None
     cliente_telefono: str | None = Field(default=None, max_length=30)
@@ -72,6 +76,15 @@ class CotizacionCrear(BaseModel):
     addendum_porcentaje: Decimal = Field(default=Decimal("0"), ge=0, le=100)
 
     items: list[ItemCalculoEntrada] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validar_cliente(self) -> "CotizacionCrear":
+        if self.cliente_id is None and not self.cliente_nombre:
+            raise ValueError(
+                "cliente_nombre es obligatorio si no se manda cliente_id "
+                "(cotizar a un cliente que todavía no está en el catálogo)"
+            )
+        return self
 
 
 class CotizacionLeer(BaseModel):
@@ -95,10 +108,8 @@ class CotizacionLeer(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    # Resultado de calc-service en el momento de crear la cotización. No
-    # se persiste (ItemCotizacion solo guarda L/A/B): por ahora este
-    # desglose solo viaja en la respuesta de creación. Reconstruirlo más
-    # adelante (ej. un GET) tiene que resolver el precio vigente EN LA
-    # FECHA de la cotización, no el actual — una proforma no puede
-    # cambiar de total porque el precio de un material cambió después.
+    # Resultado de calc-service en el momento de crear la cotización.
+    # Igual que subtotal/iva_monto/total, que ya quedaron persistidos en
+    # la Cotización: esto es la misma información, con el detalle por
+    # ítem y por material que no amerita columnas propias.
     calculo: ResultadoCalculoCotizacion

@@ -88,6 +88,17 @@ class Cotizacion(Base):
         nullable=False,
     )
 
+    # ─── Desglose, congelado al momento de crear la cotización ──────────
+    # Nullable: las cotizaciones creadas antes de que existiera este
+    # snapshot no tienen cómo reconstruirlo retroactivamente (el precio
+    # vigente de entonces ya no es el de ahora). Toda cotización nueva
+    # los llena siempre — ver services/cotizacion.py.
+    subtotal: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    addendum_monto: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    iva_porcentaje: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    iva_monto: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    total: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+
     estado: Mapped[EstadoCotizacion] = mapped_column(
         SAEnum(EstadoCotizacion, name="estado_cotizacion", values_callable=lambda e: [i.value for i in e]),
         default=EstadoCotizacion.COTIZADA,
@@ -111,6 +122,12 @@ class Cotizacion(Base):
         back_populates="cotizacion",
         cascade="all, delete-orphan",
         order_by="ItemCotizacion.id",
+    )
+
+    materiales: Mapped[list["MaterialCotizado"]] = relationship(
+        back_populates="cotizacion",
+        cascade="all, delete-orphan",
+        order_by="MaterialCotizado.id",
     )
 
     cliente: Mapped["Cliente | None"] = relationship()  # noqa: F821
@@ -155,3 +172,48 @@ class ItemCotizacion(Base):
 
     def __repr__(self) -> str:
         return f"<ItemCotizacion {self.id} L={self.paneles_largo} A={self.paneles_ancho} B={self.bloques}>"
+
+
+class MaterialCotizado(Base):
+    """
+    Cantidad y precio unitario de un material en una cotización, tal
+    como salieron de calc-service al crearla — no es la cantidad del
+    catálogo `Material` en general, sino la que correspondió a ESTA
+    cotización. Es el total de cantidades_totales de calc-service
+    (ya suma todos los ítems más los cargos fijos como LOG), no un
+    desglose por ítem.
+
+    `precio_unitario` es un snapshot: si `PrecioMaterial` cambia
+    después, esta fila no se entera, a propósito.
+    """
+
+    __tablename__ = "materiales_cotizados"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    cotizacion_id: Mapped[int] = mapped_column(
+        ForeignKey("cotizaciones.id"),
+        nullable=False,
+        index=True,
+    )
+
+    material_id: Mapped[int] = mapped_column(
+        ForeignKey("materiales.id"),
+        nullable=False,
+        index=True,
+    )
+
+    cantidad: Mapped[int] = mapped_column(Integer, nullable=False)
+    precio_unitario: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    cotizacion: Mapped["Cotizacion"] = relationship(back_populates="materiales")
+    material: Mapped["Material"] = relationship()  # noqa: F821
+
+    def __repr__(self) -> str:
+        return f"<MaterialCotizado cotizacion_id={self.cotizacion_id} material_id={self.material_id} cantidad={self.cantidad}>"
