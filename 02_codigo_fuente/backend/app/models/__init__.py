@@ -13,6 +13,7 @@ from app.models.proyecto import EstadoProyecto, Proyecto
 from app.models.cotizacion import Cotizacion, EstadoCotizacion, ItemCotizacion
 from app.models.material import Material, PrecioMaterial
 from app.models.equipo import ConfiguracionEquipo
+from app.models.layout import BloqueLayout, Layout
 from app.models.terreno import Camino, Terreno, TipoCamino
 from app.models.usuario import RolUsuario, Usuario
 
@@ -30,6 +31,8 @@ __all__ = [
     "Camino",
     "TipoCamino",
     "ConfiguracionEquipo",
+    "Layout",
+    "BloqueLayout",
     # Cotización
     "Cotizacion",
     "ItemCotizacion",
