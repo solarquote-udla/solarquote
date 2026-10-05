@@ -15,6 +15,7 @@ import { AuthProvider } from "@/context/AuthProvider";
 import { EnConstruccionPage } from "@/pages/EnConstruccionPage";
 import { EquipoPage } from "@/pages/EquipoPage";
 import { InicioPage } from "@/pages/InicioPage";
+import { LayoutPage } from "@/pages/LayoutPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { ProyectosPage } from "@/pages/ProyectosPage";
 import { SinPermisosPage } from "@/pages/SinPermisosPage";
@@ -55,6 +56,7 @@ export default function App() {
               <Route path="proyectos" element={<ProyectosPage />} />
               <Route path="proyectos/:proyectoId/terreno" element={<TerrenoPage />} />
               <Route path="proyectos/:proyectoId/equipo" element={<EquipoPage />} />
+              <Route path="proyectos/:proyectoId/layout" element={<LayoutPage />} />
               <Route
                 path="bocetos"
                 element={
