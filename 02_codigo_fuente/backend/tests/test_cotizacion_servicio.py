@@ -5,36 +5,45 @@ from decimal import Decimal
 
 import httpx
 import pytest
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.models.cliente import Cliente, TipoIdentificacion
 from app.models.cotizacion import EstadoCotizacion
 from app.models.material import Material, PrecioMaterial
+from app.models.proyecto import Proyecto
 from app.models.usuario import RolUsuario, Usuario
 from app.schemas.cotizacion import CotizacionCrear, ItemCalculoEntrada
-from app.services.cotizacion import crear_cotizacion
+from app.services.cotizacion import ProyectoNoDisponible, crear_cotizacion
 from app.services.material import PrecioVigenteFaltante
 from app.services.proyecto import ClienteNoDisponible
 
 AYER = datetime.now(timezone.utc) - timedelta(days=1)
 
-RESPUESTA_CALC_SERVICE = {
-    "items": [
-        {
-            "paneles_largo": 4,
-            "paneles_ancho": 3,
-            "bloques": 1,
-            "cantidades": {"VAR1650": 8},
-        }
-    ],
-    "cantidades_totales": {"VAR1650": 8, "LOG": 1},
-    "subtotal": "93.60",
-    "addendum_porcentaje": "0",
-    "addendum_monto": "0.00",
-    "iva_porcentaje": "15",
-    "iva_monto": "14.04",
-    "total": "107.64",
-}
+def _respuesta_calc_service(cargos_fijos: dict[str, int]) -> dict:
+    """
+    Cantidades_totales = VAR1650 (siempre, de los ítems) + lo que venga
+    en cargos_fijos — igual que haría calc-service de verdad. Si el
+    mock ignorara `cargos_fijos` y devolviera LOG fijo, un test que no
+    creó el material LOG reventaría al armar MaterialCotizado.
+    """
+    return {
+        "items": [
+            {
+                "paneles_largo": 4,
+                "paneles_ancho": 3,
+                "bloques": 1,
+                "cantidades": {"VAR1650": 8},
+            }
+        ],
+        "cantidades_totales": {"VAR1650": 8, **cargos_fijos},
+        "subtotal": "93.60",
+        "addendum_porcentaje": "0",
+        "addendum_monto": "0.00",
+        "iva_porcentaje": "15",
+        "iva_monto": "14.04",
+        "total": "107.64",
+    }
 
 
 def _crear_material_con_precio(db: Session, codigo: str, precio: Decimal, activo: bool = True) -> Material:
@@ -63,7 +72,7 @@ def _mock_calc_service_ok(monkeypatch: pytest.MonkeyPatch) -> dict:
 
     def _post_falso(url, *, json, timeout):
         llamada["json"] = json
-        return httpx.Response(200, json=RESPUESTA_CALC_SERVICE)
+        return httpx.Response(200, json=_respuesta_calc_service(json["cargos_fijos"]))
 
     monkeypatch.setattr(httpx, "post", _post_falso)
     return llamada
@@ -74,6 +83,11 @@ def _datos_minimos() -> CotizacionCrear:
         cliente_nombre="Cliente de prueba",
         items=[ItemCalculoEntrada(paneles_largo=4, paneles_ancho=3, bloques=1)],
     )
+
+
+def test_cliente_nombre_es_obligatorio_sin_cliente_id() -> None:
+    with pytest.raises(ValidationError, match="cliente_nombre"):
+        CotizacionCrear(items=[ItemCalculoEntrada(paneles_largo=4, paneles_ancho=3, bloques=1)])
 
 
 def test_crea_la_cotizacion_y_persiste_los_items(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -95,6 +109,38 @@ def test_crea_la_cotizacion_y_persiste_los_items(db: Session, monkeypatch: pytes
     # LOG estaba activo con precio: se manda como cargo fijo de cantidad 1.
     assert llamada["json"]["cargos_fijos"] == {"LOG": 1}
     assert llamada["json"]["iva_porcentaje"] == "15"  # IVA_PORCENTAJE por defecto de settings
+
+
+def test_persiste_el_desglose_en_la_cotizacion(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    _crear_material_con_precio(db, "VAR1650", Decimal("7.20"))
+    _crear_material_con_precio(db, "LOG", Decimal("35.00"))
+    usuario = _crear_usuario(db)
+    _mock_calc_service_ok(monkeypatch)
+
+    cotizacion, calculo = crear_cotizacion(db, _datos_minimos(), usuario)
+
+    assert cotizacion.subtotal == calculo.subtotal
+    assert cotizacion.addendum_monto == calculo.addendum_monto
+    assert cotizacion.iva_porcentaje == calculo.iva_porcentaje
+    assert cotizacion.iva_monto == calculo.iva_monto
+    assert cotizacion.total == calculo.total
+
+
+def test_persiste_la_cantidad_y_precio_unitario_de_cada_material(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _crear_material_con_precio(db, "VAR1650", Decimal("7.20"))
+    _crear_material_con_precio(db, "LOG", Decimal("35.00"))
+    usuario = _crear_usuario(db)
+    _mock_calc_service_ok(monkeypatch)
+
+    cotizacion, _ = crear_cotizacion(db, _datos_minimos(), usuario)
+
+    materiales = {m.material.codigo: m for m in cotizacion.materiales}
+    assert materiales["VAR1650"].cantidad == 8
+    assert materiales["VAR1650"].precio_unitario == Decimal("7.20")
+    assert materiales["LOG"].cantidad == 1
+    assert materiales["LOG"].precio_unitario == Decimal("35.00")
 
 
 def test_no_manda_cargo_fijo_de_logistica_si_no_esta_activo(
@@ -151,6 +197,36 @@ def test_cliente_id_existente_se_asocia_a_la_cotizacion(
         nombre="Cliente catalogado",
         tipo_identificacion=TipoIdentificacion.CEDULA,
         identificacion="1234567890",
+        email="cliente@example.com",
+    )
+    db.add(cliente)
+    db.flush()
+    _mock_calc_service_ok(monkeypatch)
+
+    # No manda cliente_nombre: con cliente_id alcanza.
+    datos = CotizacionCrear(
+        cliente_id=cliente.id,
+        items=[ItemCalculoEntrada(paneles_largo=4, paneles_ancho=3, bloques=1)],
+    )
+
+    cotizacion, _ = crear_cotizacion(db, datos, usuario)
+
+    assert cotizacion.cliente_id == cliente.id
+    assert cotizacion.cliente_nombre == "Cliente catalogado"
+    assert cotizacion.cliente_email == "cliente@example.com"
+
+
+def test_snapshot_del_cliente_viene_de_la_base_y_no_del_request(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Si mandan cliente_id, lo que venga en cliente_nombre/email se ignora."""
+    _crear_material_con_precio(db, "VAR1650", Decimal("7.20"))
+    usuario = _crear_usuario(db)
+    cliente = Cliente(
+        nombre="Nombre real en el catálogo",
+        tipo_identificacion=TipoIdentificacion.CEDULA,
+        identificacion="1234567890",
+        email="real@example.com",
     )
     db.add(cliente)
     db.flush()
@@ -158,10 +234,81 @@ def test_cliente_id_existente_se_asocia_a_la_cotizacion(
 
     datos = CotizacionCrear(
         cliente_id=cliente.id,
-        cliente_nombre=cliente.nombre,
+        cliente_nombre="Nombre inventado por quien llena el formulario",
+        cliente_email="otro@example.com",
         items=[ItemCalculoEntrada(paneles_largo=4, paneles_ancho=3, bloques=1)],
     )
 
     cotizacion, _ = crear_cotizacion(db, datos, usuario)
 
-    assert cotizacion.cliente_id == cliente.id
+    assert cotizacion.cliente_nombre == "Nombre real en el catálogo"
+    assert cotizacion.cliente_email == "real@example.com"
+
+
+def test_cliente_dado_de_baja_lanza_cliente_no_disponible(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _crear_material_con_precio(db, "VAR1650", Decimal("7.20"))
+    usuario = _crear_usuario(db)
+    cliente = Cliente(
+        nombre="Cliente de baja",
+        tipo_identificacion=TipoIdentificacion.CEDULA,
+        identificacion="1234567890",
+        activo=False,
+    )
+    db.add(cliente)
+    db.flush()
+    _mock_calc_service_ok(monkeypatch)
+
+    datos = CotizacionCrear(
+        cliente_id=cliente.id,
+        items=[ItemCalculoEntrada(paneles_largo=4, paneles_ancho=3, bloques=1)],
+    )
+
+    with pytest.raises(ClienteNoDisponible):
+        crear_cotizacion(db, datos, usuario)
+
+
+def test_proyecto_id_inexistente_lanza_proyecto_no_disponible(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _crear_material_con_precio(db, "VAR1650", Decimal("7.20"))
+    usuario = _crear_usuario(db)
+    _mock_calc_service_ok(monkeypatch)
+
+    datos = CotizacionCrear(
+        proyecto_id=999999,
+        cliente_nombre="Cliente de prueba",
+        items=[ItemCalculoEntrada(paneles_largo=4, paneles_ancho=3, bloques=1)],
+    )
+
+    with pytest.raises(ProyectoNoDisponible):
+        crear_cotizacion(db, datos, usuario)
+
+
+def test_proyecto_id_existente_se_asocia_a_la_cotizacion(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _crear_material_con_precio(db, "VAR1650", Decimal("7.20"))
+    usuario = _crear_usuario(db)
+    cliente = Cliente(
+        nombre="Cliente del proyecto",
+        tipo_identificacion=TipoIdentificacion.CEDULA,
+        identificacion="1234567890",
+    )
+    db.add(cliente)
+    db.flush()
+    proyecto = Proyecto(nombre="Proyecto de prueba", cliente_id=cliente.id, usuario_id=usuario.id)
+    db.add(proyecto)
+    db.flush()
+    _mock_calc_service_ok(monkeypatch)
+
+    datos = CotizacionCrear(
+        proyecto_id=proyecto.id,
+        cliente_nombre="Cliente de prueba",
+        items=[ItemCalculoEntrada(paneles_largo=4, paneles_ancho=3, bloques=1)],
+    )
+
+    cotizacion, _ = crear_cotizacion(db, datos, usuario)
+
+    assert cotizacion.proyecto_id == proyecto.id
