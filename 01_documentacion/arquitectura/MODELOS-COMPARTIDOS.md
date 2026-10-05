@@ -91,7 +91,8 @@ El Módulo 1 (Layout) agrega tablas propias colgando de `proyecto_id`:
 
 - Terreno y caminos (RF-01, Sprint 2) — **implementado**
 - Configuración de equipo: panel e inversor (RF-02, Sprint 2) — **implementado**
-- Bloques generados por el algoritmo — RF-03
+- Layout y bloques generados (RF-03) — **implementado**. Ver
+  [ALGORITMO-LAYOUT.md](ALGORITMO-LAYOUT.md)
 
 La configuración de equipo guarda los valores del panel y del inversor,
 no una referencia a un catálogo. Cuando exista la lista de inversores de
@@ -142,7 +143,7 @@ Cliente 1 ──── N Proyecto
    │                │ (Módulo 1, de Joseph)
    │                ├── Terreno 1 ── N Camino
    │                ├── ConfiguracionEquipo (1:1)
-   │                └── BloqueGenerado
+   │                └── Layout (1:1) ── N BloqueLayout
    │                │
    └────────────────┴──── N Cotizacion ──── N ItemCotizacion
                               │
