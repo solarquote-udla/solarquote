@@ -11,8 +11,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 
-import { EstadoProyectoBadge } from "@/components/EstadoProyectoBadge";
-import { PestanasProyecto } from "@/components/PestanasProyecto";
+import { EncabezadoProyecto } from "@/components/EncabezadoProyecto";
 import { mensajeDeError } from "@/services/api";
 import { guardarEquipo, listarPanelesReferencia, obtenerEquipo } from "@/services/equipo";
 import { obtenerProyecto } from "@/services/proyectos";
@@ -316,24 +315,16 @@ export function EquipoPage() {
 
   return (
     <div className="mx-auto max-w-7xl">
-      <nav className="text-sm text-acero-500">
-        <Link to="/proyectos" className="hover:text-solar-700 hover:underline">
-          Proyectos
-        </Link>
-        <span className="mx-2">/</span>
-        <span className="text-acero-700">{proyecto.nombre}</span>
-      </nav>
-
-      <div className="mt-2 flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-bold text-acero-900">Panel e inversor</h1>
-        <EstadoProyectoBadge estado={proyecto.estado} />
-      </div>
-      <p className="mt-1 text-sm text-acero-500">
-        {proyecto.cliente.nombre}
-        {proyecto.ubicacion ? ` · ${proyecto.ubicacion}` : ""}
-      </p>
-
-      <PestanasProyecto proyectoId={proyecto.id} />
+      <EncabezadoProyecto
+        proyecto={proyecto}
+        titulo="Panel e inversor"
+        onActualizado={async (p) => {
+          setProyecto(p);
+          // La separación entre filas depende de la latitud: se recalcula en el backend
+          const actual = await obtenerEquipo(proyectoId);
+          if (actual) setGuardado(actual);
+        }}
+      />
 
       {(error || aviso) && (
         <div
