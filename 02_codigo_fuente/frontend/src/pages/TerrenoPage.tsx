@@ -16,8 +16,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { EditorPoligonos, type CaminoDibujo } from "@/components/EditorPoligonos";
-import { EstadoProyectoBadge } from "@/components/EstadoProyectoBadge";
-import { PestanasProyecto } from "@/components/PestanasProyecto";
+import { EncabezadoProyecto } from "@/components/EncabezadoProyecto";
 import { mensajeDeError } from "@/services/api";
 import { obtenerProyecto } from "@/services/proyectos";
 import {
@@ -380,24 +379,7 @@ export function TerrenoPage() {
   return (
     <div className="mx-auto max-w-7xl">
       {/* ─── Encabezado ─────────────────────────────────── */}
-      <nav className="text-sm text-acero-500">
-        <Link to="/proyectos" className="hover:text-solar-700 hover:underline">
-          Proyectos
-        </Link>
-        <span className="mx-2">/</span>
-        <span className="text-acero-700">{proyecto.nombre}</span>
-      </nav>
-
-      <div className="mt-2 flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-bold text-acero-900">Terreno y caminos</h1>
-        <EstadoProyectoBadge estado={proyecto.estado} />
-      </div>
-      <p className="mt-1 text-sm text-acero-500">
-        {proyecto.cliente.nombre}
-        {proyecto.ubicacion ? ` · ${proyecto.ubicacion}` : ""}
-      </p>
-
-      <PestanasProyecto proyectoId={proyecto.id} />
+      <EncabezadoProyecto proyecto={proyecto} titulo="Terreno y caminos" onActualizado={setProyecto} />
 
       {(error || aviso) && (
         <div

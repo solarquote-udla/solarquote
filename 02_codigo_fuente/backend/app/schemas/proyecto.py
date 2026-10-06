@@ -2,13 +2,13 @@
 Schemas de Proyecto (Pydantic).
 
 Gestión mínima para que el Módulo 1 tenga a qué asociar el terreno:
-crear, listar y consultar. La edición y el archivo de proyectos quedan
-para cuando haya una necesidad concreta.
+crear, listar, consultar y corregir los datos descriptivos. El archivo
+de proyectos queda para cuando haya una necesidad concreta.
 """
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.proyecto import EstadoProyecto
 
@@ -41,6 +41,36 @@ class ProyectoCrear(BaseModel):
     latitud: float | None = Field(default=None, ge=-90, le=90)
     longitud: float | None = Field(default=None, ge=-180, le=180)
     notas: str | None = Field(default=None, max_length=500)
+
+
+class ProyectoActualizar(BaseModel):
+    """
+    Corrección parcial (PATCH): solo cambia lo que viene en el cuerpo.
+
+    Enviar `null` en un campo opcional lo borra; omitirlo lo deja igual.
+
+    Fuera a propósito:
+      - `cliente_id`: cambiar el cliente de un proyecto que ya puede
+        tener cotizaciones rompería el historial. Si el cliente estaba
+        mal, se crea otro proyecto.
+      - `estado`: lo avanza el sistema según el trabajo hecho (terreno,
+        equipo, cotización), no se edita a mano.
+    """
+
+    nombre: str | None = Field(default=None, min_length=3, max_length=150)
+    ubicacion: str | None = Field(default=None, max_length=255)
+    latitud: float | None = Field(default=None, ge=-90, le=90)
+    longitud: float | None = Field(default=None, ge=-180, le=180)
+    notas: str | None = Field(default=None, max_length=500)
+
+    @field_validator("nombre")
+    @classmethod
+    def nombre_no_nulo(cls, v: str | None) -> str:
+        # Opcional en el sentido de "puede no venir", pero si viene no
+        # puede ser null: el proyecto siempre tiene nombre.
+        if v is None or not v.strip():
+            raise ValueError("El nombre del proyecto no puede quedar vacío.")
+        return v.strip()
 
 
 class ProyectoLeer(BaseModel):
