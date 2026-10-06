@@ -12,7 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.routers import auth, cotizacion, equipo, health, layout, proyectos, terreno
+from app.routers import auth, cliente, cotizacion, equipo, health, layout, proyectos, terreno
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -37,6 +37,10 @@ app.add_middleware(
 # ─── Rutas ──────────────────────────────────────────────
 app.include_router(health.router)
 app.include_router(auth.router, prefix="/api/auth", tags=["Autenticación"])
+
+# Módulo 4 — Administración (clientes). Antes de proyectos: el alta de
+# proyectos consume GET /api/clientes (ver MODELOS-COMPARTIDOS.md).
+app.include_router(cliente.router)
 
 # Proyectos: raíz del trabajo técnico. Cada router trae su propio
 # prefijo porque el terreno cuelga del proyecto: /api/proyectos/{id}/terreno
