@@ -18,6 +18,7 @@ from app.models.usuario import Usuario
 from app.schemas.cotizacion import CotizacionCrear, CotizacionLeer, ResultadoCalculoCotizacion
 from app.services import cotizacion as servicio
 from app.services.calc_service import CalcServiceError
+from app.services.cotizacion import ProyectoNoDisponible
 from app.services.material import PrecioVigenteFaltante
 from app.services.proyecto import ClienteNoDisponible
 
@@ -56,6 +57,8 @@ def crear(
     try:
         cotizacion, calculo = servicio.crear_cotizacion(db, datos, usuario)
     except ClienteNoDisponible as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+    except ProyectoNoDisponible as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
     except PrecioVigenteFaltante as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
