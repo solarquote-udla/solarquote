@@ -3,10 +3,9 @@
  *
  * Punto de entrada al Módulo 1: desde aquí se abre el terreno de cada
  * proyecto. El alta necesita un cliente existente, que se elige del
- * listado de RF-12 (módulo de clientes).
+ * listado de RF-12 (Administración → Clientes).
  */
 
-import axios from "axios";
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -76,13 +75,7 @@ export function ProyectosPage() {
         .then(setClientes)
         .catch((e) => {
           setClientes([]);
-          // 404 = la ruta todavía no existe en el backend, no un fallo real
-          const rutaInexistente = axios.isAxiosError(e) && e.response?.status === 404;
-          setErrorClientes(
-            rutaInexistente
-              ? "El listado de clientes todavía no está disponible (RF-12 en desarrollo)."
-              : mensajeDeError(e, "No se pudo obtener el listado de clientes"),
-          );
+          setErrorClientes(mensajeDeError(e, "No se pudo obtener el listado de clientes"));
         });
     }
   }
@@ -200,6 +193,14 @@ export function ProyectosPage() {
                   </option>
                 ))}
               </select>
+              {clientes?.length === 0 && !errorClientes && (
+                <span className="mt-1 block text-xs font-normal text-acero-500">
+                  <Link to="/administracion/clientes" className="font-medium text-solar-700 hover:underline">
+                    Registra un cliente
+                  </Link>{" "}
+                  para poder crearle proyectos.
+                </span>
+              )}
             </label>
 
             <label className="text-sm font-medium text-acero-700 sm:col-span-2">
