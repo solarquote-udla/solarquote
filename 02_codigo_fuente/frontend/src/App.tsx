@@ -12,6 +12,8 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppLayout } from "@/components/AppLayout";
 import { RutaProtegida } from "@/components/RutaProtegida";
 import { AuthProvider } from "@/context/AuthProvider";
+import { AdministracionPage } from "@/pages/AdministracionPage";
+import { ClientesPage } from "@/pages/ClientesPage";
 import { EnConstruccionPage } from "@/pages/EnConstruccionPage";
 import { EquipoPage } from "@/pages/EquipoPage";
 import { InicioPage } from "@/pages/InicioPage";
@@ -79,17 +81,8 @@ export default function App() {
                   />
                 }
               />
-              <Route
-                path="administracion"
-                element={
-                  <EnConstruccionPage
-                    titulo="Administración"
-                    modulo="Módulo 4"
-                    requerimientos="RF-08 a RF-13"
-                    sprint="Sprint 3–4"
-                  />
-                }
-              />
+              <Route path="administracion" element={<AdministracionPage />} />
+              <Route path="administracion/clientes" element={<ClientesPage />} />
             </Route>
           </Route>
 
