@@ -63,6 +63,52 @@ export interface ClienteListado {
   activo?: boolean;
 }
 
+/** Espejo de `TipoIdentificacion` en backend/app/models/cliente.py */
+export const TipoIdentificacion = {
+  CEDULA: "cedula",
+  RUC: "ruc",
+  PASAPORTE: "pasaporte",
+} as const;
+
+export type TipoIdentificacion = (typeof TipoIdentificacion)[keyof typeof TipoIdentificacion];
+
+export const ETIQUETAS_TIPO_IDENTIFICACION: Record<TipoIdentificacion, string> = {
+  [TipoIdentificacion.CEDULA]: "Cédula",
+  [TipoIdentificacion.RUC]: "RUC",
+  [TipoIdentificacion.PASAPORTE]: "Pasaporte",
+};
+
+/** Espejo de `ClienteLeer` (backend/app/schemas/cliente.py). Ver CONTRATO-CLIENTES.md */
+export interface Cliente {
+  id: number;
+  nombre: string;
+  tipo_identificacion: TipoIdentificacion;
+  identificacion: string;
+  empresa: string | null;
+  email: string | null;
+  telefono: string | null;
+  direccion: string | null;
+  activo: boolean;
+  /** Calculado con un COUNT en el backend */
+  total_proyectos: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Espejo de `ClienteCrear` */
+export interface ClienteCrear {
+  nombre: string;
+  tipo_identificacion: TipoIdentificacion;
+  identificacion: string;
+  empresa: string | null;
+  email: string | null;
+  telefono: string | null;
+  direccion: string | null;
+}
+
+/** Espejo de `ClienteActualizar`: PATCH parcial, más la reactivación */
+export type ClienteActualizar = Partial<ClienteCrear> & { activo?: boolean };
+
 /** Espejo de `ClienteResumen` (backend/app/schemas/proyecto.py) */
 export interface ClienteResumen {
   id: number;
