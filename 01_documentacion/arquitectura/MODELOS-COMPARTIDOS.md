@@ -78,7 +78,12 @@ Tabla `proyectos`. Raíz del trabajo técnico.
 ### Gestión de proyectos
 
 Endpoints mínimos, de Joseph, bajo `/api/proyectos` (solo Gerente General):
-alta, listado y detalle. Consumen el modelo sin modificarlo.
+alta, listado, detalle y corrección (`PATCH`). Consumen el modelo sin
+modificar su estructura.
+
+El `PATCH` corrige nombre, ubicación, coordenadas y notas. **No** cambia
+`cliente_id` (rompería el historial de cotizaciones del proyecto) ni
+`estado` (lo avanza el sistema según el trabajo hecho).
 
 Un detalle de diseño: el listado indica si cada proyecto ya tiene terreno
 (`tiene_terreno`). Se resuelve con una consulta aparte en el servicio y no
