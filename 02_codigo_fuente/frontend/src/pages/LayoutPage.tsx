@@ -10,8 +10,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 
-import { EstadoProyectoBadge } from "@/components/EstadoProyectoBadge";
-import { PestanasProyecto } from "@/components/PestanasProyecto";
+import { EncabezadoProyecto } from "@/components/EncabezadoProyecto";
 import { VistaLayout } from "@/components/VistaLayout";
 import { mensajeDeError } from "@/services/api";
 import { obtenerEquipo } from "@/services/equipo";
@@ -198,24 +197,15 @@ export function LayoutPage() {
 
   return (
     <div className="mx-auto max-w-7xl">
-      <nav className="text-sm text-acero-500">
-        <Link to="/proyectos" className="hover:text-solar-700 hover:underline">
-          Proyectos
-        </Link>
-        <span className="mx-2">/</span>
-        <span className="text-acero-700">{proyecto.nombre}</span>
-      </nav>
-
-      <div className="mt-2 flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-bold text-acero-900">Layout solar</h1>
-        <EstadoProyectoBadge estado={proyecto.estado} />
-      </div>
-      <p className="mt-1 text-sm text-acero-500">
-        {proyecto.cliente.nombre}
-        {proyecto.ubicacion ? ` · ${proyecto.ubicacion}` : ""}
-      </p>
-
-      <PestanasProyecto proyectoId={proyecto.id} />
+      <EncabezadoProyecto
+        proyecto={proyecto}
+        titulo="Layout solar"
+        onActualizado={async (p) => {
+          setProyecto(p);
+          // La latitud entra en la huella del layout: puede quedar desactualizado
+          setLayout(await obtenerLayout(proyectoId));
+        }}
+      />
 
       {!puedeGenerar && (
         <div className="mt-4 rounded-lg border border-solar-200 bg-solar-50 px-4 py-3 text-sm text-solar-900">
