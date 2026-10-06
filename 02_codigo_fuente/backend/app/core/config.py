@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     # Formato: postgresql://usuario:password@host/basededatos
     DATABASE_URL: str
 
+    # Solo para pytest (ver tests/conftest.py). La app nunca la usa. Se
+    # declara aquí para que pueda vivir en el .env junto a DATABASE_URL:
+    # pydantic-settings solo lee del .env los campos declarados.
+    TEST_DATABASE_URL: str | None = None
+
     # ─── Seguridad / JWT ────────────────────────────────
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
