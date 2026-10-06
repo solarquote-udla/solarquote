@@ -387,6 +387,12 @@ export interface Layout {
   capacidad: CapacidadLayout | null;
   electrica: ElectricaLayout;
   advertencias: string[];
+  /** Grados del norte usados al generar; la edición arma los bloques con este ángulo */
+  angulo_norte: number;
+  /** Lo que suma cada panel de A al bloque, en metros */
+  lado_menor_m: number;
+  /** Cambios hechos a mano desde la última generación (SQ-64) */
+  ediciones_manuales: number;
   /** Terreno, caminos, equipo o latitud cambiaron después de generar */
   desactualizado: boolean;
   created_at: string;
