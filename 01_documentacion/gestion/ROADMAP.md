@@ -8,6 +8,38 @@ y navegable**, no solo en local.
 
 ---
 
+## Calendario de sprints (actualizado el 7 de octubre de 2026)
+
+Desde el Sprint 3, los sprints duran **2 semanas**, de sábado a viernes;
+la revisión, la retrospectiva y el release `develop → main` son los
+viernes. El Sprint 2 se cerró el 9 de octubre.
+
+El foco de cada sprint es una propuesta; lo que manda es el contenido de
+cada sprint en Jira.
+
+| Sprint | Fechas | Foco propuesto |
+|---|---|---|
+| 2 | 25 Sep – 9 Oct | ✅ Despliegue, RF-01, RF-02, RF-03, clientes, precios |
+| 3 | 10 Oct – 23 Oct | Cotizar desde el layout, pantalla de cotización (RF-06), autenticación entre servicios |
+| 4 | 24 Oct – 6 Nov | Proforma Word/Excel (RF-07), inversores (RF-08), spike de IA |
+| 5 | 7 Nov – 20 Nov | RF-04 Boceto con IA y DXF |
+| 6 | 21 Nov – 4 Dic | RF-05 Confirmar el diseño interpretado |
+| 7 | 5 Dic – 18 Dic | RF-14 y RF-15 Validación de materiales |
+| 8 | 19 Dic – 1 Ene | RF-16, pruebas extremo a extremo |
+| 9 | 2 Ene – 15 Ene | Estabilización y cierre |
+
+Feriados con menos capacidad: 2 y 3 de noviembre (Sprint 4), 25 de
+diciembre y 1 de enero (Sprint 8).
+
+### Estado al cierre del Sprint 2
+
+El plan de abajo se escribió antes de empezar. Lo real va **adelantado**:
+RF-01, RF-02 y RF-03 (previstos para los Sprints 3 y 4) quedaron hechos en
+el Sprint 2, junto con la administración de clientes y precios. El
+informe está en `05_evidencias/sprint-02/README.md`.
+
+---
+
 ## Criterio de priorización
 
 Se prioriza la **espina dorsal del sistema** sobre la cantidad de módulos.
@@ -170,6 +202,9 @@ en la base de datos.
 | Railway | Hobby | ~$5/mes por servicio |
 
 Con backend + calc-service en Railway, calcular alrededor de **$10/mes**.
+Desde el 6 de octubre corren los dos servicios con el crédito de prueba de
+Railway; hay que pasar a un plan pagado antes de que se agote, o se
+detienen ambos.
 El `ia-service` se suma cuando se retomen los módulos de IA.
 
 ---
