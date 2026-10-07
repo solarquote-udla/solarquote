@@ -3,9 +3,12 @@
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
+import pytest
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.models.material import Material, PrecioMaterial
+from app.schemas.material import PrecioActualizar
 from app.services.material import (
     actualizar_precio,
     listar_materiales,
@@ -105,3 +108,20 @@ def test_historial_queda_ordenado_del_mas_reciente_al_mas_antiguo(db: Session) -
     historial = obtener_historial_precios(db, material.id)
 
     assert [p.precio for p in historial] == [Decimal("9.00"), Decimal("8.50"), Decimal("7.20")]
+
+
+class TestPrecioActualizarSchema:
+    def test_acepta_un_precio_positivo(self) -> None:
+        assert PrecioActualizar(precio=Decimal("8.50")).precio == Decimal("8.50")
+
+    def test_rechaza_cero(self) -> None:
+        with pytest.raises(ValidationError):
+            PrecioActualizar(precio=Decimal("0"))
+
+    def test_rechaza_negativo(self) -> None:
+        with pytest.raises(ValidationError):
+            PrecioActualizar(precio=Decimal("-1.00"))
+
+    def test_rechaza_mas_de_dos_decimales(self) -> None:
+        with pytest.raises(ValidationError):
+            PrecioActualizar(precio=Decimal("8.555"))
