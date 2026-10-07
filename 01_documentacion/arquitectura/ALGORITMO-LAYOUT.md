@@ -119,6 +119,17 @@ arrastra, lo que el backend va a rechazar. Se verificó la paridad en 4 000
 escenarios aleatorios —terrenos cóncavos, caminos, ángulos y casos a
 milímetros del límite— sin ninguna diferencia.
 
+**Mismos números en los dos lados.** No basta con que la regla sea igual:
+también tienen que serlo los datos de entrada. El backend reconstruye los
+bloques con los valores que entrega la API (`largo_bloque_m`,
+`lado_menor_m`, `angulo_norte`), no con valores recalculados. En la
+revisión del PR #27, Esteban detectó que el backend recalculaba el largo a
+precisión completa mientras la pantalla usaba el valor redondeado al
+milímetro: hasta 0,5 mm de diferencia, justo en el borde de la tolerancia.
+La prueba de paridad no lo vio porque alimentaba ambos lados con el mismo
+número. Hay una prueba de regresión (`test_backend_valida_con_el_mismo_largo_que_entrega_la_api`)
+que reproduce el caso a 22° de montaje.
+
 Endpoint: `PUT /api/proyectos/{id}/layout/bloques`.
 
 ## Limitaciones conocidas
