@@ -20,15 +20,30 @@ herramientas seleccionadas y su justificación.
 Resultados por iteración: pruebas ejecutadas, porcentaje aprobado, defectos
 encontrados por severidad y correcciones aplicadas.
 
+## Documentos
+
+- [Estrategia de pruebas](estrategia/ESTRATEGIA-PRUEBAS.md)
+- [Reporte del Sprint 2](reportes/sprint-02.md)
+
 ## Cobertura actual
+
+Al cierre del Sprint 2: **200 pruebas automatizadas**, todas aprobadas.
 
 | Componente | Pruebas | Estado |
 |---|---|---|
 | Cálculo de materiales f(L,A,B) | Unitarias | Implementadas |
-| Endpoint de cotización | Integración | Implementadas |
+| Endpoint de cotización (calc-service) | Integración | Implementadas |
+| Orquestador de cotización y snapshot del total | Integración | Implementadas |
+| Terreno y área útil (RF-01) | Unitarias | Implementadas |
+| Panel e inversor (RF-02) | Unitarias | Implementadas |
+| Algoritmo de layout solar (RF-03) | Unitarias | Implementadas |
+| Edición manual de bloques (SQ-64) | Unitarias + integración + paridad | En revisión |
+| Clientes y validación de identificación (RF-12) | Unitarias + integración + paridad | Implementadas |
+| Precios de materiales (RF-09) | Integración | Implementadas |
+| CORS y configuración | Unitarias | Implementadas |
+| Migraciones (ciclo completo, *head* única) | CI | Implementadas |
 | Diagnóstico de servicios | Integración | Implementadas |
 | Autenticación y autorización | Unitarias | Pendiente — Sprint 6 |
-| Algoritmo de layout solar | Unitarias | Pendiente — Sprint 3 |
 | Flujo completo del usuario | Extremo a extremo | Pendiente — Sprint 8 |
 
 ## Ejecución
