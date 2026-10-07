@@ -93,22 +93,22 @@ login → clientes → proyecto → terreno y caminos → panel e inversor → l
 
 | Archivo | Qué capturar | Estado |
 |---|---|---|
-| `backlog.png` | Jira → Backlog, con el Sprint 2 y los siguientes | ☐ |
-| `tablero.png` | Jira → Active sprint, al cierre | ☐ |
-| `burndown.png` | Jira → Reports → Burndown chart, Sprint 2 | ☐ |
-| `informe-jira.png` | Jira → Reports → Sprint report, Sprint 2 | ☐ |
-| `ci.png` | GitHub → Actions: corridas en verde | ☐ |
-| `pull-requests.png` | GitHub → Pull requests → Closed | ☐ |
+| `backlog.png` | Jira → Backlog, con el Sprint 2 y los siguientes | ☑ |
+| `tablero.png` | Jira → Active sprint, al cierre | ☐ viernes 9 |
+| `burndown.png` | Jira → Reports → Burndown chart, Sprint 2 | ☐ viernes 9 |
+| `informe-jira.png` | Jira → Reports → Sprint report, Sprint 2 | ☐ viernes 9 |
+| `ci1.png`, `ci2.png` | GitHub → Actions: corridas en verde | ☑ |
+| `pull-requests.png` | GitHub → Pull requests → Closed | ☑ |
 | `retrospectiva.md` | Acuerdos de la retrospectiva | Borrador listo |
 
 Capturas del sistema en funcionamiento → `05_evidencias/capturas/sprint-02/`:
 
-| Archivo | Pantalla |
-|---|---|
-| `01-login.png` | Login en `solarquote-hextructure.vercel.app` |
-| `02-clientes.png` | Administración → Clientes |
-| `03-precios.png` | Administración → Precios |
-| `04-terreno.png` | Terreno con caminos y áreas |
-| `05-equipo.png` | Panel e inversor con resultados |
-| `06-layout.png` | Layout generado con bloques por tipo |
-| `07-edicion-bloques.png` | Modo edición con un bloque en rojo |
+| Archivo | Pantalla | Estado |
+|---|---|---|
+| `01-login.png` | Login en `solarquote-hextructure.vercel.app` | ☑ |
+| `02-clientes.png` | Administración → Clientes | ☑ |
+| `03-precios.png` | Administración → Precios | ☑ |
+| `04-terreno.png` | Terreno con caminos y áreas | ☑ |
+| `05-equipo.png` | Panel e inversor con resultados | ☑ |
+| `06-layout.png` | Layout generado con bloques por tipo | ☑ |
+| `07-edicion-bloques.png` | Modo edición con un bloque en rojo | ☐ cuando se mergee SQ-64 |
