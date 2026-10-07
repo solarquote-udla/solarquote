@@ -1,8 +1,9 @@
 """
 Endpoints del layout solar — RF-03.
 
-  GET  /api/proyectos/{id}/layout   → último layout generado
-  POST /api/proyectos/{id}/layout   → generar (reemplaza el anterior)
+  GET  /api/proyectos/{id}/layout           → último layout generado
+  POST /api/proyectos/{id}/layout           → generar (reemplaza el anterior)
+  PUT  /api/proyectos/{id}/layout/bloques   → guardar la edición manual (SQ-64)
 
 POST y no PUT: el cliente no envía el layout, envía parámetros y el
 servidor lo calcula. Dos POST con los mismos parámetros dan el mismo
@@ -16,9 +17,9 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.dependencies import requiere_gerente
-from app.schemas.layout import LayoutGenerar, LayoutLeer
+from app.schemas.layout import LayoutEditar, LayoutGenerar, LayoutLeer
 from app.services import layout as servicio
-from app.services.calculo_layout import LayoutImposible
+from app.services.calculo_layout import EdicionInvalida, LayoutImposible
 from app.services.proyecto import obtener_proyecto
 
 router = APIRouter(
@@ -69,6 +70,31 @@ def generar_layout(
     except servicio.FaltanDatos as error:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
     except LayoutImposible as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)
+        ) from error
+    return servicio.a_respuesta(layout, layout.huella)
+
+
+@router.put("/bloques", response_model=LayoutLeer)
+def editar_bloques(
+    proyecto_id: int,
+    datos: LayoutEditar,
+    db: Session = Depends(get_db),
+) -> LayoutLeer:
+    """
+    Guarda los bloques editados a mano. Se envían todos los que quedan:
+    los que no vienen se eliminan.
+
+    409 si no hay layout o está desactualizado; 422 si un bloque se sale
+    del terreno, pisa un camino o se superpone con otro.
+    """
+    proyecto = _proyecto_o_404(db, proyecto_id)
+    try:
+        layout = servicio.editar_bloques(db, proyecto, datos)
+    except servicio.LayoutNoEditable as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+    except EdicionInvalida as error:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)
         ) from error
