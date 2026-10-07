@@ -116,6 +116,16 @@ def test_valida_en_el_marco_girado():
         validar_bloques(terreno, [], [bloque, otro], 2.0, angulo_norte=30)
 
 
+def test_penetracion_de_exactamente_5_mm_se_rechaza():
+    """
+    El límite es exclusivo: se toleran menos de 5 mm. Con exactamente
+    5,000 mm el bloque achicado toca al otro, y tocar cuenta. El frontend
+    aplica la misma regla (comparación con <=), así que coinciden.
+    """
+    with pytest.raises(EdicionInvalida, match="se superponen"):
+        validar_bloques(TERRENO, [], [_bloque(0, 0), _bloque(LARGO - 0.005, 0)], 2.0)
+
+
 def test_bloques_que_se_tocan_no_se_superponen():
     """Lado con lado no es superposición: el área común es cero."""
     advertencias = validar_bloques(TERRENO, [], [_bloque(0, 0), _bloque(LARGO, 0)], 2.0)
@@ -236,6 +246,44 @@ def test_no_se_edita_un_layout_desactualizado(db, proyecto):
     layout = servicio.obtener_layout(db, proyecto.id)
     with pytest.raises(servicio.LayoutNoEditable, match="Vuelve a generarlo"):
         servicio.editar_bloques(db, proyecto, _como_edicion(layout))
+
+
+def test_backend_valida_con_el_mismo_largo_que_entrega_la_api(db, proyecto):
+    """
+    Regresión del desfase que encontró Esteban en la revisión de #27.
+
+    La pantalla arma los bloques con `largo_bloque_m`, redondeado al
+    milímetro. Si el backend recalculara el largo a precisión completa,
+    los dos rectángulos diferirían hasta 0,5 mm, justo en el borde de la
+    tolerancia de 5 mm.
+
+    A 22° el largo exacto es 9,112 × cos 22° = 8,448499 m y la API
+    entrega 8,448 m: 0,499 mm de diferencia. Se pone un segundo bloque
+    que, con el largo de la API, penetra 4,7 mm (válido en la pantalla).
+    Con el largo exacto serían 5,199 mm y el backend lo rechazaría.
+    """
+    from app.models.equipo import ConfiguracionEquipo
+
+    equipo = db.query(ConfiguracionEquipo).filter_by(proyecto_id=proyecto.id).one()
+    # Float, como llega desde el formulario (Pydantic) y desde la base
+    equipo.angulo_montaje = 22.0
+    db.flush()
+    layout = servicio.generar(db, proyecto, LayoutGenerar())
+    largo_api = servicio.a_respuesta(layout, layout.huella).largo_bloque_m
+    assert largo_api == 8.448
+
+    x, y = layout.bloques[0].vertices[3]
+    edicion = LayoutEditar(
+        bloques=[
+            BloqueEditar(origen=[x, y], paneles_ancho=24),
+            # Sin redondear: con el norte girado, las coordenadas locales
+            # no caen en milímetros enteros y la penetración puede ser
+            # cualquier valor; aquí se fija en 4,7 mm para caer en la banda.
+            BloqueEditar(origen=[x + largo_api - 0.0047, y], paneles_ancho=24),
+        ]
+    )
+    editado = servicio.editar_bloques(db, proyecto, edicion)
+    assert len(editado.bloques) == 2
 
 
 def test_regenerar_reinicia_el_contador_de_ediciones(db, proyecto):

@@ -265,8 +265,14 @@ def editar_bloques(db: Session, proyecto: Proyecto, datos: LayoutEditar) -> Layo
 
     L = layout.paneles_largo
     lado_mayor = max(equipo.panel_largo_mm, equipo.panel_ancho_mm) / 1000
+    # La geometría se arma con los MISMOS valores que entrega la API
+    # (largo_bloque_m, lado_menor_m, angulo_norte), no recalculados. La
+    # pantalla valida con esos valores; si aquí se recalculara el largo a
+    # precisión completa, los dos rectángulos diferirían hasta 0,5 mm —
+    # justo en el borde de la tolerancia de 5 mm. Lo encontró Esteban en
+    # la revisión del PR #27.
+    largo_planta = layout.resumen["largo_bloque_m"]
     lado_menor = _lado_menor_del_layout(layout)
-    largo_planta = L * lado_mayor * math.cos(math.radians(equipo.angulo_montaje))
     angulo = _angulo_del_layout(layout)
 
     poligonos = [
