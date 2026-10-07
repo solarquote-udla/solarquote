@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.models.cliente import Cliente, TipoIdentificacion
 from app.models.cotizacion import EstadoCotizacion
 from app.models.material import Material, PrecioMaterial
-from app.models.proyecto import Proyecto
+from app.models.proyecto import EstadoProyecto, Proyecto
 from app.models.usuario import RolUsuario, Usuario
 from app.schemas.cotizacion import CotizacionCrear, ItemCalculoEntrada
 from app.services.cotizacion import ProyectoNoDisponible, crear_cotizacion
@@ -312,3 +312,47 @@ def test_proyecto_id_existente_se_asocia_a_la_cotizacion(
     cotizacion, _ = crear_cotizacion(db, datos, usuario)
 
     assert cotizacion.proyecto_id == proyecto.id
+
+
+def test_crear_cotizacion_avanza_el_proyecto_a_cotizado(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _crear_material_con_precio(db, "VAR1650", Decimal("7.20"))
+    usuario = _crear_usuario(db)
+    cliente = Cliente(
+        nombre="Cliente del proyecto",
+        tipo_identificacion=TipoIdentificacion.CEDULA,
+        identificacion="1234567890",
+    )
+    db.add(cliente)
+    db.flush()
+    proyecto = Proyecto(
+        nombre="Proyecto en diseño",
+        cliente_id=cliente.id,
+        usuario_id=usuario.id,
+        estado=EstadoProyecto.DISENADO,
+    )
+    db.add(proyecto)
+    db.flush()
+    _mock_calc_service_ok(monkeypatch)
+
+    datos = CotizacionCrear(
+        proyecto_id=proyecto.id,
+        cliente_nombre="Cliente de prueba",
+        items=[ItemCalculoEntrada(paneles_largo=4, paneles_ancho=3, bloques=1)],
+    )
+
+    crear_cotizacion(db, datos, usuario)
+
+    assert proyecto.estado == EstadoProyecto.COTIZADO
+
+
+def test_crear_cotizacion_sin_proyecto_id_no_falla(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Cotizar a un cliente sin proyecto asociado no tiene nada que avanzar."""
+    _crear_material_con_precio(db, "VAR1650", Decimal("7.20"))
+    usuario = _crear_usuario(db)
+    _mock_calc_service_ok(monkeypatch)
+
+    cotizacion, _ = crear_cotizacion(db, _datos_minimos(), usuario)
+
+    assert cotizacion.proyecto_id is None

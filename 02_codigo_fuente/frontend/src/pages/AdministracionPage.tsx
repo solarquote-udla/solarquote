@@ -34,7 +34,7 @@ const SECCIONES: Seccion[] = [
     titulo: "Precios",
     descripcion: "Precio vigente de cada material, con historial de cambios.",
     rf: "RF-09",
-    sprint: "Sprint 3",
+    ruta: "/administracion/precios",
   },
   {
     titulo: "Usuarios y perfiles",

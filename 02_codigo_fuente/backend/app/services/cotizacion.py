@@ -19,7 +19,7 @@ from app.models.usuario import Usuario
 from app.schemas.cotizacion import CotizacionCrear, ItemCalculoEntrada, ResultadoCalculoCotizacion
 from app.services.calc_service import calcular_via_calc_service
 from app.services.material import obtener_precios_vigentes
-from app.services.proyecto import ClienteNoDisponible
+from app.services.proyecto import ClienteNoDisponible, avanzar_a_cotizado
 
 # Cantidad fija de logística por cotización (SQ-76): no escala con L/A/B.
 CODIGO_LOGISTICA = "LOG"
@@ -45,6 +45,7 @@ def crear_cotizacion(
                 f"El cliente {cliente.nombre} está dado de baja y no admite cotizaciones nuevas"
             )
 
+    proyecto: Proyecto | None = None
     if datos.proyecto_id is not None:
         proyecto = db.get(Proyecto, datos.proyecto_id)
         if proyecto is None:
@@ -116,6 +117,10 @@ def crear_cotizacion(
         ],
     )
     db.add(cotizacion)
+
+    if proyecto is not None:
+        avanzar_a_cotizado(proyecto)
+
     db.commit()
     db.refresh(cotizacion)
 
