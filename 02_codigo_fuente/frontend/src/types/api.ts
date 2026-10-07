@@ -116,6 +116,30 @@ export interface ClienteResumen {
   identificacion: string;
 }
 
+// ─── Materiales y precios (RF-09) ───────────────────────
+
+/** Espejo de `MaterialLeer` (backend/app/schemas/material.py) */
+export interface Material {
+  id: number;
+  codigo: string;
+  nombre: string;
+  unidad: string;
+  activo: boolean;
+  /** null si el material todavía no tiene un precio registrado */
+  precio_vigente: string | null;
+  vigente_desde: string | null;
+}
+
+/** Espejo de `PrecioMaterialLeer`: una fila del historial de un material */
+export interface PrecioMaterial {
+  id: number;
+  precio: string;
+  vigente_desde: string;
+  /** null mientras este precio siga vigente */
+  vigente_hasta: string | null;
+  created_at: string;
+}
+
 // ─── Proyectos ──────────────────────────────────────────
 
 /** Espejo de `EstadoProyecto` en backend/app/models/proyecto.py */
