@@ -1,9 +1,14 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.core.dependencies import requiere_secreto_compartido
 from app.schemas.cotizacion import CalcularCotizacionEntrada, CalcularCotizacionSalida
 from app.services.cotizacion import armar_cotizacion
 
-router = APIRouter(prefix="/api/cotizacion", tags=["Cotización"])
+router = APIRouter(
+    prefix="/api/cotizacion",
+    tags=["Cotización"],
+    dependencies=[Depends(requiere_secreto_compartido)],
+)
 
 
 @router.post("/calcular", response_model=CalcularCotizacionSalida)

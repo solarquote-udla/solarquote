@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     CORS_ORIGINS: str = "http://localhost:8000"
 
+    # DS-05: el backend es el único que debe poder llamar a este servicio.
+    # Sin default a propósito: que falte el secreto tumba el arranque en
+    # vez de dejar el endpoint sin protección.
+    CALC_SERVICE_SECRET: str
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]

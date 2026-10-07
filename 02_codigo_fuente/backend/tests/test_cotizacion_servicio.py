@@ -70,7 +70,7 @@ def _crear_usuario(db: Session) -> Usuario:
 def _mock_calc_service_ok(monkeypatch: pytest.MonkeyPatch) -> dict:
     llamada = {}
 
-    def _post_falso(url, *, json, timeout):
+    def _post_falso(url, *, json, headers, timeout):
         llamada["json"] = json
         return httpx.Response(200, json=_respuesta_calc_service(json["cargos_fijos"]))
 

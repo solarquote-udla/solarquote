@@ -68,6 +68,10 @@ class Settings(BaseSettings):
     IA_SERVICE_URL: str = "http://localhost:8001"
     CALC_SERVICE_URL: str = "http://localhost:8002"
 
+    # DS-05: secreto compartido con calc-service (mismo valor en los dos
+    # .env). Sin default a propósito, igual que SECRET_KEY.
+    CALC_SERVICE_SECRET: str
+
     # ─── Cotización (RF-06) ─────────────────────────────
     # calc-service no asume ninguna tasa: la resuelve este valor y se la
     # manda en cada request a /api/cotizacion/calcular.
