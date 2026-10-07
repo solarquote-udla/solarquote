@@ -32,3 +32,17 @@ export async function generarLayout(proyectoId: number, datos: LayoutGenerar): P
   const { data } = await api.post<Layout>(ruta(proyectoId), datos);
   return data;
 }
+
+/**
+ * Guarda la edición manual (SQ-64). Se envían todos los bloques que
+ * quedan, cada uno con su esquina suroeste y su A; los que no vienen se
+ * eliminan. 422 si alguno no se puede construir, 409 si el layout quedó
+ * desactualizado.
+ */
+export async function guardarBloques(
+  proyectoId: number,
+  bloques: { origen: [number, number]; paneles_ancho: number }[],
+): Promise<Layout> {
+  const { data } = await api.put<Layout>(`${ruta(proyectoId)}/bloques`, { bloques });
+  return data;
+}
