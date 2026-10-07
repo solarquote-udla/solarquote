@@ -13,8 +13,9 @@ desarrollo. Por eso las pruebas con base de datos solo corren contra una
 base cuyo nombre lo declare como de pruebas: que contenga `test` o
 termine en `_ci` (en el CI es `solarquote_ci`).
 
-Para correrlas en local, crea una base aparte (por ejemplo una rama
-`test` en Neon con la base `solarquote_test`) y define:
+Para correrlas en local, crea una base aparte (por ejemplo
+`solarquote_test` en Neon) y agrega al `.env`, o como variable de
+entorno:
 
     TEST_DATABASE_URL=postgresql://.../solarquote_test
 
@@ -34,7 +35,8 @@ import app.models  # noqa: F401 — registra las tablas en Base.metadata
 from app.core.config import settings
 from app.core.database import Base
 
-URL_PRUEBAS = os.getenv("TEST_DATABASE_URL") or settings.DATABASE_URL
+# Variable de entorno primero (la usa el CI), luego el .env vía Settings.
+URL_PRUEBAS = os.getenv("TEST_DATABASE_URL") or settings.TEST_DATABASE_URL or settings.DATABASE_URL
 
 
 def _es_base_de_pruebas(url: str) -> bool:
