@@ -141,10 +141,10 @@ facilita ataques dirigidos de fuerza bruta o phishing.
 
 ---
 
-## DS-05 — Autenticación entre servicios (pendiente)
+## DS-05 — Autenticación entre servicios
 
-**Fecha:** septiembre 2026
-**Estado:** pendiente — a resolver antes del despliegue
+**Fecha:** septiembre 2026 · implementada octubre 2026
+**Estado:** aceptada
 
 ### Problema
 
@@ -157,10 +157,35 @@ Bajo: el servicio no accede a la base de datos ni expone información de
 clientes; únicamente realiza operaciones aritméticas sobre los parámetros
 recibidos. Aun así, permite consumo no autorizado de recursos.
 
-### Solución propuesta
+### Decisión
 
-Cabecera con secreto compartido entre el backend principal y `calc-service`,
-validada mediante una dependencia de FastAPI. El secreto se gestiona como
-variable de entorno en ambos servicios.
+Cabecera `X-Internal-Secret` con un secreto compartido entre el backend
+principal y `calc-service`, validada por la dependencia
+`requiere_secreto_compartido` (`app/core/dependencies.py` de calc-service)
+en el router de cotización. El secreto vive en la variable de entorno
+`CALC_SERVICE_SECRET`, con el mismo valor en el `.env` de los dos
+servicios — sin default en ninguno de los dos, para que falte el secreto
+tumbe el arranque en vez de dejar el endpoint sin protección.
 
-**Responsable:** Esteban · **Plazo:** Sprint 2, antes del despliegue
+### Por qué no protege `/health` ni `/`
+
+El healthcheck de Railway (`railway.json` → `healthcheckPath`) y el
+diagnóstico de la raíz los llama la plataforma sin ninguna cabecera
+custom. Protegerlos tumbaría los despliegues. Solo el router
+`/api/cotizacion` — el que de verdad expone cómputo — exige el secreto.
+
+### Comparación con `==`
+
+Se usa `hmac.compare_digest` en vez de `==` para comparar el secreto: una
+comparación normal de strings corta en el primer carácter distinto, lo que
+en teoría permite inferir el secreto midiendo el tiempo de respuesta
+carácter por carácter (*timing attack*). `compare_digest` compara en
+tiempo constante.
+
+### Pendiente operativo
+
+Configurar `CALC_SERVICE_SECRET` (mismo valor) en las variables de Railway
+de los dos servicios antes de que este cambio llegue a producción.
+
+**Responsable:** Esteban · **Sprint:** 2 (atrasado a Sprint 3 por el
+alcance del sprint)
