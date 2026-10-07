@@ -43,6 +43,21 @@ def avanzar_a_en_diseno(proyecto: Proyecto) -> None:
         proyecto.estado = EstadoProyecto.EN_DISENO
 
 
+def avanzar_a_cotizado(proyecto: Proyecto) -> None:
+    """
+    Un proyecto pasa a cotizado en cuanto tiene su primera cotización,
+    venga de borrador, en_diseño o diseñado — a diferencia del layout,
+    cotizar no exige un estado previo puntual.
+
+    Es el último estado: esto solo evita un UPDATE de más si ya estaba
+    cotizado, no hay a dónde "retroceder".
+
+    No hace commit: lo hace quien llama, junto con el resto del cambio.
+    """
+    if proyecto.estado != EstadoProyecto.COTIZADO:
+        proyecto.estado = EstadoProyecto.COTIZADO
+
+
 def listar_proyectos(db: Session) -> list[Proyecto]:
     """Todos los proyectos, los más recientes primero."""
     return (
