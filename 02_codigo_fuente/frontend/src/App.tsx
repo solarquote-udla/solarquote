@@ -19,6 +19,7 @@ import { EquipoPage } from "@/pages/EquipoPage";
 import { InicioPage } from "@/pages/InicioPage";
 import { LayoutPage } from "@/pages/LayoutPage";
 import { LoginPage } from "@/pages/LoginPage";
+import { PreciosPage } from "@/pages/PreciosPage";
 import { ProyectosPage } from "@/pages/ProyectosPage";
 import { SinPermisosPage } from "@/pages/SinPermisosPage";
 import { TerrenoPage } from "@/pages/TerrenoPage";
@@ -83,6 +84,7 @@ export default function App() {
               />
               <Route path="administracion" element={<AdministracionPage />} />
               <Route path="administracion/clientes" element={<ClientesPage />} />
+              <Route path="administracion/precios" element={<PreciosPage />} />
             </Route>
           </Route>
 
