@@ -66,7 +66,8 @@ import math
 from dataclasses import dataclass, field
 
 from shapely.affinity import rotate
-from shapely.geometry import Polygon, box
+from shapely import STRtree
+from shapely.geometry import Point, Polygon, box
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union
 
@@ -204,9 +205,39 @@ class ResultadoLayout:
     capacidad: Capacidad | None
     electrica: Electrica
     advertencias: list[str] = field(default_factory=list)
+    # Necesarios para editar bloques después (SQ-64): con la orientación
+    # y el ancho de un panel, un bloque se reconstruye a partir de su
+    # esquina suroeste y su A.
+    angulo_norte: float = 0.0
+    lado_menor_m: float = 0.0
 
 
 # ─── Geometría del bloque ───────────────────────────────────────────
+
+
+def construir_bloque(
+    origen: tuple[float, float],
+    largo_planta_m: float,
+    ancho_m: float,
+    angulo_norte: float,
+) -> Polygon:
+    """
+    Rectángulo del bloque en coordenadas del terreno.
+
+    `origen` es la esquina suroeste. Se lleva al marco local (norte hacia
+    +Y), se arma el rectángulo alineado a los ejes y se devuelve girado
+    al terreno. Es la misma construcción que usa `generar_layout`, así
+    que un bloque generado y uno editado tienen la misma forma y el mismo
+    orden de vértices: [SE, NE, NO, SO].
+    """
+    ox, oy = rotate(Point(origen), angulo_norte, origin=(0, 0)).coords[0]
+    local = box(ox, oy, ox + largo_planta_m, oy + ancho_m)
+    return rotate(local, -angulo_norte, origin=(0, 0))
+
+
+def vertices_de(poligono: Polygon) -> list[list[float]]:
+    """Cuatro esquinas redondeadas al milímetro, sin repetir la primera."""
+    return [[round(x, 3), round(y, 3)] for x, y in list(poligono.exterior.coords)[:-1]]
 
 
 def paneles_ancho_ideal(paneles_largo: int, lado_mayor_m: float, lado_menor_m: float) -> int:
@@ -456,6 +487,17 @@ def _letra(indice: int) -> str:
     return letras
 
 
+def advertencia_proporcion(tipos: list[TipoBloque], tolerancia: float) -> str | None:
+    """Aviso de bloques fuera de proporción, o None si todos cumplen."""
+    fuera = sum(t.repeticiones for t in tipos if not t.en_proporcion)
+    if not fuera:
+        return None
+    return (
+        f"{fuera} bloque(s) se apartan más de {tolerancia:.0%} de la proporción "
+        f"ancho = 3 × largo. Revísalos antes de confirmar."
+    )
+
+
 def agrupar_por_tipo(bloques: list[Bloque]) -> tuple[list[Bloque], list[TipoBloque]]:
     """
     Agrupa los bloques idénticos y les asigna una letra.
@@ -622,9 +664,7 @@ def generar_layout(
     # ─── Volver a coordenadas del terreno ────────────────────────
     bloques = []
     for b in mejor:
-        local = box(b.x0, b.y0, b.x1, b.y1)
-        global_ = rotate(local, -angulo, origin=(0, 0))
-        esquinas = [[round(x, 3), round(y, 3)] for x, y in list(global_.exterior.coords)[:-1]]
+        esquinas = vertices_de(rotate(box(b.x0, b.y0, b.x1, b.y1), -angulo, origin=(0, 0)))
         prop = proporcion_bloque(L, b.paneles_ancho, lado_mayor, lado_menor)
         bloques.append(
             Bloque(
@@ -639,13 +679,9 @@ def generar_layout(
     bloques, tipos = agrupar_por_tipo(bloques)
     total = sum(b.paneles for b in bloques)
 
-    fuera = sum(t.repeticiones for t in tipos if not t.en_proporcion)
-    if fuera:
-        advertencias.append(
-            f"{fuera} bloque(s) se apartan más de "
-            f"{parametros.tolerancia_proporcion:.0%} de la proporción ancho = 3 × largo. "
-            f"Revísalos antes de confirmar."
-        )
+    aviso = advertencia_proporcion(tipos, parametros.tolerancia_proporcion)
+    if aviso:
+        advertencias.append(aviso)
 
     if not cumple_proporcion(
         proporcion_bloque(L, a_ideal, lado_mayor, lado_menor), parametros.tolerancia_proporcion
@@ -672,4 +708,89 @@ def generar_layout(
         capacidad=capacidad,
         electrica=electrica,
         advertencias=advertencias,
+        angulo_norte=angulo,
+        lado_menor_m=lado_menor,
     )
+
+
+# ─── Edición manual (SQ-64) ─────────────────────────────────────────
+
+# Penetración que se tolera: 5 mm. Un bloque puede asomarse hasta eso
+# fuera del terreno, sobre un camino o sobre otro bloque sin que cuente
+# como error. Absorbe el redondeo de las coordenadas al milímetro.
+#
+# Es una medida de profundidad y no de área a propósito: dos bloques que
+# se rozan 0,5 mm a lo largo de 27 m suman 0,0135 m², y una tolerancia
+# por área los rechazaría por puro redondeo.
+#
+# La misma regla está en frontend/src/utils/edicionLayout.ts, para que
+# la pantalla marque exactamente lo que el backend va a rechazar.
+TOLERANCIA_PENETRACION_M = 0.005
+
+
+class EdicionInvalida(ValueError):
+    """La edición deja un bloque en una posición imposible de construir."""
+
+
+def validar_bloques(
+    terreno: list[list[float]],
+    caminos: list[list[list[float]]],
+    bloques: list[Polygon],
+    pasillo_m: float,
+    angulo_norte: float = 0.0,
+) -> list[str]:
+    """
+    Comprueba que los bloques editados se puedan construir.
+
+    Bloquea (lanza `EdicionInvalida`) lo que no tiene arreglo en obra:
+    un bloque fuera del terreno, sobre un camino o encima de otro. Lo
+    que es mala práctica pero posible —un pasillo más angosto que el
+    configurado— solo se devuelve como advertencia.
+
+    Todo se evalúa en el marco local (norte hacia +Y), donde los bloques
+    son rectángulos alineados a los ejes. Cada bloque se achica la
+    tolerancia por lado: si aun así toca el borde, un camino u otro
+    bloque, se mete más de 5 mm.
+
+    Los bloques se numeran desde 1 en el orden recibido, que es el orden
+    en que la pantalla los lista.
+    """
+    t = TOLERANCIA_PENETRACION_M
+    a_local = lambda g: rotate(g, angulo_norte, origin=(0, 0))  # noqa: E731
+
+    cajas = [a_local(b).bounds for b in bloques]  # (x0, y0, x1, y1)
+    reducidos = [box(x0 + t, y0 + t, x1 - t, y1 - t) for x0, y0, x1, y1 in cajas]
+
+    terreno_local = a_local(Polygon(terreno))
+    for i, r in enumerate(reducidos, start=1):
+        if not terreno_local.contains(r):
+            raise EdicionInvalida(f"El bloque {i} se sale del terreno.")
+
+    if caminos:
+        caminos_local = unary_union([a_local(Polygon(c)) for c in caminos])
+        for i, r in enumerate(reducidos, start=1):
+            if r.intersects(caminos_local):
+                raise EdicionInvalida(f"El bloque {i} queda sobre un camino.")
+
+    # Índice espacial: con miles de bloques, comparar todos contra todos
+    # serían millones de comparaciones. El bloque achicado contra el otro
+    # entero: se tocan solo si se meten más de t uno en otro.
+    bloques_locales = [box(*c) for c in cajas]
+    arbol = STRtree(bloques_locales)
+    pares = arbol.query(reducidos, predicate="intersects")
+    conflictos = sorted({(min(i, j), max(i, j)) for i, j in zip(*pares) if i != j})
+    if conflictos:
+        i, j = conflictos[0]
+        raise EdicionInvalida(f"Los bloques {i + 1} y {j + 1} se superponen.")
+
+    advertencias = []
+    if pasillo_m > 0:
+        # 1 cm de margen para no avisar por diferencias de redondeo
+        cercanos = arbol.query(bloques_locales, predicate="dwithin", distance=pasillo_m - 0.01)
+        pares = sum(1 for i, j in zip(*cercanos) if i < j)
+        if pares:
+            advertencias.append(
+                f"{pares} par(es) de bloques quedan a menos de {pasillo_m:g} m, el pasillo "
+                f"configurado. Se puede construir, pero dificulta el mantenimiento."
+            )
+    return advertencias
