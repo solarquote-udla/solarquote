@@ -16,7 +16,9 @@ respuesta sigue siendo un arreglo y conserva `id`, `nombre`,
 
 ## Reglas generales
 
-- Todas las rutas exigen **Gerente General** (`requiere_gerente`).
+- Leer exige el permiso `clientes`, `generar_layout` o `cargar_boceto`;
+  crear, editar y dar de baja exigen `clientes` (ver DS-06 en
+  `DECISIONES-SEGURIDAD.md`).
 - No hay paginación: HEXtructure maneja decenas de clientes, no miles.
   Si algún día hace falta, se acuerda antes (el selector de proyectos
   depende de recibir la lista completa).

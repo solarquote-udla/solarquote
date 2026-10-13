@@ -16,7 +16,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.dependencies import requiere_gerente
+from app.core.dependencies import requiere_permiso
+from app.core.permisos import Permiso
 from app.schemas.layout import LayoutEditar, LayoutGenerar, LayoutLeer
 from app.services import layout as servicio
 from app.services.calculo_layout import EdicionInvalida, LayoutImposible
@@ -25,7 +26,7 @@ from app.services.proyecto import obtener_proyecto
 router = APIRouter(
     prefix="/api/proyectos/{proyecto_id}/layout",
     tags=["Módulo 1 — Layout"],
-    dependencies=[Depends(requiere_gerente)],
+    dependencies=[Depends(requiere_permiso(Permiso.GENERAR_LAYOUT))],
 )
 
 

@@ -17,6 +17,11 @@ from app.core.config import settings
 # bcrypt no acepta contraseñas de más de 72 bytes
 LONGITUD_MAX_PASSWORD = 72
 
+# Hash de una contraseña que nadie conoce. Cuando el correo no existe, el
+# login lo verifica igual: así tarda lo mismo que con un correo real y el
+# tiempo de respuesta no delata qué correos están registrados.
+_HASH_SEÑUELO = bcrypt.hashpw(b"solarquote-senuelo", bcrypt.gensalt()).decode("utf-8")
+
 
 # ─── Contraseñas ────────────────────────────────────────
 
@@ -47,24 +52,33 @@ def verificar_password(password: str, password_hash: str) -> bool:
         return False
 
 
+def verificar_password_señuelo(password: str) -> None:
+    """Gasta el mismo tiempo que una verificación real. Ver `_HASH_SEÑUELO`."""
+    verificar_password(password, _HASH_SEÑUELO)
+
+
 # ─── Tokens JWT ─────────────────────────────────────────
 
-def crear_access_token(*, usuario_id: int, rol: str) -> str:
+def crear_access_token(*, usuario_id: int, version: int) -> str:
     """
     Genera un token firmado que identifica al usuario.
 
     El token contiene:
       sub  → id del usuario (estándar JWT: "subject")
-      rol  → para autorizar sin consultar la base en cada petición
+      ver  → `version_token` del usuario al emitirlo; si después cambia
+             (cambio de contraseña, desactivación), el token deja de valer
       exp  → cuándo expira
       iat  → cuándo se emitió
+
+    No lleva el perfil ni los permisos: se leen de la base en cada
+    petición, así un cambio de permisos aplica de inmediato.
     """
     ahora = datetime.now(timezone.utc)
     expira = ahora + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
     payload: dict[str, Any] = {
         "sub": str(usuario_id),
-        "rol": rol,
+        "ver": version,
         "iat": ahora,
         "exp": expira,
     }

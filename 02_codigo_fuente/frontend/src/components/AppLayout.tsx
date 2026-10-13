@@ -1,65 +1,20 @@
 /**
  * Shell de la aplicación: barra lateral + encabezado + área de contenido.
  *
- * El menú se filtra por rol: el Personal de Producción solo ve el módulo
- * de Validación, según el documento capstone.
+ * El menú (components/menu.ts) sigue la estructura del prototipo y se
+ * filtra por los permisos del perfil: cada usuario ve solo las opciones
+ * que su perfil permite (RF-11).
  */
 
-import { NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
 
+import { menuVisible } from "@/components/menu";
 import { useAuth } from "@/hooks/useAuth";
-import { ETIQUETAS_ROL, RolUsuario } from "@/types/api";
-
-interface ItemMenu {
-  ruta: string;
-  etiqueta: string;
-  modulo: string;
-  roles: RolUsuario[];
-}
-
-const MENU: ItemMenu[] = [
-  {
-    ruta: "/",
-    etiqueta: "Inicio",
-    modulo: "",
-    roles: [RolUsuario.GERENTE_GENERAL, RolUsuario.PERSONAL_PRODUCCION],
-  },
-  {
-    ruta: "/proyectos",
-    etiqueta: "Proyectos",
-    modulo: "Módulo 1",
-    roles: [RolUsuario.GERENTE_GENERAL],
-  },
-  {
-    ruta: "/bocetos",
-    etiqueta: "Bocetos",
-    modulo: "Módulo 2",
-    roles: [RolUsuario.GERENTE_GENERAL],
-  },
-  {
-    ruta: "/cotizaciones",
-    etiqueta: "Cotizaciones",
-    modulo: "Módulo 3",
-    roles: [RolUsuario.GERENTE_GENERAL],
-  },
-  {
-    ruta: "/administracion",
-    etiqueta: "Administración",
-    modulo: "Módulo 4",
-    roles: [RolUsuario.GERENTE_GENERAL],
-  },
-  {
-    ruta: "/validacion",
-    etiqueta: "Validación",
-    modulo: "Módulo 5",
-    roles: [RolUsuario.GERENTE_GENERAL, RolUsuario.PERSONAL_PRODUCCION],
-  },
-];
 
 export function AppLayout() {
-  const { usuario, cerrarSesion } = useAuth();
+  const { usuario, cerrarSesion, tienePermiso } = useAuth();
 
-  const menuVisible = MENU.filter((item) => usuario && item.roles.includes(usuario.rol));
+  const grupos = menuVisible(tienePermiso);
 
   const iniciales = usuario?.nombre
     .split(" ")
@@ -78,26 +33,40 @@ export function AppLayout() {
           </span>
         </div>
 
-        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-          {menuVisible.map((item) => (
-            <NavLink
-              key={item.ruta}
-              to={item.ruta}
-              end={item.ruta === "/"}
-              className={({ isActive }) =>
-                [
-                  "block rounded-lg px-3 py-2 text-sm transition",
-                  isActive
-                    ? "bg-solar-50 font-semibold text-solar-700"
-                    : "text-acero-600 hover:bg-acero-100",
-                ].join(" ")
-              }
-            >
-              <span className="block">{item.etiqueta}</span>
-              {item.modulo && (
-                <span className="block text-xs font-normal text-acero-400">{item.modulo}</span>
+        <nav className="flex-1 overflow-y-auto px-3 py-4">
+          {grupos.map((grupo) => (
+            <div key={grupo.titulo ?? "inicio"} className="mb-4">
+              {grupo.titulo && (
+                <p className="px-3 pb-1 text-[11px] font-semibold tracking-wider text-acero-400">
+                  {grupo.titulo}
+                </p>
               )}
-            </NavLink>
+              {grupo.secciones.map((seccion, i) => (
+                <div key={seccion.titulo ?? i} className="space-y-0.5">
+                  {seccion.titulo && (
+                    <p className="px-3 pt-1 text-xs font-medium text-acero-500">{seccion.titulo}</p>
+                  )}
+                  {seccion.opciones.map((opcion) => (
+                    <NavLink
+                      key={opcion.ruta}
+                      to={opcion.ruta}
+                      end={opcion.ruta === "/"}
+                      className={({ isActive }) =>
+                        [
+                          "block rounded-lg py-1.5 text-sm transition",
+                          seccion.titulo ? "pl-6 pr-3" : "px-3",
+                          isActive
+                            ? "bg-solar-50 font-semibold text-solar-700"
+                            : "text-acero-600 hover:bg-acero-100",
+                        ].join(" ")
+                      }
+                    >
+                      {opcion.etiqueta}
+                    </NavLink>
+                  ))}
+                </div>
+              ))}
+            </div>
           ))}
         </nav>
 
@@ -111,14 +80,19 @@ export function AppLayout() {
         <header className="flex h-16 shrink-0 items-center justify-end gap-4 border-b border-acero-200 bg-white px-6">
           <div className="text-right">
             <p className="text-sm font-medium text-acero-800">{usuario?.nombre}</p>
-            <p className="text-xs text-acero-500">
-              {usuario ? ETIQUETAS_ROL[usuario.rol] : ""}
-            </p>
+            <p className="text-xs text-acero-500">{usuario?.perfil.nombre}</p>
           </div>
 
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-solar-100 text-sm font-semibold text-solar-700">
             {iniciales}
           </div>
+
+          <Link
+            to="/cambiar-password"
+            className="rounded-lg px-3 py-1.5 text-sm text-acero-600 transition hover:bg-acero-100"
+          >
+            Cambiar contraseña
+          </Link>
 
           <button
             type="button"

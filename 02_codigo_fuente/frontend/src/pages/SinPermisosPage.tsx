@@ -6,7 +6,7 @@ export function SinPermisosPage() {
       <p className="text-5xl font-bold text-acero-300">403</p>
       <h1 className="text-xl font-semibold text-acero-800">No tienes permisos</h1>
       <p className="max-w-sm text-sm text-acero-500">
-        Tu rol no tiene acceso a esta sección. Si crees que es un error, contacta al
+        Tu perfil no tiene acceso a esta sección. Si crees que es un error, contacta al
         Gerente General.
       </p>
       <Link

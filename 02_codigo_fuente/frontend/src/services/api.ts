@@ -13,6 +13,9 @@ import type { ErrorApi } from "@/types/api";
 
 const CLAVE_TOKEN = "solarquote_token";
 
+// Mismo texto que DETALLE_CAMBIO_PENDIENTE en backend/app/core/dependencies.py
+export const DETALLE_CAMBIO_PENDIENTE = "Debes cambiar tu contraseña temporal antes de continuar";
+
 export const api = axios.create({
   // En desarrollo el proxy de Vite reenvía /api al backend.
   // En producción se define con VITE_API_URL.
@@ -64,6 +67,14 @@ api.interceptors.response.use(
       if (window.location.pathname !== "/login") {
         window.location.href = "/login?expirado=1";
       }
+    }
+
+    // El administrador restableció la contraseña mientras había una sesión
+    // abierta: se lleva al usuario a elegir una nueva.
+    const debeCambiarPassword =
+      error.response?.status === 403 && error.response.data?.detail === DETALLE_CAMBIO_PENDIENTE;
+    if (debeCambiarPassword && window.location.pathname !== "/cambiar-password") {
+      window.location.href = "/cambiar-password";
     }
 
     return Promise.reject(error);
