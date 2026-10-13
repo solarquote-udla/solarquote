@@ -117,7 +117,7 @@ const numero = (v: number, decimales = 2) =>
 
 function Tarjeta({ titulo, children }: { titulo: string; children: ReactNode }) {
   return (
-    <div className="rounded-xl border border-acero-200 bg-white p-5">
+    <div className="rounded-xl border border-acero-200 bg-superficie p-5">
       <h2 className="text-sm font-semibold text-acero-700">{titulo}</h2>
       {children}
     </div>
@@ -443,7 +443,7 @@ export function LayoutPage() {
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         {/* ─── Parámetros y plano ───────────────────────── */}
         <div className="space-y-5 lg:col-span-2">
-          <form onSubmit={generar} className="rounded-xl border border-acero-200 bg-white p-5">
+          <form onSubmit={generar} className="rounded-xl border border-acero-200 bg-superficie p-5">
             <div className="grid gap-4 sm:grid-cols-4">
               <Entrada etiqueta="Paneles en el largo (L)" ayuda="Par: soportes en A y V">
                 <select className={CAMPO} value={parametros.L} onChange={(e) => actualizar("L", e.target.value)}>
@@ -474,7 +474,7 @@ export function LayoutPage() {
                   <button type="button" onClick={() => setConfirmarRegenerar(false)} className="rounded-lg border border-amber-400 px-4 py-1.5 text-sm hover:bg-amber-100">
                     Cancelar
                   </button>
-                  <button type="submit" disabled={generando} className="rounded-lg bg-amber-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-50">
+                  <button type="submit" disabled={generando} className="rounded-lg bg-amber-500 px-4 py-1.5 text-sm font-semibold text-acero-50 hover:bg-amber-400 disabled:opacity-50">
                     {generando ? "Generando…" : "Sí, volver a generar"}
                   </button>
                 </div>
@@ -485,7 +485,7 @@ export function LayoutPage() {
                 <button
                   type="submit"
                   disabled={!puedeGenerar || generando || borrador !== null}
-                  className="rounded-lg bg-solar-500 px-5 py-2 text-sm font-semibold text-white transition hover:bg-solar-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-lg bg-solar-500 px-5 py-2 text-sm font-semibold text-acero-50 transition hover:bg-solar-600 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {generando ? "Generando…" : layout ? "Volver a generar" : "Generar layout"}
                 </button>
@@ -495,7 +495,7 @@ export function LayoutPage() {
 
           {/* ─── Barra de edición (SQ-64) ─────────────────── */}
           {layout && !borrador && (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-acero-200 bg-white px-5 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-acero-200 bg-superficie px-5 py-3">
               <p className="text-sm text-acero-600">
                 {layout.ediciones_manuales > 0
                   ? `${layout.ediciones_manuales} edición(es) manual(es) desde la última generación.`
@@ -527,7 +527,7 @@ export function LayoutPage() {
                     {cambios} cambio(s)
                     {problemas.size > 0 && <span className="ml-2 font-semibold text-red-700">· {problemas.size} bloque(s) con problemas</span>}
                   </span>
-                  <button type="button" onClick={descartarEdicion} className="rounded-lg border border-acero-300 bg-white px-3 py-1.5 text-sm text-acero-700 hover:bg-acero-100">
+                  <button type="button" onClick={descartarEdicion} className="rounded-lg border border-acero-300 bg-superficie px-3 py-1.5 text-sm text-acero-700 hover:bg-acero-100">
                     Descartar
                   </button>
                   <button
@@ -535,7 +535,7 @@ export function LayoutPage() {
                     onClick={guardarEdicion}
                     disabled={guardando || cambios === 0 || problemas.size > 0 || borrador.length === 0}
                     title={problemas.size > 0 ? "Corrige los bloques en rojo antes de guardar" : undefined}
-                    className="rounded-lg bg-solar-500 px-4 py-1.5 text-sm font-semibold text-white hover:bg-solar-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-lg bg-solar-500 px-4 py-1.5 text-sm font-semibold text-acero-50 hover:bg-solar-600 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {guardando ? "Guardando…" : "Guardar cambios"}
                   </button>
@@ -550,11 +550,11 @@ export function LayoutPage() {
                   </span>
                   <span className="flex items-center gap-1">
                     <span className="text-xs text-acero-500">A:</span>
-                    <button type="button" onClick={() => cambiarA(-1)} disabled={bloqueSeleccionado.paneles_ancho <= 1} className="h-7 w-7 rounded border border-acero-300 bg-white text-acero-700 hover:bg-acero-100 disabled:opacity-40" aria-label="Quitar un panel en A">
+                    <button type="button" onClick={() => cambiarA(-1)} disabled={bloqueSeleccionado.paneles_ancho <= 1} className="h-7 w-7 rounded border border-acero-300 bg-superficie text-acero-700 hover:bg-acero-100 disabled:opacity-40" aria-label="Quitar un panel en A">
                       −
                     </button>
                     <span className="w-8 text-center font-mono">{bloqueSeleccionado.paneles_ancho}</span>
-                    <button type="button" onClick={() => cambiarA(1)} className="h-7 w-7 rounded border border-acero-300 bg-white text-acero-700 hover:bg-acero-100" aria-label="Agregar un panel en A">
+                    <button type="button" onClick={() => cambiarA(1)} className="h-7 w-7 rounded border border-acero-300 bg-superficie text-acero-700 hover:bg-acero-100" aria-label="Agregar un panel en A">
                       +
                     </button>
                   </span>
@@ -602,7 +602,7 @@ export function LayoutPage() {
             </p>
           )}
           {!layout ? (
-            <div className="rounded-xl border border-dashed border-acero-300 bg-white p-5 text-sm text-acero-500">
+            <div className="rounded-xl border border-dashed border-acero-300 bg-superficie p-5 text-sm text-acero-500">
               Genera el layout para ver los bloques, la potencia instalada y la configuración eléctrica.
             </div>
           ) : (
