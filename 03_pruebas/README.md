@@ -27,7 +27,7 @@ encontrados por severidad y correcciones aplicadas.
 
 ## Cobertura actual
 
-Al cierre del Sprint 2: **200 pruebas automatizadas**, todas aprobadas.
+Al cierre del Sprint 2: **228 pruebas automatizadas**, todas aprobadas.
 
 | Componente | Pruebas | Estado |
 |---|---|---|
@@ -37,7 +37,8 @@ Al cierre del Sprint 2: **200 pruebas automatizadas**, todas aprobadas.
 | Terreno y área útil (RF-01) | Unitarias | Implementadas |
 | Panel e inversor (RF-02) | Unitarias | Implementadas |
 | Algoritmo de layout solar (RF-03) | Unitarias | Implementadas |
-| Edición manual de bloques (SQ-64) | Unitarias + integración + paridad | En revisión |
+| Edición manual de bloques (SQ-64) | Unitarias + integración + paridad | Implementadas |
+| Autenticación entre servicios (SQ-37) | Integración | Implementadas |
 | Clientes y validación de identificación (RF-12) | Unitarias + integración + paridad | Implementadas |
 | Precios de materiales (RF-09) | Integración | Implementadas |
 | CORS y configuración | Unitarias | Implementadas |

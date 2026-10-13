@@ -39,18 +39,20 @@ login → clientes → proyecto → terreno y caminos → panel e inversor → l
 | SQ-89 | RF-12 Administrar clientes | Esteban (backend) · Joseph (pantalla) | 8 | ✅ Hecha | #15, #17, #18, #22 |
 | SQ-93 | RF-09 Administrar precios de materiales | Esteban | 8 | ✅ Hecha | #23, #24, #25 |
 | SQ-21 | Desplegar el microservicio de cálculo | Esteban · Joseph | 3 | ✅ Hecha | despliegue en Railway |
-| SQ-72 | RF-06 Calcular materiales por proyecto | Esteban | 13 | 🟡 Backend listo; falta la pantalla → Sprint 3 | #5, #10–#13, #16, #19, #28 |
-| SQ-37 | Autenticar la comunicación entre servicios | Esteban | 3 | ⬜ Pasa al Sprint 3 | — |
+| SQ-37 | Autenticar la comunicación entre servicios | Esteban | 3 | ✅ Hecha | #30 |
+| SQ-72 | RF-06 Calcular materiales por proyecto | Esteban | 13 | 🟡 Backend listo (subtareas completas); sigue en progreso → Sprint 3 | #5, #10–#13, #16, #19, #28 |
+
+**Sobre SQ-72:** todo el cálculo y la orquestación de la cotización
+quedaron hechos y probados. La historia se mantiene abierta para que el
+informe refleje lo real: falta poder consultar y mostrar una cotización.
+La pantalla de detalle es **SQ-84** (RF-07, Sprint 3).
 
 **Adelantadas de sprints futuros:**
 
 | Clave | Historia | Sprint previsto | Estado |
 |---|---|---|---|
 | SQ-56 | RF-03 Generar el layout solar automáticamente | Sprint 4 | ✅ Hecha (#14) |
-| SQ-64 | Editar manualmente los bloques generados | Sprint 4 | 🟡 En revisión |
-
-> Completar antes del cierre: confirmar en Jira los estados finales y
-> los puntos completados según el *Sprint Report*.
+| SQ-64 | Editar manualmente los bloques generados | Sprint 4 | ✅ Hecha (#27) |
 
 ---
 
@@ -58,9 +60,9 @@ login → clientes → proyecto → terreno y caminos → panel e inversor → l
 
 | Indicador | Valor |
 |---|---|
-| Pull requests mergeados | 23 (todos con revisión del otro integrante) |
-| Pruebas automatizadas | 200, todas aprobadas ([reporte](../../03_pruebas/reportes/sprint-02.md)) |
-| Defectos encontrados / abiertos | 9 / 0 |
+| Pull requests mergeados | 25 (todos con revisión del otro integrante) |
+| Pruebas automatizadas | 228, todas aprobadas ([reporte](../../03_pruebas/reportes/sprint-02.md)) |
+| Defectos encontrados / abiertos | 10 / 0 |
 | Despliegues | Frontend (Vercel), backend y calc-service (Railway), base de producción (Neon) |
 | Líneas de código agregadas | ~11 000 (`02_codigo_fuente/`) |
 
@@ -94,12 +96,16 @@ login → clientes → proyecto → terreno y caminos → panel e inversor → l
 | Archivo | Qué capturar | Estado |
 |---|---|---|
 | `backlog.png` | Jira → Backlog, con el Sprint 2 y los siguientes | ☑ |
-| `tablero.png` | Jira → Active sprint, al cierre | ☐ viernes 9 |
-| `burndown.png` | Jira → Reports → Burndown chart, Sprint 2 | ☐ viernes 9 |
-| `informe-jira.png` | Jira → Reports → Sprint report, Sprint 2 | ☐ viernes 9 |
+| `informe-jira.png` | Jira → Reports → Sprint report, Sprint 2: historias completadas y no completadas al cierre | ☐ |
+| `burndown.png` | Jira → Reports → Burndown chart, Sprint 2 | ☐ |
+| `velocidad.png` | Jira → Reports → Velocity chart: Sprints 1 y 2 | ☐ |
 | `ci1.png`, `ci2.png` | GitHub → Actions: corridas en verde | ☑ |
 | `pull-requests.png` | GitHub → Pull requests → Closed | ☑ |
 | `retrospectiva.md` | Acuerdos de la retrospectiva | Borrador listo |
+
+No hay captura del tablero al cierre: el sprint se cerró en Jira antes de
+tomarla, y el tablero pasó a mostrar el Sprint 3. El *Sprint report*
+conserva el estado final de cada historia y cumple esa función.
 
 Capturas del sistema en funcionamiento → `05_evidencias/capturas/sprint-02/`:
 
@@ -111,4 +117,4 @@ Capturas del sistema en funcionamiento → `05_evidencias/capturas/sprint-02/`:
 | `04-terreno.png` | Terreno con caminos y áreas | ☑ |
 | `05-equipo.png` | Panel e inversor con resultados | ☑ |
 | `06-layout.png` | Layout generado con bloques por tipo | ☑ |
-| `07-edicion-bloques.png` | Modo edición con un bloque en rojo | ☐ cuando se mergee SQ-64 |
+| `07-edicion-bloques.png` | Modo edición con un bloque en rojo | ☑ |
