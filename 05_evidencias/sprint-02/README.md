@@ -1,6 +1,6 @@
 # Sprint 2 — Informe de cierre
 
-**Periodo:** 25 de septiembre – 9 de octubre de 2026
+**Periodo:** 25 de septiembre – 10 de octubre de 2026 (cierre en Jira: 10 de octubre, 18:04)
 **Equipo:** Joseph Flores · Esteban Narváez
 **Objetivo del sprint:** que el sistema se vea y esté en línea — frontend
 y backend desplegados, y las primeras funcionalidades de los módulos de
@@ -40,12 +40,19 @@ login → clientes → proyecto → terreno y caminos → panel e inversor → l
 | SQ-93 | RF-09 Administrar precios de materiales | Esteban | 8 | ✅ Hecha | #23, #24, #25 |
 | SQ-21 | Desplegar el microservicio de cálculo | Esteban · Joseph | 3 | ✅ Hecha | despliegue en Railway |
 | SQ-37 | Autenticar la comunicación entre servicios | Esteban | 3 | ✅ Hecha | #30 |
-| SQ-72 | RF-06 Calcular materiales por proyecto | Esteban | 13 | 🟡 Backend listo (subtareas completas); sigue en progreso → Sprint 3 | #5, #10–#13, #16, #19, #28 |
+| SQ-72 | RF-06 Calcular materiales por proyecto | Esteban | 13 | ✅ Hecha | #5, #10–#13, #16, #19, #28 |
+| SQ-148 | Pantalla de administración de clientes (subtarea de SQ-89) | Joseph | — | ✅ Hecha | #22 |
 
-**Sobre SQ-72:** todo el cálculo y la orquestación de la cotización
-quedaron hechos y probados. La historia se mantiene abierta para que el
-informe refleje lo real: falta poder consultar y mostrar una cotización.
-La pantalla de detalle es **SQ-84** (RF-07, Sprint 3).
+**Sobre SQ-72:** se verificó contra sus cinco criterios de aceptación,
+todos de backend: las diez fórmulas, el rechazo de L impar, el IVA
+configurable, la logística como línea aparte y el total con subtotal,
+addendum e IVA. La pantalla para consultar y mostrar una cotización no es
+parte de esta historia: es **SQ-84** (RF-07), planificada para el Sprint 3.
+
+**Resultado en Jira** (*Sprint report*): 13 elementos completados, ninguno
+pendiente. El alcance pasó de 64 a 69 puntos por las historias que se
+agregaron durante el sprint (SQ-145, SQ-146, SQ-147 y SQ-148), todas
+marcadas con `*` en el informe.
 
 **Adelantadas de sprints futuros:**
 
@@ -96,12 +103,13 @@ La pantalla de detalle es **SQ-84** (RF-07, Sprint 3).
 | Archivo | Qué capturar | Estado |
 |---|---|---|
 | `backlog.png` | Jira → Backlog, con el Sprint 2 y los siguientes | ☑ |
-| `informe-jira.png` | Jira → Reports → Sprint report, Sprint 2: historias completadas y no completadas al cierre | ☐ |
-| `burndown.png` | Jira → Reports → Burndown chart, Sprint 2 | ☐ |
+| `informe-jira.png` | Jira → Reports → Sprint report, Sprint 2: historias completadas al cierre | ☑ |
+| `burndown.png` | Jira → Reports → Burndown chart, Sprint 2 | ☑ |
+| `burndown-eventos.png` | Detalle de eventos del burndown (qué se completó y cuándo) | ☑ |
 | `velocidad.png` | Jira → Reports → Velocity chart: Sprints 1 y 2 | ☐ |
 | `ci1.png`, `ci2.png` | GitHub → Actions: corridas en verde | ☑ |
 | `pull-requests.png` | GitHub → Pull requests → Closed | ☑ |
-| `retrospectiva.md` | Acuerdos de la retrospectiva | Borrador listo |
+| `retrospectiva.md` | Acuerdos de la retrospectiva | ☑ |
 
 No hay captura del tablero al cierre: el sprint se cerró en Jira antes de
 tomarla, y el tablero pasó a mostrar el Sprint 3. El *Sprint report*

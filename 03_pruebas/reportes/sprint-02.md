@@ -1,6 +1,6 @@
 # Reporte de pruebas — Sprint 2
 
-**Periodo:** 25 de septiembre – 9 de octubre de 2026
+**Periodo:** 25 de septiembre – 10 de octubre de 2026
 **Estrategia aplicada:** [ESTRATEGIA-PRUEBAS.md](../estrategia/ESTRATEGIA-PRUEBAS.md)
 
 Medición sobre `develop` al 7 de octubre de 2026 (commit `0ed5ea0`).

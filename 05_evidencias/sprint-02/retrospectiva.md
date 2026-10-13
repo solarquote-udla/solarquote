@@ -1,22 +1,27 @@
 # Retrospectiva — Sprint 2
 
-**Fecha:** 9 de octubre de 2026
+**Fecha:** octubre de 2026, al cierre del Sprint 2 (cerrado en Jira el 10 de octubre)
 **Participantes:** Joseph Flores · Esteban Narváez
 
-> **Borrador.** Armado a partir de lo que pasó en el sprint (PRs,
-> incidentes, decisiones). Revísenlo juntos en la retrospectiva:
-> corrijan, agreguen su propia lectura y borren esta nota.
+El equipo partió de un borrador armado con los hechos del sprint (PRs,
+incidentes y decisiones), lo revisó en conjunto y lo validó. Lo que se
+destacó en la conversación está marcado como **(reunión)**.
 
 ---
 
 ## Qué funcionó
 
+- **(reunión) Se cumplió lo planificado.** Todas las historias del sprint
+  se terminaron (13 elementos, 69 puntos en el *Sprint report*), y además
+  se adelantaron RF-03 y la edición manual de bloques, previstas para el
+  Sprint 4.
 - **CI obligatorio desde el 1 de octubre.** Detectó dos defectos antes de que
   llegaran a `develop`: el ENUM huérfano en las migraciones y las dos
   *heads* al juntar ramas en paralelo.
-- **Revisión cruzada de cada PR.** Los dos defectos más graves (las
-  pruebas borraban la base de desarrollo y la cotización no guardaba el
-  total) salieron de revisar el código del otro, no de las pruebas.
+- **Revisión cruzada de cada PR.** Los defectos más graves (las pruebas
+  borraban la base de desarrollo, la cotización no guardaba el total y el
+  desfase de 0,5 mm en la edición de bloques) salieron de revisar el
+  código del otro, no de las pruebas.
 - **Contrato antes del código.** Con `CONTRATO-CLIENTES.md`, el backend y
   el frontend de clientes se hicieron en paralelo y encajaron sin ajustes.
 - **Funciones puras con cálculos a mano.** El algoritmo de layout se
@@ -29,6 +34,11 @@
 
 ## Qué no funcionó
 
+- **(reunión) Choques entre los cambios de los dos.** Al trabajar en
+  paralelo, a veces tocamos las mismas partes: conflictos en `main.py` al
+  registrar routers, en `types/api.ts`, y dos *heads* de migración al
+  juntar el layout con el desglose de la cotización. Se resolvieron, pero
+  costaron tiempo de integración.
 - **Ramas duplicadas** (`-clean`, `-v2`, `-v3`) al rehacer rebases:
   llegaron a haber 20 ramas. *Resuelto:* borrado automático de ramas al
   mergear.
@@ -41,19 +51,20 @@
   apuntaba a la base del `.env`. Se detectó antes de perder datos.
 - **Estados de Jira desactualizados** respecto al trabajo real durante
   buena parte del sprint.
-- **Desbalance de carga:** el Módulo 1 avanzó dos sprints por delante y
-  la pantalla de cotización (RF-06) quedó para el siguiente.
 
 ## Acuerdos para el Sprint 3
 
-1. **Ninguna captura con valores del `.env` ni de variables de Railway**:
+1. **(reunión) Avisar antes de tocar archivos compartidos** (`main.py`,
+   `types/api.ts`, las migraciones y los modelos compartidos), y
+   actualizar la rama con `develop` seguido, no solo al final.
+2. **Ninguna captura con valores del `.env` ni de variables de Railway**:
    se tapan antes de compartirlas.
-2. **Todo servicio nuevo se despliega en el mismo sprint en que se
+3. **Todo servicio nuevo se despliega en el mismo sprint en que se
    integra**, con su `/health` verificado.
-3. **Mover las tareas en Jira el mismo día del merge**, no al final.
-4. **`pytest` en local solo contra `solarquote_test`** (ya lo impone el
+4. **Mover las tareas en Jira el mismo día del merge**, no al final.
+5. **`pytest` en local solo contra `solarquote_test`** (ya lo impone el
    `conftest`).
-5. **Revisión y cierre del sprint los viernes**, con release
+6. **Revisión y cierre del sprint los viernes**, con release
    `develop → main`.
-6. Priorizar en el Sprint 3 la pantalla de cotización (RF-06) y
+7. Priorizar en el Sprint 3 la pantalla de cotización (SQ-84) y
    "Cotizar este layout", para cerrar el circuito completo.
