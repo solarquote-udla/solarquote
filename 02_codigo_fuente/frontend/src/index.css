@@ -1,31 +1,74 @@
 @import "tailwindcss";
 
-/* ─── Tema de SolarQuote ────────────────────────────────
+/* ─── Tema de SolarQuote: oscuro, como el prototipo ─────
    Tailwind 4 define el tema con variables CSS en @theme.
    No hace falta tailwind.config.js.
+
+   Cómo funciona el tema oscuro sin tocar cada pantalla:
+   las escalas están invertidas respecto a su uso habitual. Las pantallas
+   usan "50/100" para fondos y "700/900" para textos; aquí 50 es el
+   fondo más oscuro y 900 el texto más claro. Así `bg-acero-50` sigue
+   siendo "el fondo" y `text-acero-900` sigue siendo "el título".
+
+   - `superficie`: tarjetas, paneles y la barra lateral (antes bg-superficie).
+   - Los tonos 400-600 de los colores de acento no se invierten: son los
+     de botones, puntos de estado y bloques del plano.
+   - Contraste del texto secundario (acero-500) sobre superficie: ~6,9:1;
+     del texto atenuado (acero-400): ~4,3:1.
    ──────────────────────────────────────────────────────── */
 @theme {
-  --color-solar-50: #fffbeb;
-  --color-solar-100: #fef3c7;
-  --color-solar-200: #fde68a;
-  --color-solar-300: #fcd34d;
+  --color-superficie: #101a2d;
+
+  --color-acero-50: #0a1120;
+  --color-acero-100: #152036;
+  --color-acero-200: #22304a;
+  --color-acero-300: #31415f;
+  --color-acero-400: #7083a3;
+  --color-acero-500: #97a6bf;
+  --color-acero-600: #b6c2d6;
+  --color-acero-700: #cdd6e4;
+  --color-acero-800: #e1e7f0;
+  --color-acero-900: #f3f6fa;
+
+  --color-solar-50: #2b2112;
+  --color-solar-100: #3d2e14;
+  --color-solar-200: #5f4518;
+  --color-solar-300: #8c641b;
   --color-solar-400: #fbbf24;
   --color-solar-500: #f59e0b;
   --color-solar-600: #d97706;
-  --color-solar-700: #b45309;
-  --color-solar-800: #92400e;
-  --color-solar-900: #78350f;
+  --color-solar-700: #fbbf24;
+  --color-solar-800: #fcd34d;
+  --color-solar-900: #fde68a;
 
-  --color-acero-50: #f8fafc;
-  --color-acero-100: #f1f5f9;
-  --color-acero-200: #e2e8f0;
-  --color-acero-300: #cbd5e1;
-  --color-acero-400: #94a3b8;
-  --color-acero-500: #64748b;
-  --color-acero-600: #475569;
-  --color-acero-700: #334155;
-  --color-acero-800: #1e293b;
-  --color-acero-900: #0f172a;
+  /* Alertas: fondo oscuro teñido, borde intermedio y texto claro */
+  --color-red-50: #2d1418;
+  --color-red-100: #3f1a1f;
+  --color-red-200: #6b2228;
+  --color-red-600: #f87171;
+  --color-red-700: #fca5a5;
+  --color-red-800: #fecaca;
+
+  --color-green-50: #10261b;
+  --color-green-100: #143322;
+  --color-green-200: #1f5136;
+  --color-green-800: #86efac;
+
+  --color-amber-50: #2b2112;
+  --color-amber-100: #3d2e14;
+  --color-amber-300: #7a5a1c;
+  --color-amber-700: #fbbf24;
+  --color-amber-800: #fcd34d;
+  --color-amber-900: #fde68a;
+
+  --color-sky-50: #0f2233;
+  --color-sky-100: #12304a;
+  --color-sky-800: #7dd3fc;
+}
+
+:root {
+  /* Controles nativos (select, scroll, autocompletado) en modo oscuro */
+  color-scheme: dark;
 }
 
 html,

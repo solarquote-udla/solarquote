@@ -44,9 +44,9 @@ interface CaminoEditable extends CaminoDibujo {
 type Modo = "terreno" | "camino" | null;
 
 const BOTON =
-  "rounded-lg border border-acero-300 bg-white px-3 py-1.5 text-sm text-acero-700 transition hover:bg-acero-100 disabled:cursor-not-allowed disabled:opacity-40";
+  "rounded-lg border border-acero-300 bg-superficie px-3 py-1.5 text-sm text-acero-700 transition hover:bg-acero-100 disabled:cursor-not-allowed disabled:opacity-40";
 const BOTON_PRIMARIO =
-  "rounded-lg bg-solar-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-solar-600 disabled:cursor-not-allowed disabled:opacity-50";
+  "rounded-lg bg-solar-500 px-4 py-2 text-sm font-semibold text-acero-50 transition hover:bg-solar-600 disabled:cursor-not-allowed disabled:opacity-50";
 const CAMPO =
   "w-full rounded-lg border border-acero-300 px-2.5 py-1.5 text-sm focus:border-solar-500 focus:outline-none focus:ring-1 focus:ring-solar-500";
 
@@ -481,7 +481,7 @@ export function TerrenoPage() {
         {/* ─── Panel lateral ────────────────────────────── */}
         <aside className="space-y-5">
           {/* Áreas */}
-          <div className="rounded-xl border border-acero-200 bg-white p-5">
+          <div className="rounded-xl border border-acero-200 bg-superficie p-5">
             <h2 className="text-sm font-semibold text-acero-700">Superficies</h2>
             {guardado ? (
               <dl className="mt-3 space-y-2 text-sm">
@@ -517,7 +517,7 @@ export function TerrenoPage() {
           </div>
 
           {/* Terreno */}
-          <div className="rounded-xl border border-acero-200 bg-white p-5">
+          <div className="rounded-xl border border-acero-200 bg-superficie p-5">
             <h2 className="text-sm font-semibold text-acero-700">Terreno</h2>
 
             <p className="mt-3 text-xs font-medium text-acero-500">Rectángulo rápido</p>
@@ -634,7 +634,7 @@ export function TerrenoPage() {
           </div>
 
           {/* Caminos */}
-          <div className="rounded-xl border border-acero-200 bg-white p-5">
+          <div className="rounded-xl border border-acero-200 bg-superficie p-5">
             <h2 className="text-sm font-semibold text-acero-700">Caminos ({caminos.length})</h2>
 
             {caminos.length > 0 && (

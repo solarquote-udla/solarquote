@@ -66,6 +66,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUsuario(respuesta.usuario);
   }, []);
 
+  const refrescarSesion = useCallback(async () => {
+    setUsuario(await obtenerUsuarioActual());
+  }, []);
+
   // Es solo para no mostrar opciones inútiles: quien decide es el backend
   const tienePermiso = useCallback(
     (...permisos: Permiso[]) =>
@@ -81,9 +85,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       iniciarSesion,
       cerrarSesion,
       cambiarPassword,
+      refrescarSesion,
       tienePermiso,
     }),
-    [usuario, cargando, iniciarSesion, cerrarSesion, cambiarPassword, tienePermiso],
+    [usuario, cargando, iniciarSesion, cerrarSesion, cambiarPassword, refrescarSesion, tienePermiso],
   );
 
   return <AuthContext.Provider value={valor}>{children}</AuthContext.Provider>;

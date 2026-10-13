@@ -340,7 +340,7 @@ export function EquipoPage() {
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         {/* ─── Formulario ───────────────────────────────── */}
         <form onSubmit={guardar} className="space-y-5 lg:col-span-2">
-          <section className="rounded-xl border border-acero-200 bg-white p-5">
+          <section className="rounded-xl border border-acero-200 bg-superficie p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-sm font-semibold text-acero-700">Panel solar</h2>
               <select
@@ -404,7 +404,7 @@ export function EquipoPage() {
             </div>
           </section>
 
-          <section className="rounded-xl border border-acero-200 bg-white p-5">
+          <section className="rounded-xl border border-acero-200 bg-superficie p-5">
             <h2 className="text-sm font-semibold text-acero-700">Inversor</h2>
 
             <div className="mt-4 grid gap-4 sm:grid-cols-3">
@@ -448,7 +448,7 @@ export function EquipoPage() {
             <button
               type="submit"
               disabled={guardando || (!hayCambios && guardado !== null)}
-              className="rounded-lg bg-solar-500 px-5 py-2 text-sm font-semibold text-white transition hover:bg-solar-600 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg bg-solar-500 px-5 py-2 text-sm font-semibold text-acero-50 transition hover:bg-solar-600 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {guardando ? "Guardando…" : guardado ? "Guardar cambios" : "Guardar configuración"}
             </button>
@@ -458,7 +458,7 @@ export function EquipoPage() {
         {/* ─── Resultados ───────────────────────────────── */}
         <aside className="space-y-5">
           {!calculos ? (
-            <div className="rounded-xl border border-dashed border-acero-300 bg-white p-5 text-sm text-acero-500">
+            <div className="rounded-xl border border-dashed border-acero-300 bg-superficie p-5 text-sm text-acero-500">
               Guarda la configuración para ver el área por panel, la separación entre filas y los
               límites de string.
             </div>
@@ -470,14 +470,14 @@ export function EquipoPage() {
                 </p>
               )}
 
-              <div className="rounded-xl border border-acero-200 bg-white p-5">
+              <div className="rounded-xl border border-acero-200 bg-superficie p-5">
                 <h2 className="text-sm font-semibold text-acero-700">Panel</h2>
                 <dl className="mt-3 space-y-2">
                   <Fila nombre="Área por panel" valor={`${numero(calculos.area_panel_m2, 3)} m²`} />
                 </dl>
               </div>
 
-              <div className="rounded-xl border border-acero-200 bg-white p-5">
+              <div className="rounded-xl border border-acero-200 bg-superficie p-5">
                 <h2 className="text-sm font-semibold text-acero-700">Separación entre filas</h2>
                 {calculos.separacion ? (
                   <>
@@ -503,7 +503,7 @@ export function EquipoPage() {
                 )}
               </div>
 
-              <div className="rounded-xl border border-acero-200 bg-white p-5">
+              <div className="rounded-xl border border-acero-200 bg-superficie p-5">
                 <h2 className="text-sm font-semibold text-acero-700">Paneles por string</h2>
                 {calculos.strings ? (
                   calculos.strings.compatible ? (

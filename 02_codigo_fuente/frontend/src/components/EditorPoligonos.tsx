@@ -106,7 +106,7 @@ export function EditorPoligonos({
   const ultimo = borrador.at(-1);
 
   return (
-    <div className="relative h-[520px] w-full overflow-hidden rounded-xl border border-acero-200 bg-white">
+    <div className="relative h-[520px] w-full overflow-hidden rounded-xl border border-acero-200 bg-superficie">
       <svg
         viewBox={`${lim.minX} ${-lim.maxY} ${ancho} ${alto}`}
         preserveAspectRatio="xMidYMid meet"
@@ -203,7 +203,7 @@ export function EditorPoligonos({
         </g>
 
         {/* ─── Textos (Y negada a mano para no verlos en espejo) ─── */}
-        <g fontSize={fuente} className="fill-acero-400">
+        <g fontSize={fuente} className="fill-acero-500">
           {marcas(lim.minX, lim.maxX, paso).map((x) => (
             <text key={`tx${x}`} x={x} y={-lim.minY - fuente * 0.4} textAnchor="middle">
               {x}
@@ -227,7 +227,7 @@ export function EditorPoligonos({
                   x={(a[0] + b[0]) / 2}
                   y={-(a[1] + b[1]) / 2}
                   dominantBaseline="middle"
-                  stroke="white"
+                  className="stroke-superficie"
                   strokeWidth={fuente * 0.35}
                   paintOrder="stroke"
                 >
@@ -238,7 +238,7 @@ export function EditorPoligonos({
         </g>
 
         {/* Nombre de cada camino en su centro aproximado */}
-        <g fontSize={fuente * 0.85} textAnchor="middle" className="fill-acero-700">
+        <g fontSize={fuente * 0.85} textAnchor="middle" className="fill-acero-800">
           {caminos
             .filter((c) => c.nombre)
             .map((c) => {
@@ -250,7 +250,7 @@ export function EditorPoligonos({
                   x={cx}
                   y={-cy}
                   dominantBaseline="middle"
-                  stroke="white"
+                  className="stroke-superficie"
                   strokeWidth={fuente * 0.3}
                   paintOrder="stroke"
                 >
@@ -262,7 +262,7 @@ export function EditorPoligonos({
       </svg>
 
       {/* Lectura de coordenadas del cursor */}
-      <div className="pointer-events-none absolute bottom-3 right-3 rounded-md bg-white/90 px-2 py-1 font-mono text-xs text-acero-600 shadow-sm">
+      <div className="pointer-events-none absolute bottom-3 right-3 rounded-md bg-superficie/90 px-2 py-1 font-mono text-xs text-acero-600 shadow-sm">
         {cursor ? `x ${cursor[0].toFixed(2)} · y ${cursor[1].toFixed(2)} m` : "— m"}
       </div>
 
