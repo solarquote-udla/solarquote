@@ -41,6 +41,7 @@ def calcular_via_calc_service(
         respuesta = httpx.post(
             f"{settings.CALC_SERVICE_URL}/api/cotizacion/calcular",
             json=payload,
+            headers={"X-Internal-Secret": settings.CALC_SERVICE_SECRET},
             timeout=TIMEOUT_SEGUNDOS,
         )
     except httpx.RequestError as exc:
