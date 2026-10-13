@@ -12,7 +12,19 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.routers import auth, cliente, cotizacion, equipo, health, layout, material, proyectos, terreno
+from app.routers import (
+    auth,
+    cliente,
+    cotizacion,
+    equipo,
+    health,
+    layout,
+    material,
+    perfiles,
+    proyectos,
+    terreno,
+    usuarios,
+)
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -37,6 +49,10 @@ app.add_middleware(
 # ─── Rutas ──────────────────────────────────────────────
 app.include_router(health.router)
 app.include_router(auth.router, prefix="/api/auth", tags=["Autenticación"])
+
+# Seguridad (RF-11): perfiles con permisos por opción de menú y usuarios
+app.include_router(perfiles.router)
+app.include_router(usuarios.router)
 
 # Módulo 4 — Administración (clientes, precios de materiales). Antes
 # de proyectos: el alta de proyectos consume GET /api/clientes (ver

@@ -15,12 +15,14 @@ from app.models.material import Material, PrecioMaterial
 from app.models.equipo import ConfiguracionEquipo
 from app.models.layout import BloqueLayout, Layout
 from app.models.terreno import Camino, Terreno, TipoCamino
-from app.models.usuario import RolUsuario, Usuario
+from app.models.perfil import Perfil, PerfilPermiso
+from app.models.usuario import Usuario
 
 __all__ = [
     # Usuarios y seguridad
     "Usuario",
-    "RolUsuario",
+    "Perfil",
+    "PerfilPermiso",
     # Modelos compartidos — ver docs/MODELOS-COMPARTIDOS.md
     "Cliente",
     "TipoIdentificacion",

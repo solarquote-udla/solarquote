@@ -195,7 +195,7 @@ export function ProyectosPage() {
               </select>
               {clientes?.length === 0 && !errorClientes && (
                 <span className="mt-1 block text-xs font-normal text-acero-500">
-                  <Link to="/administracion/clientes" className="font-medium text-solar-700 hover:underline">
+                  <Link to="/clientes" className="font-medium text-solar-700 hover:underline">
                     Registra un cliente
                   </Link>{" "}
                   para poder crearle proyectos.

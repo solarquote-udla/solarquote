@@ -14,7 +14,8 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.dependencies import requiere_gerente
+from app.core.dependencies import requiere_permiso
+from app.core.permisos import Permiso
 from app.models.usuario import Usuario
 from app.schemas.terreno import (
     CaminoCrear,
@@ -28,7 +29,7 @@ from app.services import terreno as servicio
 router = APIRouter(
     prefix="/api/proyectos/{proyecto_id}/terreno",
     tags=["Módulo 1 — Terreno"],
-    dependencies=[Depends(requiere_gerente)],
+    dependencies=[Depends(requiere_permiso(Permiso.GENERAR_LAYOUT))],
 )
 
 
@@ -82,7 +83,7 @@ def definir_terreno(
     proyecto_id: int,
     datos: TerrenoCrear,
     db: Session = Depends(get_db),
-    _: Usuario = Depends(requiere_gerente),
+    _: Usuario = Depends(requiere_permiso(Permiso.GENERAR_LAYOUT)),
 ) -> TerrenoLeer:
     """
     Define la geometría del terreno de un proyecto.

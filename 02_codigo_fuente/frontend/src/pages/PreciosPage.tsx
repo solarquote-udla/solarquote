@@ -8,7 +8,6 @@
  */
 
 import { Fragment, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 
 import { mensajeDeError } from "@/services/api";
 import { actualizarPrecio, listarMateriales, obtenerHistorialPrecios } from "@/services/materiales";
@@ -92,11 +91,9 @@ export function PreciosPage() {
   return (
     <div className="mx-auto max-w-5xl">
       <nav className="text-sm text-acero-500">
-        <Link to="/administracion" className="hover:text-solar-700 hover:underline">
-          Administración
-        </Link>
+        <span>Configuración</span>
         <span className="mx-2">/</span>
-        <span className="text-acero-700">Precios</span>
+        <span className="text-acero-700">Precios unitarios</span>
       </nav>
 
       <div className="mt-2">

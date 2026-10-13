@@ -5,7 +5,8 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.models.cliente import Cliente, TipoIdentificacion
-from app.models.usuario import RolUsuario, Usuario
+from app.models.usuario import Usuario
+from tests.fabricas import perfil_gerente
 from app.schemas.cliente import ClienteActualizar, ClienteCrear
 from app.services.cliente import (
     IdentificacionDuplicada,
@@ -25,7 +26,7 @@ def _crear_usuario(db: Session) -> Usuario:
         nombre="Gerente de prueba",
         email=f"gerente-{id(db)}@example.com",
         password_hash="hash-no-usado-en-este-test",
-        rol=RolUsuario.GERENTE_GENERAL,
+        perfil=perfil_gerente(db),
     )
     db.add(usuario)
     db.flush()

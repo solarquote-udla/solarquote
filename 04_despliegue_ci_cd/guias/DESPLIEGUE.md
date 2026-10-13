@@ -173,7 +173,7 @@ CALC_SERVICE_URL=http://solarquote-calc.railway.internal:8080
 > La red interna no sale a internet: es más rápida y no consume ancho de
 > banda facturable.
 
-⚠️ **Antes de generar un dominio público para calc-service**, cierra DS-05
+**Atención:** antes de generar un dominio público para calc-service, cierra DS-05
 (autenticación entre servicios). Si solo se comunica internamente, no
 generes dominio — así queda inaccesible desde fuera.
 
