@@ -38,4 +38,4 @@ Revisado al cierre del Sprint 2:
 
 | Acuerdo | ¿Se cumplió? | Evidencia |
 |---|---|---|
-| Comunicar los cambios | Sí, y se formalizó | Todo cambio entró por pull request con revisión del otro integrante (23 PRs). El CRUD de clientes se acordó por escrito antes de programarlo (`CONTRATO-CLIENTES.md`). |
+| Comunicar los cambios | Sí, y se formalizó | Todo cambio entró por pull request con revisión del otro integrante (25 PRs). El CRUD de clientes se acordó por escrito antes de programarlo (`CONTRATO-CLIENTES.md`). |
