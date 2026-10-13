@@ -2,9 +2,10 @@ from decimal import Decimal
 
 from fastapi.testclient import TestClient
 
+from app.core.config import settings
 from app.main import app
 
-client = TestClient(app)
+client = TestClient(app, headers={"X-Internal-Secret": settings.CALC_SERVICE_SECRET})
 
 PRECIOS = {
     "VAR1650": "7.20",

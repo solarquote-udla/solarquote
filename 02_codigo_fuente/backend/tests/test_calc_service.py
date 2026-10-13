@@ -6,6 +6,7 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
+from app.core.config import settings
 from app.schemas.cotizacion import ItemCalculoEntrada
 from app.services.calc_service import CalcServiceError, calcular_via_calc_service
 
@@ -34,9 +35,10 @@ RESPUESTA_OK = {
 def test_arma_el_payload_y_mapea_la_respuesta(monkeypatch: pytest.MonkeyPatch) -> None:
     llamada = {}
 
-    def _post_falso(url, *, json, timeout):
+    def _post_falso(url, *, json, headers, timeout):
         llamada["url"] = url
         llamada["json"] = json
+        llamada["headers"] = headers
         llamada["timeout"] = timeout
         return httpx.Response(200, json=RESPUESTA_OK)
 
@@ -54,13 +56,15 @@ def test_arma_el_payload_y_mapea_la_respuesta(monkeypatch: pytest.MonkeyPatch) -
     assert llamada["json"]["precios"] == {"VAR1650": "7.20", "LOG": "35.00"}
     assert llamada["json"]["cargos_fijos"] == {"LOG": 1}
     assert llamada["json"]["iva_porcentaje"] == "15"
+    # DS-05: calc-service rechaza cualquier petición sin este secreto.
+    assert llamada["headers"]["X-Internal-Secret"] == settings.CALC_SERVICE_SECRET
 
     assert resultado.total == Decimal("107.64")
     assert resultado.cantidades_totales == {"VAR1650": 8, "LOG": 1}
 
 
 def test_lanza_calc_service_error_si_no_hay_conexion(monkeypatch: pytest.MonkeyPatch) -> None:
-    def _post_falso(url, *, json, timeout):
+    def _post_falso(url, *, json, headers, timeout):
         raise httpx.ConnectError("conexión rechazada")
 
     monkeypatch.setattr(httpx, "post", _post_falso)
@@ -76,7 +80,7 @@ def test_lanza_calc_service_error_si_no_hay_conexion(monkeypatch: pytest.MonkeyP
 
 
 def test_lanza_calc_service_error_si_la_respuesta_no_es_200(monkeypatch: pytest.MonkeyPatch) -> None:
-    def _post_falso(url, *, json, timeout):
+    def _post_falso(url, *, json, headers, timeout):
         return httpx.Response(422, json={"detail": "Faltan precios para los materiales: LOG"})
 
     monkeypatch.setattr(httpx, "post", _post_falso)

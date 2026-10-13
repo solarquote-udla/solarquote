@@ -52,6 +52,26 @@ class LayoutGenerar(BaseModel):
         return v
 
 
+class BloqueEditar(BaseModel):
+    """
+    Un bloque tras la edición manual (SQ-64).
+
+    Solo viajan la esquina suroeste y A: el backend reconstruye el
+    rectángulo con L, el panel y la orientación del layout. Así el
+    cliente no puede mandar un bloque deformado o girado distinto al
+    resto.
+    """
+
+    origen: list[float] = Field(min_length=2, max_length=2, description="Esquina suroeste [x, y], en metros")
+    paneles_ancho: int = Field(ge=1, le=500, description="A: paneles a lo largo de la fila")
+
+
+class LayoutEditar(BaseModel):
+    """Todos los bloques que quedan. Los que no vienen, se eliminan."""
+
+    bloques: list[BloqueEditar] = Field(min_length=1, max_length=20_000)
+
+
 class BloqueLeer(BaseModel):
     vertices: list[list[float]]
     paneles_largo: int
@@ -113,6 +133,11 @@ class LayoutLeer(BaseModel):
     capacidad: CapacidadLeer | None
     electrica: ElectricaLeer
     advertencias: list[str]
+
+    # Para que el plano pueda editar bloques con la misma geometría que el backend
+    angulo_norte: float = Field(description="Grados del norte en sentido horario desde +Y, usados al generar")
+    lado_menor_m: float = Field(description="Lo que suma cada panel de A al bloque, en metros")
+    ediciones_manuales: int = Field(description="Cambios hechos a mano desde la última generación")
 
     desactualizado: bool = Field(
         description=(

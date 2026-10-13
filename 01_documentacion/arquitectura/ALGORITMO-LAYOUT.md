@@ -97,6 +97,41 @@ latitud, panel e inversor. Si cualquiera cambia, la respuesta trae
 `desactualizado: true` y la pantalla pide volver a generar. No se borra
 automáticamente: el Gerente puede querer compararlo.
 
+## Edición manual (SQ-64)
+
+El Gerente puede **mover**, **cambiar A** (de a un panel) y **eliminar**
+bloques sobre el plano. L queda fijo. No se agregan bloques nuevos.
+
+| Decisión | Detalle |
+|---|---|
+| Qué viaja | Por bloque, solo la esquina suroeste y A. El backend reconstruye el rectángulo con L, el panel y la orientación guardada al generar, así que no puede llegar un bloque deformado o girado distinto al resto |
+| Qué se bloquea | Bloque fuera del terreno, sobre un camino o encima de otro (422) |
+| Qué solo advierte | Pasillo más angosto que el configurado |
+| Tolerancia | 5 mm de **penetración**, no de área: dos bloques que se rozan 0,5 mm a lo largo de 27 m suman 0,0135 m² y no deberían rechazarse por redondeo |
+| Guardado | Borrador local con botón Guardar / Descartar. Al guardar se recalculan tipos, potencia, capacidad y eléctrica |
+| Regenerar | Pide confirmación si hay ediciones manuales; regenerar las reemplaza |
+| Layout desactualizado | No se puede editar (409): primero hay que regenerar |
+
+La validación se hace en el marco local del layout, donde los bloques son
+rectángulos alineados a los ejes. La pantalla aplica **la misma regla**
+(`frontend/src/utils/edicionLayout.ts`) para marcar en rojo, mientras se
+arrastra, lo que el backend va a rechazar. Se verificó la paridad en 4 000
+escenarios aleatorios —terrenos cóncavos, caminos, ángulos y casos a
+milímetros del límite— sin ninguna diferencia.
+
+**Mismos números en los dos lados.** No basta con que la regla sea igual:
+también tienen que serlo los datos de entrada. El backend reconstruye los
+bloques con los valores que entrega la API (`largo_bloque_m`,
+`lado_menor_m`, `angulo_norte`), no con valores recalculados. En la
+revisión del PR #27, Esteban detectó que el backend recalculaba el largo a
+precisión completa mientras la pantalla usaba el valor redondeado al
+milímetro: hasta 0,5 mm de diferencia, justo en el borde de la tolerancia.
+La prueba de paridad no lo vio porque alimentaba ambos lados con el mismo
+número. Hay una prueba de regresión (`test_backend_valida_con_el_mismo_largo_que_entrega_la_api`)
+que reproduce el caso a 22° de montaje.
+
+Endpoint: `PUT /api/proyectos/{id}/layout/bloques`.
+
 ## Limitaciones conocidas
 
 - La sombra entre bloques usa la fórmula de RF-02 (sol al mediodía del peor
