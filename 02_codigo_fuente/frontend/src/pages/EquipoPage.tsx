@@ -604,7 +604,8 @@ export function EquipoPage() {
         atras={{
           etiqueta: "← Anterior",
           onClick: () => {
-            if (hayCambios && guardado && !window.confirm("Tienes cambios sin guardar en el equipo. ¿Volver al Paso 1 sin guardarlos?")) return;
+            // También la primera vez: sin configuración guardada, cualquier dato escrito se perdería
+            if (hayCambios && !window.confirm("Tienes cambios sin guardar en el equipo. ¿Volver al Paso 1 sin guardarlos?")) return;
             void navegar(rutaPaso(proyectoId, 1));
           },
         }}

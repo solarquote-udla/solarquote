@@ -179,6 +179,10 @@ export function TerrenoPage() {
     [vertices, orientacion, notas, guardado],
   );
 
+  /** Algo escrito que todavía no está en el servidor (proyecto o terreno). */
+  const sinGuardar =
+    terrenoCambio || JSON.stringify(datos) !== JSON.stringify(proyecto ? datosDe(proyecto) : DATOS_VACIOS);
+
   const caminos: CaminoDibujo[] = useMemo(
     () => (guardado?.caminos ?? []).map((c) => ({ clave: `c${c.id}`, nombre: c.nombre, vertices: c.vertices })),
     [guardado],
@@ -567,7 +571,13 @@ export function TerrenoPage() {
       </div>
 
       <BarraPaso
-        atras={{ etiqueta: "Cancelar", a: "/historial" }}
+        atras={{
+          etiqueta: "Cancelar",
+          onClick: () => {
+            if (sinGuardar && !window.confirm("Hay datos sin guardar en este paso. ¿Salir sin guardarlos?")) return;
+            void navegar("/historial");
+          },
+        }}
         resumen={
           area !== null
             ? `${formatearMetros(numeroOpcional(dimensiones.ancho) || 0)} × ${formatearMetros(numeroOpcional(dimensiones.largo) || 0)} · ${formatearArea(area)}`

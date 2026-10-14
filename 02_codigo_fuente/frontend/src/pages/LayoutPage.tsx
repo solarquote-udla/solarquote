@@ -130,14 +130,28 @@ function nombreCamino(existentes: (string | null)[], direccion: Direccion): stri
   return `Camino ${letra}${Math.max(0, ...usados) + 1}`;
 }
 
-/** Ancho y sentido aproximados de un camino, para la lista del panel. */
-function describirCamino(vertices: Punto[]): string {
+/**
+ * Sentido y ancho de un camino, para la lista del panel.
+ *
+ * El sentido sale del nombre que le da esta pantalla ("Camino H1" o
+ * "Camino V1"): adivinarlo por la forma falla en terrenos angostos, donde
+ * un camino horizontal puede ser más alto que ancho. Solo para caminos
+ * con otro nombre (creados antes del asistente) se infiere por la forma.
+ */
+function describirCamino(nombre: string | null, vertices: Punto[]): string {
   const xs = vertices.map((p) => p[0]);
   const ys = vertices.map((p) => p[1]);
   const dx = Math.max(...xs) - Math.min(...xs);
   const dy = Math.max(...ys) - Math.min(...ys);
-  const horizontal = dx >= dy;
+  const letra = nombre?.match(/^Camino ([HV])\d+$/)?.[1];
+  const horizontal = letra ? letra === "H" : dx >= dy;
   return `${horizontal ? "Horizontal" : "Vertical"} · ${numero(horizontal ? dy : dx)} m de ancho`;
+}
+
+/** Eje centrado del terreno en la dirección del camino, en metros desde el borde. */
+function posicionCentrada(terreno: Punto[], direccion: Direccion): string {
+  const valores = terreno.map((p) => (direccion === "horizontal" ? p[1] : p[0]));
+  return String(Math.round((Math.max(...valores) - Math.min(...valores)) / 2));
 }
 
 function desdeLayout(l: Layout | null): Parametros {
@@ -405,10 +419,9 @@ export function LayoutPage() {
     if (!terreno) return;
     setError(null);
     setAviso(null);
-    const ys = terreno.vertices.map((p) => p[1]);
     setFormCamino({
       direccion: "horizontal",
-      posicion: String(Math.round((Math.max(...ys) - Math.min(...ys)) / 2)),
+      posicion: posicionCentrada(terreno.vertices, "horizontal"),
       ancho: "4",
       tipo: TipoCamino.ACCESO,
     });
@@ -786,7 +799,7 @@ export function LayoutPage() {
                     <span>
                       <span className="block text-sm font-medium text-amber-900">{c.nombre ?? "Camino"}</span>
                       <span className="block text-xs text-amber-800">
-                        {describirCamino(c.vertices)} · {ETIQUETAS_TIPO_CAMINO[c.tipo]}
+                        {describirCamino(c.nombre, c.vertices)} · {ETIQUETAS_TIPO_CAMINO[c.tipo]}
                       </span>
                     </span>
                     <button
@@ -808,7 +821,14 @@ export function LayoutPage() {
                       <button
                         key={d}
                         type="button"
-                        onClick={() => setFormCamino((f) => (f ? { ...f, direccion: d } : f))}
+                        onClick={() =>
+                          setFormCamino((f) => {
+                            if (!f || !terreno || f.direccion === d) return f;
+                            // Si la posición sigue en el centro del otro eje, se centra en el nuevo
+                            const centrada = f.posicion === posicionCentrada(terreno.vertices, f.direccion);
+                            return { ...f, direccion: d, posicion: centrada ? posicionCentrada(terreno.vertices, d) : f.posicion };
+                          })
+                        }
                         className={[
                           "rounded-lg border px-3 py-1.5 text-sm transition",
                           formCamino.direccion === d ? "border-solar-500 bg-solar-50 text-solar-700" : "border-acero-300 text-acero-700 hover:bg-acero-100",
