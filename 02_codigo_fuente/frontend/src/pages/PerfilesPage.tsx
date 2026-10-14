@@ -114,7 +114,7 @@ export function PerfilesPage() {
   const soloLectura = (perfil?.acceso_total ?? false) || esMiPerfil;
   /** Encender un permiso que mi perfil no tiene sería escalar privilegios. */
   const puedoActivar = (codigo: Permiso) => tengoAccesoTotal || misPermisos.has(codigo);
-  const nombreEditable = esNuevo || (perfil !== null && !perfil.es_sistema);
+  const nombreEditable = esNuevo || (perfil !== null && !perfil.es_sistema && !esMiPerfil);
 
   const original = useMemo(() => borradorDe(perfil), [perfil]);
   const sucio =
@@ -167,13 +167,23 @@ export function PerfilesPage() {
         permisos: [...borrador.permisos],
         ...(nombreEditable ? { nombre: borrador.nombre.trim().replace(/\s+/g, " ") } : {}),
       };
-      const guardado = perfil ? await actualizarPerfil(perfil.id, datos) : await crearPerfil(datos);
-      await cargar(guardado.id);
-      setAviso(esNuevo ? `Perfil «${guardado.nombre}» creado.` : `Cambios guardados en «${guardado.nombre}».`);
-      // Si edité mi propio perfil, el menú cambia en el acto
-      if (usuario && usuario.perfil.id === guardado.id) await refrescarSesion();
-    } catch (e) {
-      setError(mensajeDeError(e, "No se pudo guardar el perfil"));
+      let guardado: Perfil;
+      try {
+        guardado = perfil ? await actualizarPerfil(perfil.id, datos) : await crearPerfil(datos);
+      } catch (e) {
+        setError(mensajeDeError(e, "No se pudo guardar el perfil"));
+        return;
+      }
+      const mensaje = esNuevo ? `Perfil «${guardado.nombre}» creado.` : `Cambios guardados en «${guardado.nombre}».`;
+      // Lo de después ya no es "guardar": si falla, el perfil igual quedó guardado
+      try {
+        await cargar(guardado.id);
+        // Si edité mi propio perfil, el menú cambia en el acto
+        if (usuario && usuario.perfil.id === guardado.id) await refrescarSesion();
+        setAviso(mensaje);
+      } catch {
+        setAviso(`${mensaje} No se pudo actualizar la pantalla: recárgala para ver los cambios.`);
+      }
     } finally {
       setGuardando(false);
     }
@@ -299,7 +309,7 @@ export function PerfilesPage() {
                     )}
                     {!nombreEditable && (
                       <span className="mt-1 block text-xs font-normal text-acero-400">
-                        Los perfiles del sistema no se renombran
+                        {esMiPerfil ? "Es tu propio perfil" : "Los perfiles del sistema no se renombran"}
                       </span>
                     )}
                   </label>

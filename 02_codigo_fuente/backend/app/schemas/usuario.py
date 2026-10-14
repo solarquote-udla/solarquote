@@ -10,7 +10,7 @@ import re
 from datetime import datetime
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, EmailStr, Field, field_validator
 
 from app.core.permisos import Permiso
 from app.core.security import LONGITUD_MAX_PASSWORD
@@ -40,6 +40,14 @@ PasswordNueva = Annotated[
 
 def _normalizar_email(valor: str) -> str:
     return valor.strip().lower()
+
+
+def _colapsar_espacios(valor: object) -> object:
+    return " ".join(valor.split()) if isinstance(valor, str) else valor
+
+
+# Los espacios se colapsan ANTES de medir el largo: "   " no pasa como nombre
+NombrePersona = Annotated[str, BeforeValidator(_colapsar_espacios), Field(min_length=2, max_length=120)]
 
 
 # ─── Perfiles ───────────────────────────────────────────
@@ -133,21 +141,16 @@ class UsuarioSesion(UsuarioLeer):
 class UsuarioCrear(BaseModel):
     """Alta de un usuario. La contraseña es temporal: se cambia al primer acceso."""
 
-    nombre: str = Field(min_length=2, max_length=120)
+    nombre: NombrePersona
     email: Annotated[EmailStr, AfterValidator(_normalizar_email)]
     password_temporal: PasswordNueva
     perfil_id: int
-
-    @field_validator("nombre")
-    @classmethod
-    def _limpiar_nombre(cls, valor: str) -> str:
-        return " ".join(valor.split())
 
 
 class UsuarioActualizar(BaseModel):
     """Solo se cambian los campos enviados."""
 
-    nombre: str | None = Field(default=None, min_length=2, max_length=120)
+    nombre: NombrePersona | None = None
     email: Annotated[EmailStr, AfterValidator(_normalizar_email)] | None = None
     perfil_id: int | None = None
     activo: bool | None = None
