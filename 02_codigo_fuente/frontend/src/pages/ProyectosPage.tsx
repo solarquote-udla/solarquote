@@ -15,21 +15,25 @@ import { EstadoProyectoBadge } from "@/components/EstadoProyectoBadge";
 import { useAuth } from "@/hooks/useAuth";
 import { mensajeDeError } from "@/services/api";
 import { listarProyectos } from "@/services/proyectos";
-import { EstadoProyecto, Permiso, type Proyecto } from "@/types/api";
+import { Permiso, type Proyecto } from "@/types/api";
 import { fechaHora } from "@/utils/fechas";
 
-/** Paso en el que conviene retomar el proyecto. */
+/**
+ * Paso en el que conviene retomar el proyecto: el primero que falta.
+ * No se usa el estado: "en diseño" no distingue si falta el equipo o el
+ * layout (lo marca el backend en cuanto hay terreno o equipo).
+ */
 function pasoParaRetomar(p: Proyecto): NumeroPaso {
   if (!p.tiene_terreno) return 1;
-  if (p.estado === EstadoProyecto.EN_DISENO || p.estado === EstadoProyecto.BORRADOR) return 2;
+  if (!p.tiene_equipo) return 2;
   return 3;
 }
 
-const ETIQUETA_PASO: Record<NumeroPaso, string> = {
-  1: "Continuar en Terreno",
-  2: "Continuar en Panel + Inversor",
-  3: "Abrir Caminos + Layout",
-};
+function etiquetaRetomar(p: Proyecto, paso: NumeroPaso): string {
+  if (paso === 1) return "Continuar en Terreno";
+  if (paso === 2) return "Continuar en Panel + Inversor";
+  return p.tiene_layout ? "Abrir Caminos + Layout" : "Continuar en Caminos + Layout";
+}
 
 export function ProyectosPage() {
   const { tienePermiso } = useAuth();
@@ -135,7 +139,7 @@ export function ProyectosPage() {
                     <td className="px-4 py-3 text-right">
                       {puedeEditar && (
                         <Link to={rutaPaso(p.id, paso)} className="text-sm font-medium text-solar-700 hover:underline">
-                          {ETIQUETA_PASO[paso]}
+                          {etiquetaRetomar(p, paso)}
                         </Link>
                       )}
                     </td>
