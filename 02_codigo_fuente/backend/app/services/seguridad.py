@@ -29,6 +29,7 @@ alguien se otorgue más acceso del que tiene:
 """
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
@@ -172,7 +173,13 @@ def eliminar_perfil(db: Session, perfil: Perfil) -> None:
             f"{'s' if asignados != 1 else ''}; cámbialos de perfil antes de eliminarlo"
         )
     db.delete(perfil)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Alguien asignó un usuario entre el conteo y el borrado: la FK
+        # (ondelete RESTRICT) lo impide y se responde 409, no 500
+        db.rollback()
+        raise Conflicto("El perfil acaba de recibir usuarios; cámbialos de perfil antes de eliminarlo") from None
 
 
 # ─── Usuarios ───────────────────────────────────────────

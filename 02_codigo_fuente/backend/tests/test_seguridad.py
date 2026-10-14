@@ -607,3 +607,43 @@ def test_dos_desactivaciones_simultaneas_no_dejan_sin_gerente(_engine):
             limpiar.execute(delete(Usuario).where(Usuario.id.in_(ids[:2])))
             limpiar.execute(delete(Perfil).where(Perfil.id == ids[2]))
             limpiar.commit()
+
+
+# ─── Detalles de la segunda revisión (Esteban, PR #31) ──
+
+
+def test_cambiar_la_propia_contraseña_levanta_el_bloqueo(api, db):
+    usuario = crear_usuario(db, intentos_fallidos=3, bloqueado_hasta=datetime.now(timezone.utc) + timedelta(minutes=10))
+
+    r = api.post(
+        "/api/auth/cambiar-password",
+        headers=cabecera(usuario),
+        json={"password_actual": PASSWORD, "password_nueva": "NuevaClave9"},
+    )
+    assert r.status_code == 200
+    assert r.json()["usuario"]["bloqueado"] is False
+    db.refresh(usuario)
+    assert usuario.intentos_fallidos == 0
+    assert login(api, usuario.email, "NuevaClave9").status_code == 200
+
+
+@pytest.mark.parametrize("nombre", ["  ", " a ", "\t \n"])
+def test_nombre_de_solo_espacios_se_rechaza(api, db, nombre):
+    sesion = cabecera(crear_usuario(db))
+    otro = crear_usuario(db, perfil=perfil_produccion(db))
+    alta = {"nombre": nombre, "email": "espacios@example.com", "password_temporal": "Temporal1", "perfil_id": perfil_produccion(db).id}
+
+    assert api.post("/api/usuarios", headers=sesion, json=alta).status_code == 422
+    assert api.patch(f"/api/usuarios/{otro.id}", headers=sesion, json={"nombre": nombre}).status_code == 422
+
+
+def test_eliminar_perfil_que_recibe_usuarios_a_ultimo_momento_da_409(api, db, monkeypatch):
+    sesion = cabecera(crear_usuario(db))
+    perfil = perfil_personalizado(db, Permiso.CLIENTES)
+    crear_usuario(db, perfil=perfil)
+    # Simula la carrera: el conteo no ve al usuario que se asignó justo después
+    monkeypatch.setattr(seguridad, "contar_usuarios", lambda *_: 0)
+
+    r = api.delete(f"/api/perfiles/{perfil.id}", headers=sesion)
+    assert r.status_code == 409
+    assert "acaba de recibir usuarios" in r.json()["detail"]
