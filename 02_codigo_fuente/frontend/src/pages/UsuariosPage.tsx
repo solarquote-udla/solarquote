@@ -115,15 +115,26 @@ export function UsuariosPage() {
     const texto = buscar.trim().toLowerCase();
     return usuarios.filter(
       (u) =>
-        (!texto || u.nombre.toLowerCase().includes(texto) || u.email.includes(texto)) &&
+        (!texto || u.nombre.toLowerCase().includes(texto) || u.email.toLowerCase().includes(texto)) &&
         (perfilId === "" || u.perfil.id === perfilId) &&
         (estado === "" || u.estado === estado),
     );
   }, [usuarios, buscar, perfilId, estado]);
 
-  /** Solo quien tiene acceso total administra a un Gerente General (DS-06). */
-  function puedeAdministrar(u: Usuario): boolean {
-    return !u.perfil.acceso_total || (yo?.perfil.acceso_total ?? false);
+  const perfilesPorId = useMemo(() => new Map(perfiles.map((p) => [p.id, p])), [perfiles]);
+
+  /**
+   * Sin acceso total, solo se administra a quien no tiene más permisos que
+   * uno (DS-06): un Gerente General, o un perfil con permisos que el mío no
+   * tiene, queda fuera. El backend aplica la misma regla.
+   */
+  function motivoNoAdministrable(u: Usuario): string | null {
+    if (yo?.perfil.acceso_total) return null;
+    if (u.perfil.acceso_total) return "Solo un Gerente General";
+    const perfil = perfilesPorId.get(u.perfil.id);
+    const mios = new Set(yo?.permisos ?? []);
+    if (!perfil || perfil.permisos.some((p) => !mios.has(p))) return "Tiene permisos que tu perfil no tiene";
+    return null;
   }
 
   async function cambiarActivo(u: Usuario) {
@@ -318,7 +329,7 @@ export function UsuariosPage() {
             <tbody className="divide-y divide-acero-200">
               {visibles.map((u) => {
                 const soyYo = u.id === yo?.id;
-                const administrable = puedeAdministrar(u);
+                const motivo = motivoNoAdministrable(u);
                 return (
                   <tr key={u.id} className={u.activo ? "hover:bg-acero-100/40" : "text-acero-400"}>
                     <td className="px-4 py-3">
@@ -346,8 +357,8 @@ export function UsuariosPage() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {!administrable ? (
-                        <span className="text-xs text-acero-400">Solo un Gerente General</span>
+                      {motivo ? (
+                        <span className="text-xs text-acero-400">{motivo}</span>
                       ) : restableciendo === u.id ? (
                         <div className="ml-auto max-w-xs text-left">
                           <p className="text-xs text-acero-700">
