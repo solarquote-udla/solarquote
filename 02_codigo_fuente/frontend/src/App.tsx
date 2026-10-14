@@ -9,7 +9,7 @@
  */
 
 import type { ReactNode } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
 
 import { AppLayout } from "@/components/AppLayout";
 import { RutaProtegida } from "@/components/RutaProtegida";
@@ -30,13 +30,19 @@ import { UsuarioFormPage } from "@/pages/UsuarioFormPage";
 import { UsuariosPage } from "@/pages/UsuariosPage";
 import { Permiso } from "@/types/api";
 
-/** Rutas que exigen un permiso, dentro del shell. */
-function conPermiso(permiso: Permiso, rutas: ReactNode) {
+/** Rutas que exigen un permiso (basta uno de la lista), dentro del shell. */
+function conPermiso(permiso: Permiso | Permiso[], rutas: ReactNode) {
   return (
-    <Route element={<RutaProtegida permisos={[permiso]} />}>
+    <Route element={<RutaProtegida permisos={Array.isArray(permiso) ? permiso : [permiso]} />}>
       <Route element={<AppLayout />}>{rutas}</Route>
     </Route>
   );
+}
+
+/** Rutas anteriores al asistente: /proyectos/:id/terreno → /generar/:id/terreno */
+function RedirigirPaso({ paso }: { paso: string }) {
+  const { proyectoId } = useParams();
+  return <Navigate to={`/generar/${proyectoId}/${paso}`} replace />;
 }
 
 function pendiente(titulo: string, modulo: string, requerimientos: string) {
@@ -66,20 +72,23 @@ export default function App() {
           {conPermiso(
             Permiso.GENERAR_LAYOUT,
             <>
-              <Route path="proyectos" element={<ProyectosPage />} />
-              <Route path="proyectos/:proyectoId/terreno" element={<TerrenoPage />} />
-              <Route path="proyectos/:proyectoId/equipo" element={<EquipoPage />} />
-              <Route path="proyectos/:proyectoId/layout" element={<LayoutPage />} />
+              {/* Asistente: Paso 1 sin id crea el proyecto */}
+              <Route path="generar" element={<TerrenoPage />} />
+              <Route path="generar/:proyectoId/terreno" element={<TerrenoPage />} />
+              <Route path="generar/:proyectoId/equipo" element={<EquipoPage />} />
+              <Route path="generar/:proyectoId/layout" element={<LayoutPage />} />
+              <Route path="proyectos" element={<Navigate to="/historial" replace />} />
+              <Route path="proyectos/:proyectoId/terreno" element={<RedirigirPaso paso="terreno" />} />
+              <Route path="proyectos/:proyectoId/equipo" element={<RedirigirPaso paso="equipo" />} />
+              <Route path="proyectos/:proyectoId/layout" element={<RedirigirPaso paso="layout" />} />
             </>,
           )}
           {conPermiso(
             Permiso.CARGAR_BOCETO,
             <Route path="bocetos" element={pendiente("Cargar boceto", "Módulo 2", "RF-04 y RF-05")} />,
           )}
-          {conPermiso(
-            Permiso.HISTORIAL,
-            <Route path="historial" element={pendiente("Historial", "Módulo 3", "RF-10")} />,
-          )}
+          {/* Provisional: proyectos en curso hasta que llegue RF-10 */}
+          {conPermiso([Permiso.HISTORIAL, Permiso.GENERAR_LAYOUT], <Route path="historial" element={<ProyectosPage />} />)}
 
           {/* ─── OPERACIONES ────────────────────────── */}
           {conPermiso(
