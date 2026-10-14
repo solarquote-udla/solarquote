@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 8  # 8 horas
 
+    # Bloqueo temporal de la cuenta tras intentos fallidos de login
+    MAX_INTENTOS_LOGIN: int = Field(default=5, ge=1)
+    MINUTOS_BLOQUEO_LOGIN: int = Field(default=15, ge=1)
+
     # ─── CORS ───────────────────────────────────────────
     # Orígenes permitidos, separados por coma en el .env
     CORS_ORIGINS: str = "http://localhost:5173"

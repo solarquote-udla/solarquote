@@ -35,13 +35,13 @@ justificarla.
 
 | Clave | Historia | Responsable | Pts | Estado |
 |---|---|---|---|---|
-| SQ-2 | Configurar repositorio y flujo de trabajo Git | Joseph | 3 | ✅ Done |
-| SQ-6 | Configurar backend FastAPI con conexión a base de datos | Joseph | 5 | ✅ Done |
-| SQ-11 | Configurar frontend React con Tailwind y enrutamiento | Joseph | 8 | ✅ Done |
-| SQ-16 | Desplegar backend y frontend en la nube | Joseph | 5 | ✅ Done |
-| SQ-29 | Autenticar usuarios con JWT | Joseph | 8 | ✅ Done |
-| SQ-39 | Modelar Cliente y Proyecto | Joseph | 5 | ✅ Done |
-| SQ-68 | Modelar cotizaciones y catálogo de materiales | Esteban | 8 | ✅ Done |
+| SQ-2 | Configurar repositorio y flujo de trabajo Git | Joseph | 3 | Done |
+| SQ-6 | Configurar backend FastAPI con conexión a base de datos | Joseph | 5 | Done |
+| SQ-11 | Configurar frontend React con Tailwind y enrutamiento | Joseph | 8 | Done |
+| SQ-16 | Desplegar backend y frontend en la nube | Joseph | 5 | Done |
+| SQ-29 | Autenticar usuarios con JWT | Joseph | 8 | Done |
+| SQ-39 | Modelar Cliente y Proyecto | Joseph | 5 | Done |
+| SQ-68 | Modelar cotizaciones y catálogo de materiales | Esteban | 8 | Done |
 | | **Total** | | **42** | **7 de 7** |
 
 ---

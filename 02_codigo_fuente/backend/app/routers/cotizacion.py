@@ -12,7 +12,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.dependencies import requiere_gerente
+from app.core.dependencies import requiere_permiso
+from app.core.permisos import Permiso
+
+puede_cotizar = requiere_permiso(Permiso.GENERAR_LAYOUT, Permiso.CARGAR_BOCETO)
 from app.models.cotizacion import Cotizacion
 from app.models.usuario import Usuario
 from app.schemas.cotizacion import CotizacionCrear, CotizacionLeer, ResultadoCalculoCotizacion
@@ -25,7 +28,7 @@ from app.services.proyecto import ClienteNoDisponible
 router = APIRouter(
     prefix="/api/cotizacion",
     tags=["Cotización"],
-    dependencies=[Depends(requiere_gerente)],
+    dependencies=[Depends(puede_cotizar)],
 )
 
 
@@ -52,7 +55,7 @@ def _respuesta(cotizacion: Cotizacion, calculo: ResultadoCalculoCotizacion) -> C
 def crear(
     datos: CotizacionCrear,
     db: Session = Depends(get_db),
-    usuario: Usuario = Depends(requiere_gerente),
+    usuario: Usuario = Depends(puede_cotizar),
 ) -> CotizacionLeer:
     try:
         cotizacion, calculo = servicio.crear_cotizacion(db, datos, usuario)

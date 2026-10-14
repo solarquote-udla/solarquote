@@ -19,7 +19,7 @@ export function EnConstruccionPage({ titulo, modulo, requerimientos, sprint }: P
       <div className="mt-8 rounded-xl border border-dashed border-acero-300 bg-white p-8 text-center">
         <p className="text-sm font-medium text-acero-700">En desarrollo</p>
         <p className="mt-2 text-sm text-acero-500">
-          Cubre {requerimientos}. Planificado para el {sprint}.
+          Cubre {requerimientos}. Planificado según el {sprint} del proyecto.
         </p>
       </div>
     </div>

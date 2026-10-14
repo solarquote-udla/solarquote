@@ -10,11 +10,15 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 
 import { AuthContext, type EstadoAuth } from "@/context/AuthContext";
 import { borrarToken, guardarToken, obtenerToken } from "@/services/api";
-import { iniciarSesion as loginApi, obtenerUsuarioActual } from "@/services/auth";
-import type { RolUsuario, Usuario } from "@/types/api";
+import {
+  cambiarPassword as cambiarPasswordApi,
+  iniciarSesion as loginApi,
+  obtenerUsuarioActual,
+} from "@/services/auth";
+import type { CambioPassword, Permiso, UsuarioSesion } from "@/types/api";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [usuario, setUsuario] = useState<Usuario | null>(null);
+  const [usuario, setUsuario] = useState<UsuarioSesion | null>(null);
   const [cargando, setCargando] = useState(true);
 
   // Al arrancar: si hay token, recuperar la sesión
@@ -56,8 +60,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUsuario(null);
   }, []);
 
-  const tieneRol = useCallback(
-    (...roles: RolUsuario[]) => (usuario ? roles.includes(usuario.rol) : false),
+  const cambiarPassword = useCallback(async (datos: CambioPassword) => {
+    const respuesta = await cambiarPasswordApi(datos);
+    guardarToken(respuesta.access_token);
+    setUsuario(respuesta.usuario);
+  }, []);
+
+  // Es solo para no mostrar opciones inútiles: quien decide es el backend
+  const tienePermiso = useCallback(
+    (...permisos: Permiso[]) =>
+      usuario ? permisos.some((permiso) => usuario.permisos.includes(permiso)) : false,
     [usuario],
   );
 
@@ -68,9 +80,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       autenticado: usuario !== null,
       iniciarSesion,
       cerrarSesion,
-      tieneRol,
+      cambiarPassword,
+      tienePermiso,
     }),
-    [usuario, cargando, iniciarSesion, cerrarSesion, tieneRol],
+    [usuario, cargando, iniciarSesion, cerrarSesion, cambiarPassword, tienePermiso],
   );
 
   return <AuthContext.Provider value={valor}>{children}</AuthContext.Provider>;

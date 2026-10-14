@@ -20,7 +20,8 @@ from sqlalchemy.orm import Session
 
 from app.models.cliente import Cliente, TipoIdentificacion
 from app.models.proyecto import Proyecto
-from app.models.usuario import RolUsuario, Usuario
+from app.models.usuario import Usuario
+from tests.fabricas import perfil_gerente
 from app.schemas.equipo import ConfiguracionEquipoGuardar
 from app.schemas.layout import BloqueEditar, LayoutEditar, LayoutGenerar
 from app.schemas.terreno import TerrenoCrear
@@ -150,7 +151,7 @@ def proyecto(db: Session) -> Proyecto:
         nombre="Gerente",
         email=f"gerente-{marca}@example.com",
         password_hash="no-se-usa",
-        rol=RolUsuario.GERENTE_GENERAL,
+        perfil=perfil_gerente(db),
     )
     cliente = Cliente(
         nombre="Cliente",

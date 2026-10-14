@@ -1,25 +1,26 @@
 /**
  * Guarda de rutas.
  *
- * Bloquea el acceso a quien no haya iniciado sesión y, opcionalmente,
- * a quien no tenga el rol requerido (RF-11).
+ * Bloquea el acceso a quien no haya iniciado sesión, lleva a cambiar la
+ * contraseña a quien todavía tiene una temporal y, opcionalmente, exige
+ * que el perfil tenga al menos uno de los permisos indicados (RF-11).
  *
  * Esto es comodidad de interfaz, no seguridad: cualquiera puede alterar
  * el JavaScript del navegador. La autorización real la impone el backend
- * con `requiere_roles`. Aquí solo se evita mostrar pantallas inútiles.
+ * con `requiere_permiso`. Aquí solo se evita mostrar pantallas inútiles.
  */
 
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 
 import { useAuth } from "@/hooks/useAuth";
-import type { RolUsuario } from "@/types/api";
+import type { Permiso } from "@/types/api";
 
 interface Props {
-  rolesPermitidos?: RolUsuario[];
+  permisos?: Permiso[];
 }
 
-export function RutaProtegida({ rolesPermitidos }: Props) {
-  const { autenticado, cargando, tieneRol } = useAuth();
+export function RutaProtegida({ permisos }: Props) {
+  const { usuario, cargando, tienePermiso } = useAuth();
   const ubicacion = useLocation();
 
   if (cargando) {
@@ -33,12 +34,16 @@ export function RutaProtegida({ rolesPermitidos }: Props) {
     );
   }
 
-  if (!autenticado) {
+  if (usuario === null) {
     // `state` recuerda a dónde iba, para volver ahí tras iniciar sesión
     return <Navigate to="/login" state={{ destino: ubicacion.pathname }} replace />;
   }
 
-  if (rolesPermitidos && !tieneRol(...rolesPermitidos)) {
+  if (usuario.debe_cambiar_password) {
+    return <Navigate to="/cambiar-password" replace />;
+  }
+
+  if (permisos && !tienePermiso(...permisos)) {
     return <Navigate to="/sin-permisos" replace />;
   }
 

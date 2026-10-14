@@ -14,7 +14,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.dependencies import requiere_gerente
+from app.core.dependencies import requiere_permiso
+from app.core.permisos import Permiso
+
+# Leer: cualquier opción de CÁLCULO. Crear o corregir: generar layout o boceto.
+lectura = requiere_permiso(Permiso.GENERAR_LAYOUT, Permiso.CARGAR_BOCETO, Permiso.HISTORIAL)
+escritura = requiere_permiso(Permiso.GENERAR_LAYOUT, Permiso.CARGAR_BOCETO)
 from app.models.proyecto import Proyecto
 from app.models.usuario import Usuario
 from app.schemas.proyecto import ClienteResumen, ProyectoActualizar, ProyectoCrear, ProyectoLeer
@@ -23,7 +28,7 @@ from app.services import proyecto as servicio
 router = APIRouter(
     prefix="/api/proyectos",
     tags=["Proyectos"],
-    dependencies=[Depends(requiere_gerente)],
+    dependencies=[Depends(lectura)],
 )
 
 
@@ -55,7 +60,7 @@ def listar(db: Session = Depends(get_db)) -> list[ProyectoLeer]:
 def crear(
     datos: ProyectoCrear,
     db: Session = Depends(get_db),
-    usuario: Usuario = Depends(requiere_gerente),
+    usuario: Usuario = Depends(escritura),
 ) -> ProyectoLeer:
     """Registra un proyecto nuevo, en estado borrador."""
     try:
@@ -88,7 +93,7 @@ def detalle(proyecto_id: int, db: Session = Depends(get_db)) -> ProyectoLeer:
     return _respuesta(proyecto, tiene_terreno)
 
 
-@router.patch("/{proyecto_id}", response_model=ProyectoLeer)
+@router.patch("/{proyecto_id}", response_model=ProyectoLeer, dependencies=[Depends(escritura)])
 def actualizar(
     proyecto_id: int,
     datos: ProyectoActualizar,

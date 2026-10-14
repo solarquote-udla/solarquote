@@ -53,9 +53,9 @@ Dentro de la organización: **New repository**
 | Repository name | `solarquote` |
 | Description | `Sistema de gestión y cotización de estructuras fotovoltaicas — HEXtructure S.A.S.` |
 | Visibility | **Public** |
-| Add README | ❌ No marcar |
-| Add .gitignore | ❌ No marcar |
-| Add license | ❌ None |
+| Add README | No marcar |
+| Add .gitignore | No marcar |
+| Add license | None |
 
 ---
 
@@ -67,11 +67,11 @@ Aquí está la corrección al problema anterior.
 
 | Rol | Puede aprobar PRs | Puede administrar |
 |---|---|---|
-| Read | ❌ | ❌ |
-| Triage | ❌ | ❌ |
-| **Write** | ✅ | ❌ |
-| **Maintain** | ✅ | Parcialmente |
-| Admin | ✅ | ✅ |
+| Read | No | No |
+| Triage | No | No |
+| **Write** | Sí | No |
+| **Maintain** | Sí | Parcialmente |
+| Admin | Sí | Sí |
 
 Asigna **Write** como mínimo. Con `Read` o `Triage` no puede aprobar, que es
 lo que ocurría antes.
@@ -144,9 +144,9 @@ git push -u origin develop
 | Target branches | Add target → Include by pattern → `develop` |
 
 Marcar:
-- ✅ Restrict deletions
-- ✅ Require a pull request before merging → Required approvals: **1**
-- ✅ Block force pushes
+- [x] Restrict deletions
+- [x] Require a pull request before merging → Required approvals: **1**
+- [x] Block force pushes
 
 ### Regla para `main`
 

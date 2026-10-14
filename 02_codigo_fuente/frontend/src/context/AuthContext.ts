@@ -8,15 +8,17 @@
 
 import { createContext } from "react";
 
-import type { RolUsuario, Usuario } from "@/types/api";
+import type { CambioPassword, Permiso, UsuarioSesion } from "@/types/api";
 
 export interface EstadoAuth {
-  usuario: Usuario | null;
+  usuario: UsuarioSesion | null;
   cargando: boolean;
   autenticado: boolean;
   iniciarSesion: (email: string, password: string) => Promise<void>;
   cerrarSesion: () => void;
-  tieneRol: (...roles: RolUsuario[]) => boolean;
+  cambiarPassword: (datos: CambioPassword) => Promise<void>;
+  /** True si el perfil tiene AL MENOS UNO de los permisos (igual que el backend). */
+  tienePermiso: (...permisos: Permiso[]) => boolean;
 }
 
 export const AuthContext = createContext<EstadoAuth | null>(null);

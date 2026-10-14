@@ -17,7 +17,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.dependencies import requiere_gerente
+from app.core.dependencies import requiere_permiso
+from app.core.permisos import Permiso
 from app.data.paneles_referencia import PANELES_REFERENCIA
 from app.schemas.equipo import (
     ConfiguracionEquipoGuardar,
@@ -29,7 +30,7 @@ from app.services.proyecto import obtener_proyecto
 
 router = APIRouter(
     tags=["Módulo 1 — Equipo"],
-    dependencies=[Depends(requiere_gerente)],
+    dependencies=[Depends(requiere_permiso(Permiso.GENERAR_LAYOUT))],
 )
 
 
