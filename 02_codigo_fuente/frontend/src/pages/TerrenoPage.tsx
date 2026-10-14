@@ -570,7 +570,7 @@ export function TerrenoPage() {
         atras={{ etiqueta: "Cancelar", a: "/historial" }}
         resumen={
           area !== null
-            ? `${formatearMetros(Number(dimensiones.ancho) || 0)} × ${formatearMetros(Number(dimensiones.largo) || 0)} · ${formatearArea(area)}`
+            ? `${formatearMetros(numeroOpcional(dimensiones.ancho) || 0)} × ${formatearMetros(numeroOpcional(dimensiones.largo) || 0)} · ${formatearArea(area)}`
             : "Define el terreno para continuar"
         }
         adelante={{

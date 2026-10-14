@@ -5,10 +5,14 @@ Lógica de negocio de proyectos.
 servicio solo lo lee y lo crea; no altera su estructura.
 """
 
+from dataclasses import dataclass
+
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.cliente import Cliente
 from app.models.proyecto import EstadoProyecto, Proyecto
+from app.models.equipo import ConfiguracionEquipo
+from app.models.layout import Layout
 from app.models.terreno import Terreno
 from app.models.usuario import Usuario
 from app.schemas.proyecto import ProyectoActualizar, ProyectoCrear
@@ -68,23 +72,35 @@ def listar_proyectos(db: Session) -> list[Proyecto]:
     )
 
 
-def ids_con_terreno(db: Session, proyecto_ids: list[int]) -> set[int]:
-    """
-    Cuáles de estos proyectos ya tienen terreno definido.
+@dataclass(frozen=True)
+class Avance:
+    """Qué pasos del asistente ya tienen datos guardados."""
 
-    Una sola consulta para todo el listado. Se resuelve aquí y no con una
-    relación en el modelo porque `Proyecto` es compartido: agregarle un
-    atributo exige acordarlo, y esto no lo justifica.
+    terreno: set[int]
+    equipo: set[int]
+    layout: set[int]
+
+
+def avance_de(db: Session, proyecto_ids: list[int]) -> Avance:
+    """
+    Cuáles de estos proyectos ya tienen terreno, equipo y layout.
+
+    El estado del proyecto no alcanza para esto: pasa a "en diseño" en
+    cuanto se guarda el terreno o el equipo, sin distinguir cuál. El
+    Historial lo usa para retomar cada proyecto en el paso que le falta.
+
+    Tres consultas para todo el listado, no tres por proyecto. Se resuelve
+    aquí y no con relaciones en el modelo porque `Proyecto` es compartido:
+    agregarle atributos exige acordarlo, y esto no lo justifica.
     """
     if not proyecto_ids:
-        return set()
+        return Avance(set(), set(), set())
 
-    filas = (
-        db.query(Terreno.proyecto_id)
-        .filter(Terreno.proyecto_id.in_(proyecto_ids))
-        .all()
-    )
-    return {fila.proyecto_id for fila in filas}
+    def con(modelo) -> set[int]:
+        filas = db.query(modelo.proyecto_id).filter(modelo.proyecto_id.in_(proyecto_ids)).all()
+        return {fila.proyecto_id for fila in filas}
+
+    return Avance(terreno=con(Terreno), equipo=con(ConfiguracionEquipo), layout=con(Layout))
 
 
 def crear_proyecto(db: Session, datos: ProyectoCrear, usuario: Usuario) -> Proyecto:

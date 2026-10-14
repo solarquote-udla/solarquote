@@ -272,29 +272,34 @@ export function EquipoPage() {
     setPresetAplicado(preset);
   }
 
-  async function guardar(evento: FormEvent) {
-    evento.preventDefault();
+  /** Valida y guarda. Devuelve si quedó guardado. Lo usan el formulario y "Siguiente". */
+  async function persistir(): Promise<boolean> {
     setError(null);
     setAviso(null);
 
     const resultado = aPeticion(formulario);
     if ("error" in resultado) {
       setError(resultado.error);
-      return;
+      return false;
     }
 
     setGuardando(true);
     try {
-      const configuracion = await guardarEquipo(proyectoId, resultado.datos);
-      cargarEnFormulario(configuracion);
+      cargarEnFormulario(await guardarEquipo(proyectoId, resultado.datos));
       // El estado del proyecto pudo avanzar (borrador → en diseño)
       setProyecto(await obtenerProyecto(proyectoId));
-      setAviso("Configuración guardada.");
+      return true;
     } catch (e) {
       setError(mensajeDeError(e, "No se pudo guardar la configuración"));
+      return false;
     } finally {
       setGuardando(false);
     }
+  }
+
+  async function guardar(evento: FormEvent) {
+    evento.preventDefault();
+    if (await persistir()) setAviso("Configuración guardada.");
   }
 
   // ─── Render ──────────────────────────────────────────
@@ -332,27 +337,10 @@ export function EquipoPage() {
       ? `${formulario.panel_marca} ${formulario.panel_potencia_wp || "?"} Wp · ${formulario.inversor_marca} ${formulario.inversor_potencia_kw || "?"} kW`
       : "Configura el panel y el inversor";
 
-  /** Guarda si hace falta y devuelve si se puede continuar. */
+  /** "Siguiente": guarda solo si hay algo nuevo y devuelve si se puede continuar. */
   async function guardarSiHaceFalta(): Promise<boolean> {
     if (guardado && !hayCambios) return true;
-    setError(null);
-    setAviso(null);
-    const resultado = aPeticion(formulario);
-    if ("error" in resultado) {
-      setError(resultado.error);
-      return false;
-    }
-    setGuardando(true);
-    try {
-      cargarEnFormulario(await guardarEquipo(proyectoId, resultado.datos));
-      setProyecto(await obtenerProyecto(proyectoId));
-      return true;
-    } catch (e) {
-      setError(mensajeDeError(e, "No se pudo guardar la configuración"));
-      return false;
-    } finally {
-      setGuardando(false);
-    }
+    return persistir();
   }
 
   return (
@@ -554,9 +542,12 @@ export function EquipoPage() {
               <div className="grid gap-5 sm:grid-cols-2">
                 <div className="rounded-xl border border-acero-200 bg-superficie p-5">
                   <h2 className="text-sm font-semibold text-acero-700">Separación entre filas</h2>
+                  <dl className="mt-3 space-y-2">
+                    {/* No depende de la latitud: se muestra siempre */}
+                    <Fila nombre="Área por panel" valor={`${numero(calculos.area_panel_m2, 3)} m²`} />
+                  </dl>
                   {calculos.separacion ? (
-                    <dl className="mt-3 space-y-2">
-                      <Fila nombre="Área por panel" valor={`${numero(calculos.area_panel_m2, 3)} m²`} />
+                    <dl className="mt-2 space-y-2">
                       <Fila nombre="Sol más bajo al mediodía" valor={`${numero(calculos.separacion.elevacion_solar_grados)}°`} />
                       <Fila nombre="Sombra (hueco libre)" valor={`${numero(calculos.separacion.sombra_m)} m`} />
                       <div className="border-t border-acero-200 pt-2">

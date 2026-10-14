@@ -240,6 +240,10 @@ export interface Proyecto {
   estado: EstadoProyecto;
   notas: string | null;
   tiene_terreno: boolean;
+  /** Panel e inversor guardados (RF-02) */
+  tiene_equipo: boolean;
+  /** Layout generado (RF-03) */
+  tiene_layout: boolean;
   created_at: string;
   updated_at: string;
 }
