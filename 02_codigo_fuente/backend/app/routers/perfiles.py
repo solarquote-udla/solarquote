@@ -19,6 +19,7 @@ from app.core.database import get_db
 from app.core.dependencies import requiere_permiso
 from app.core.permisos import CATALOGO, Permiso
 from app.models.perfil import Perfil
+from app.models.usuario import Usuario
 from app.schemas.usuario import PerfilActualizar, PerfilCrear, PerfilLeer, PermisoLeer
 from app.services import seguridad as servicio
 from app.services.seguridad import ReglaSeguridad
@@ -73,18 +74,23 @@ def detalle(perfil_id: int, db: Session = Depends(get_db)) -> PerfilLeer:
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(puede_editar)],
 )
-def crear(datos: PerfilCrear, db: Session = Depends(get_db)) -> PerfilLeer:
+def crear(datos: PerfilCrear, db: Session = Depends(get_db), actor: Usuario = Depends(puede_editar)) -> PerfilLeer:
     try:
-        perfil = servicio.crear_perfil(db, datos)
+        perfil = servicio.crear_perfil(db, actor, datos)
     except ReglaSeguridad as exc:
         raise _error(exc)
     return _respuesta(perfil, 0)
 
 
 @router.patch("/api/perfiles/{perfil_id}", response_model=PerfilLeer, dependencies=[Depends(puede_editar)])
-def actualizar(perfil_id: int, datos: PerfilActualizar, db: Session = Depends(get_db)) -> PerfilLeer:
+def actualizar(
+    perfil_id: int,
+    datos: PerfilActualizar,
+    db: Session = Depends(get_db),
+    actor: Usuario = Depends(puede_editar),
+) -> PerfilLeer:
     try:
-        perfil = servicio.actualizar_perfil(db, servicio.obtener_perfil(db, perfil_id), datos)
+        perfil = servicio.actualizar_perfil(db, actor, servicio.obtener_perfil(db, perfil_id), datos)
     except ReglaSeguridad as exc:
         raise _error(exc)
     return _respuesta(perfil, servicio.contar_usuarios(db, perfil.id))

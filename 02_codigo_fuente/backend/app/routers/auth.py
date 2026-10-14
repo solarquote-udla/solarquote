@@ -23,9 +23,7 @@ router = APIRouter()
 
 
 def sesion_de(usuario: Usuario) -> UsuarioSesion:
-    datos = UsuarioSesion.model_validate(usuario, from_attributes=True).model_dump()
-    datos["permisos"] = sorted(usuario.permisos)
-    return UsuarioSesion(**datos)
+    return UsuarioSesion.model_validate(usuario)
 
 
 def _token(usuario: Usuario) -> Token:
