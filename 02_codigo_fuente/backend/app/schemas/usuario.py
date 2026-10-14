@@ -123,6 +123,12 @@ class UsuarioSesion(UsuarioLeer):
 
     permisos: list[Permiso]
 
+    @field_validator("permisos", mode="before")
+    @classmethod
+    def _ordenar(cls, valor: object) -> object:
+        # `Usuario.permisos` es un set: se ordena para una respuesta estable
+        return sorted(valor) if isinstance(valor, (set, frozenset)) else valor
+
 
 class UsuarioCrear(BaseModel):
     """Alta de un usuario. La contraseña es temporal: se cambia al primer acceso."""

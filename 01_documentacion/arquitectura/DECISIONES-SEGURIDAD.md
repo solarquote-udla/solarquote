@@ -153,6 +153,13 @@ facilita ataques dirigidos de fuerza bruta o phishing.
   verifica igual la contraseña contra un hash señuelo
   (`verificar_password_señuelo`). Sin esto, la respuesta para un correo
   inexistente llegaría ~0,2 s antes y delataría qué correos existen.
+- **Mismas sentencias en la base.** Con contraseña incorrecta se guarda
+  el intento fallido (UPDATE + COMMIT), y con Neon cada viaje a la base
+  suma milisegundos medibles. Por eso, si el correo no existe, se ejecuta
+  la misma sentencia `UPDATE ... RETURNING` sobre un id inexistente, y la
+  búsqueda del usuario no carga su perfil (una consulta, exista o no).
+  Una prueba compara las sentencias de ambos casos y exige que sean
+  idénticas. Hallazgo de la revisión del PR #31.
 - **Cuenta desactivada.** Solo se informa "La cuenta está desactivada"
   (403) si la contraseña es correcta; con una contraseña incorrecta la
   respuesta es la genérica.
@@ -264,9 +271,27 @@ tipo. La API valida los códigos contra el catálogo.
 1. Solo un usuario con acceso total puede crear, modificar o restablecer
    la contraseña de un Gerente General, o asignar ese perfil.
 2. Nadie cambia su propio perfil ni desactiva su propia cuenta.
-3. Siempre queda al menos un Gerente General activo.
-4. Los usuarios no se eliminan: se desactivan (baja lógica), porque
+3. **Nadie se otorga más de lo que tiene** (para quien no tiene acceso
+   total):
+   - no modifica su propio perfil;
+   - no agrega a un perfil permisos que su perfil no tiene (quitarlos sí
+     puede);
+   - no asigna a un usuario un perfil con permisos que él no tiene, ni
+     modifica o restablece la contraseña de un usuario cuyo perfil tiene
+     permisos que él no tiene (sería tomar una cuenta con más acceso).
+4. Siempre queda al menos un Gerente General activo. El conteo bloquea
+   las filas de los gerentes (`SELECT ... FOR UPDATE`): si A desactiva a
+   B mientras B desactiva a A, la segunda operación espera a la primera
+   y se rechaza.
+5. Los usuarios no se eliminan: se desactivan (baja lógica), porque
    proyectos y cotizaciones los referencian.
+
+Las reglas 3 y 4 se agregaron tras la revisión del PR #31 (Esteban): sin
+la regla 3, quien tuviera el permiso `perfiles` podía editar su propio
+perfil y agregarse todo el catálogo; sin el bloqueo de la regla 4, dos
+desactivaciones simultáneas podían dejar al sistema sin ningún gerente.
+Cada caso tiene su prueba en `tests/test_seguridad.py`, incluida una con
+dos transacciones concurrentes reales.
 
 ### Cambios de permisos
 
