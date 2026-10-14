@@ -114,7 +114,7 @@ export function ClientesPage() {
               setAviso(null);
               setEdicion("nuevo");
             }}
-            className="rounded-lg bg-solar-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-solar-600"
+            className="rounded-lg bg-solar-500 px-4 py-2 text-sm font-semibold text-acero-50 transition hover:bg-solar-600"
           >
             Nuevo cliente
           </button>
@@ -166,7 +166,7 @@ export function ClientesPage() {
       </div>
 
       {/* ─── Listado ──────────────────────────────────── */}
-      <div className="mt-4 overflow-hidden rounded-xl border border-acero-200 bg-white">
+      <div className="mt-4 overflow-hidden rounded-xl border border-acero-200 bg-superficie">
         {cargando && clientes.length === 0 ? (
           <p className="p-6 text-sm text-acero-500">Cargando clientes…</p>
         ) : clientes.length === 0 ? (
@@ -229,7 +229,7 @@ export function ClientesPage() {
                             type="button"
                             disabled={procesando === c.id}
                             onClick={() => darDeBaja(c)}
-                            className="rounded-md bg-red-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                            className="rounded-md bg-red-500 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-400 disabled:opacity-50"
                           >
                             Dar de baja
                           </button>

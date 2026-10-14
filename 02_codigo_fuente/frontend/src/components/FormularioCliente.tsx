@@ -163,7 +163,7 @@ export function FormularioCliente({ cliente, onGuardado, onCancelar }: Props) {
   }
 
   return (
-    <form onSubmit={guardar} noValidate className="rounded-xl border border-acero-200 bg-white p-6">
+    <form onSubmit={guardar} noValidate className="rounded-xl border border-acero-200 bg-superficie p-6">
       <h2 className="text-sm font-semibold text-acero-700">
         {cliente ? `Editar cliente — ${cliente.nombre}` : "Nuevo cliente"}
       </h2>
@@ -221,7 +221,7 @@ export function FormularioCliente({ cliente, onGuardado, onCancelar }: Props) {
         <button
           type="submit"
           disabled={guardando}
-          className="rounded-lg bg-solar-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-solar-600 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-lg bg-solar-500 px-4 py-2 text-sm font-semibold text-acero-50 transition hover:bg-solar-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {guardando ? "Guardando…" : cliente ? "Guardar cambios" : "Registrar cliente"}
         </button>

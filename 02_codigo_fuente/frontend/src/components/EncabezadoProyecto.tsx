@@ -164,7 +164,7 @@ export function EncabezadoProyecto({ proyecto, titulo, onActualizado }: Props) {
       </div>
 
       {editando && (
-        <form onSubmit={guardar} className="mt-4 rounded-xl border border-acero-200 bg-white p-5">
+        <form onSubmit={guardar} className="mt-4 rounded-xl border border-acero-200 bg-superficie p-5">
           <h2 className="text-sm font-semibold text-acero-700">Datos del proyecto</h2>
           <p className="mt-1 text-xs text-acero-400">
             El cliente no se cambia aquí: un proyecto con cotizaciones debe conservar su cliente.
@@ -206,7 +206,7 @@ export function EncabezadoProyecto({ proyecto, titulo, onActualizado }: Props) {
             <button
               type="submit"
               disabled={guardando}
-              className="rounded-lg bg-solar-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-solar-600 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg bg-solar-500 px-4 py-2 text-sm font-semibold text-acero-50 transition hover:bg-solar-600 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {guardando ? "Guardando…" : "Guardar"}
             </button>

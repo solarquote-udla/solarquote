@@ -26,7 +26,7 @@ export function AppLayout() {
   return (
     <div className="flex h-screen bg-acero-50">
       {/* ─── Barra lateral ─────────────────────────────── */}
-      <aside className="flex w-64 shrink-0 flex-col border-r border-acero-200 bg-white">
+      <aside className="flex w-64 shrink-0 flex-col border-r border-acero-200 bg-superficie">
         <div className="border-b border-acero-200 px-6 py-5">
           <span className="text-xl font-bold tracking-tight text-acero-900">
             Solar<span className="text-solar-500">Quote</span>
@@ -77,7 +77,7 @@ export function AppLayout() {
 
       {/* ─── Contenido ─────────────────────────────────── */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex h-16 shrink-0 items-center justify-end gap-4 border-b border-acero-200 bg-white px-6">
+        <header className="flex h-16 shrink-0 items-center justify-end gap-4 border-b border-acero-200 bg-superficie px-6">
           <div className="text-right">
             <p className="text-sm font-medium text-acero-800">{usuario?.nombre}</p>
             <p className="text-xs text-acero-500">{usuario?.perfil.nombre}</p>

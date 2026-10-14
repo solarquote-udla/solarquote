@@ -16,7 +16,7 @@ export function EnConstruccionPage({ titulo, modulo, requerimientos, sprint }: P
       <h1 className="text-2xl font-bold text-acero-900">{titulo}</h1>
       <p className="mt-1 text-sm text-acero-500">{modulo}</p>
 
-      <div className="mt-8 rounded-xl border border-dashed border-acero-300 bg-white p-8 text-center">
+      <div className="mt-8 rounded-xl border border-dashed border-acero-300 bg-superficie p-8 text-center">
         <p className="text-sm font-medium text-acero-700">En desarrollo</p>
         <p className="mt-2 text-sm text-acero-500">
           Cubre {requerimientos}. Planificado según el {sprint} del proyecto.

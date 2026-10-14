@@ -11,7 +11,7 @@ export function SinPermisosPage() {
       </p>
       <Link
         to="/"
-        className="mt-2 rounded-lg bg-solar-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-solar-600"
+        className="mt-2 rounded-lg bg-solar-500 px-4 py-2 text-sm font-semibold text-acero-50 transition hover:bg-solar-600"
       >
         Volver al inicio
       </Link>

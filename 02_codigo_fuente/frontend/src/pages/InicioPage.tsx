@@ -31,7 +31,7 @@ export function InicioPage() {
         Sistema de gestión y cotización de estructuras fotovoltaicas
       </p>
 
-      <div className="mt-8 rounded-xl border border-acero-200 bg-white p-6">
+      <div className="mt-8 rounded-xl border border-acero-200 bg-superficie p-6">
         <h2 className="text-sm font-semibold text-acero-700">Estado del sistema</h2>
 
         <div className="mt-4 flex items-center gap-3">
@@ -51,10 +51,10 @@ export function InicioPage() {
         </div>
       </div>
 
-      <div className="mt-6 rounded-xl border border-dashed border-acero-300 bg-white p-6">
+      <div className="mt-6 rounded-xl border border-dashed border-acero-300 bg-superficie p-6">
         <h2 className="text-sm font-semibold text-acero-700">Próximos módulos</h2>
         <p className="mt-2 text-sm text-acero-500">
-          Las pantallas de cada módulo se irán habilitando conforme avancen los sprints.
+          Las pantallas de cada módulo se irán habilitando según el cronograma del proyecto.
           Puedes seguir el plan en{" "}
           <code className="rounded bg-acero-100 px-1.5 py-0.5 text-xs">
             01_documentacion/gestion/ROADMAP.md

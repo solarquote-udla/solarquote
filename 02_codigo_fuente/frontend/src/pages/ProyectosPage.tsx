@@ -125,7 +125,7 @@ export function ProyectosPage() {
           <button
             type="button"
             onClick={abrirFormulario}
-            className="rounded-lg bg-solar-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-solar-600"
+            className="rounded-lg bg-solar-500 px-4 py-2 text-sm font-semibold text-acero-50 transition hover:bg-solar-600"
           >
             Nuevo proyecto
           </button>
@@ -136,7 +136,7 @@ export function ProyectosPage() {
       {formularioAbierto && (
         <form
           onSubmit={enviar}
-          className="mt-6 rounded-xl border border-acero-200 bg-white p-6"
+          className="mt-6 rounded-xl border border-acero-200 bg-superficie p-6"
         >
           <h2 className="text-sm font-semibold text-acero-700">Nuevo proyecto</h2>
 
@@ -146,7 +146,7 @@ export function ProyectosPage() {
               {import.meta.env.DEV && (
                 <span className="mt-1 block text-xs">
                   Para probar en local:{" "}
-                  <code className="rounded bg-white px-1">python -m scripts.datos_demo</code>
+                  <code className="rounded bg-superficie px-1">python -m scripts.datos_demo</code>
                 </span>
               )}
             </div>
@@ -262,7 +262,7 @@ export function ProyectosPage() {
             <button
               type="submit"
               disabled={enviando || !formulario.clienteId}
-              className="rounded-lg bg-solar-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-solar-600 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg bg-solar-500 px-4 py-2 text-sm font-semibold text-acero-50 transition hover:bg-solar-600 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {enviando ? "Creando…" : "Crear y definir terreno"}
             </button>
@@ -271,7 +271,7 @@ export function ProyectosPage() {
       )}
 
       {/* ─── Listado ────────────────────────────────────── */}
-      <div className="mt-6 overflow-hidden rounded-xl border border-acero-200 bg-white">
+      <div className="mt-6 overflow-hidden rounded-xl border border-acero-200 bg-superficie">
         {cargando ? (
           <p className="p-6 text-sm text-acero-500">Cargando proyectos…</p>
         ) : errorCarga ? (

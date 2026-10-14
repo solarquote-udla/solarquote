@@ -21,10 +21,13 @@ import { EquipoPage } from "@/pages/EquipoPage";
 import { InicioPage } from "@/pages/InicioPage";
 import { LayoutPage } from "@/pages/LayoutPage";
 import { LoginPage } from "@/pages/LoginPage";
+import { PerfilesPage } from "@/pages/PerfilesPage";
 import { PreciosPage } from "@/pages/PreciosPage";
 import { ProyectosPage } from "@/pages/ProyectosPage";
 import { SinPermisosPage } from "@/pages/SinPermisosPage";
 import { TerrenoPage } from "@/pages/TerrenoPage";
+import { UsuarioFormPage } from "@/pages/UsuarioFormPage";
+import { UsuariosPage } from "@/pages/UsuariosPage";
 import { Permiso } from "@/types/api";
 
 /** Rutas que exigen un permiso, dentro del shell. */
@@ -102,13 +105,14 @@ export default function App() {
             <Route path="configuracion/materiales" element={pendiente("Materiales", "Módulo 4", "RF-09")} />,
           )}
           {conPermiso(Permiso.PRECIOS, <Route path="configuracion/precios" element={<PreciosPage />} />)}
-          {conPermiso(
-            Permiso.PERFILES,
-            <Route path="seguridad/perfiles" element={pendiente("Perfiles", "Seguridad", "RF-11")} />,
-          )}
+          {conPermiso(Permiso.PERFILES, <Route path="seguridad/perfiles" element={<PerfilesPage />} />)}
           {conPermiso(
             Permiso.USUARIOS,
-            <Route path="seguridad/usuarios" element={pendiente("Usuarios", "Seguridad", "RF-11")} />,
+            <>
+              <Route path="seguridad/usuarios" element={<UsuariosPage />} />
+              <Route path="seguridad/usuarios/nuevo" element={<UsuarioFormPage />} />
+              <Route path="seguridad/usuarios/:usuarioId" element={<UsuarioFormPage />} />
+            </>,
           )}
 
           {/* Rutas anteriores al menú del prototipo */}

@@ -17,6 +17,8 @@ export interface EstadoAuth {
   iniciarSesion: (email: string, password: string) => Promise<void>;
   cerrarSesion: () => void;
   cambiarPassword: (datos: CambioPassword) => Promise<void>;
+  /** Vuelve a leer el usuario (p. ej. tras editar los permisos de su propio perfil). */
+  refrescarSesion: () => Promise<void>;
   /** True si el perfil tiene AL MENOS UNO de los permisos (igual que el backend). */
   tienePermiso: (...permisos: Permiso[]) => boolean;
 }
