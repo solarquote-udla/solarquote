@@ -114,7 +114,7 @@ export function PreciosPage() {
         </div>
       )}
 
-      <div className="mt-4 overflow-hidden rounded-xl border border-acero-200 bg-white">
+      <div className="mt-4 overflow-hidden rounded-xl border border-acero-200 bg-superficie">
         {cargando ? (
           <p className="p-6 text-sm text-acero-500">Cargando materiales…</p>
         ) : materiales.length === 0 ? (

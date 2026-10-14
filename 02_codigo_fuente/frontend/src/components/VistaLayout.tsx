@@ -70,7 +70,7 @@ function ladoMenor(vertices: Punto[]): number {
 
 function claseBloque(b: BloqueDibujo): string {
   if (b.problema) return "fill-red-500/70 stroke-red-800";
-  return b.en_proporcion ? "fill-sky-600/80 stroke-sky-900" : "fill-amber-400/90 stroke-amber-700";
+  return b.en_proporcion ? "fill-sky-600/80 stroke-sky-900" : "fill-amber-400/90 stroke-amber-600";
 }
 
 export function VistaLayout({
@@ -129,7 +129,7 @@ export function VistaLayout({
   }
 
   return (
-    <div className="relative h-[560px] w-full overflow-hidden rounded-xl border border-acero-200 bg-white">
+    <div className="relative h-[560px] w-full overflow-hidden rounded-xl border border-acero-200 bg-superficie">
       <svg
         viewBox={`${lim.minX} ${-lim.maxY} ${ancho} ${alto}`}
         preserveAspectRatio="xMidYMid meet"
@@ -185,7 +185,7 @@ export function VistaLayout({
           {bloques.map((b) => {
             if (ladoMenor(b.vertices) < fuente) return null;
             const [x, y] = centro(b.vertices);
-            const color = b.problema ? "fill-white" : b.en_proporcion ? "fill-white" : "fill-amber-900";
+            const color = b.problema ? "fill-white" : b.en_proporcion ? "fill-white" : "fill-acero-50";
             return (
               <text key={`t${b.clave}`} x={x} y={-y} className={color}>
                 {b.tipo}
@@ -196,14 +196,14 @@ export function VistaLayout({
       </svg>
 
       {/* Rosa del norte */}
-      <div className="pointer-events-none absolute right-3 top-3 flex flex-col items-center rounded-md bg-white/90 px-2 py-1.5 shadow-sm">
+      <div className="pointer-events-none absolute right-3 top-3 flex flex-col items-center rounded-md bg-superficie/90 px-2 py-1.5 shadow-sm">
         <svg viewBox="-12 -12 24 24" className="h-8 w-8" style={{ transform: `rotate(${orientacionNorte ?? 0}deg)` }} aria-hidden="true">
-          <polygon points="0,-11 5,6 0,2 -5,6" className={orientacionNorte == null ? "fill-acero-300" : "fill-red-600"} />
+          <polygon points="0,-11 5,6 0,2 -5,6" className={orientacionNorte == null ? "fill-acero-500" : "fill-red-600"} />
         </svg>
         <span className="text-[10px] font-semibold text-acero-600">N{orientacionNorte == null ? "?" : ""}</span>
       </div>
 
-      <div className="pointer-events-none absolute bottom-3 left-3 flex gap-3 rounded-md bg-white/90 px-3 py-1.5 text-xs text-acero-600 shadow-sm">
+      <div className="pointer-events-none absolute bottom-3 left-3 flex gap-3 rounded-md bg-superficie/90 px-3 py-1.5 text-xs text-acero-600 shadow-sm">
         <span className="flex items-center gap-1.5">
           <span className="inline-block h-3 w-3 rounded-sm bg-sky-600" /> En proporción
         </span>

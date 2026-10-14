@@ -69,7 +69,7 @@ export function CambiarPasswordPage() {
 
         <form
           onSubmit={(e) => void manejarEnvio(e)}
-          className="rounded-xl border border-acero-200 bg-white p-8 shadow-sm"
+          className="rounded-xl border border-acero-200 bg-superficie p-8 shadow-sm"
         >
           <h2 className="text-lg font-semibold text-acero-800">
             {obligatorio ? "Crea tu contraseña" : "Cambiar contraseña"}
@@ -135,7 +135,7 @@ export function CambiarPasswordPage() {
           <button
             type="submit"
             disabled={enviando}
-            className="w-full rounded-lg bg-solar-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-solar-600 focus:ring-2 focus:ring-solar-300 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-lg bg-solar-500 px-4 py-2.5 text-sm font-semibold text-acero-50 transition hover:bg-solar-600 focus:ring-2 focus:ring-solar-300 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {enviando ? "Guardando…" : "Guardar contraseña"}
           </button>
