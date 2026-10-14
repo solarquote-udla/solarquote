@@ -31,7 +31,7 @@ export const MENU: GrupoMenu[] = [
       {
         titulo: "Generación",
         opciones: [
-          { ruta: "/proyectos", etiqueta: "Generar layout solar", permiso: Permiso.GENERAR_LAYOUT },
+          { ruta: "/generar", etiqueta: "Generar layout solar", permiso: Permiso.GENERAR_LAYOUT },
           { ruta: "/bocetos", etiqueta: "Cargar boceto", permiso: Permiso.CARGAR_BOCETO },
         ],
       },

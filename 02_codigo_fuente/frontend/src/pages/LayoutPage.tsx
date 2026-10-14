@@ -1,5 +1,10 @@
 /**
- * Generación del layout solar — RF-03.
+ * Asistente, Paso 3 — Caminos + Layout (RF-01 caminos, RF-03 layout).
+ *
+ * Como en el prototipo: el plano con los bloques a la izquierda y, a la
+ * derecha, el resumen, los caminos de acceso y las advertencias de la
+ * proporción antisísmica. Agregar o quitar un camino deja el layout
+ * desactualizado hasta volver a generarlo.
  *
  * El usuario elige L, el pasillo, la tolerancia de proporción y,
  * opcionalmente, una capacidad en kWp. El backend distribuye los bloques
@@ -13,16 +18,27 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
+import { BarraPaso } from "@/components/BarraPaso";
 import { EncabezadoProyecto } from "@/components/EncabezadoProyecto";
+import { rutaPaso } from "@/components/asistente";
 import { VistaLayout, type BloqueDibujo } from "@/components/VistaLayout";
 import { mensajeDeError } from "@/services/api";
 import { obtenerEquipo } from "@/services/equipo";
 import { generarLayout, guardarBloques, obtenerLayout } from "@/services/layout";
 import { obtenerProyecto } from "@/services/proyectos";
-import { obtenerTerreno } from "@/services/terreno";
-import type { ConfiguracionEquipo, Layout, LayoutGenerar, Proyecto, Punto, Terreno } from "@/types/api";
+import { agregarCamino, eliminarCamino, obtenerTerreno } from "@/services/terreno";
+import {
+  ETIQUETAS_TIPO_CAMINO,
+  TipoCamino,
+  type ConfiguracionEquipo,
+  type Layout,
+  type LayoutGenerar,
+  type Proyecto,
+  type Punto,
+  type Terreno,
+} from "@/types/api";
 import {
   redondearMm,
   validarBloques,
@@ -74,6 +90,55 @@ const PARAMETROS_DEFECTO = { L: "4", pasillo: "2", tolerancia: "20", kwp: "" };
 type Parametros = typeof PARAMETROS_DEFECTO;
 
 const OPCIONES_L = [2, 4, 6, 8, 10, 12];
+
+type Direccion = "horizontal" | "vertical";
+
+interface FormularioCamino {
+  direccion: Direccion;
+  /** Eje del camino desde el borde inferior (horizontal) o izquierdo (vertical), en m */
+  posicion: string;
+  ancho: string;
+  tipo: TipoCamino;
+}
+
+/**
+ * Camino recto de borde a borde del terreno, como en el prototipo
+ * ("Camino H1 · Horizontal · 4 m de ancho"). El backend lo recorta contra
+ * el terreno al calcular el área útil, así que en un terreno irregular
+ * puede sobresalir sin problema.
+ */
+function rectanguloCamino(terreno: Punto[], f: { direccion: Direccion; posicion: number; ancho: number }): Punto[] {
+  const xs = terreno.map((p) => p[0]);
+  const ys = terreno.map((p) => p[1]);
+  const [minX, maxX, minY, maxY] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const medio = f.ancho / 2;
+  if (f.direccion === "horizontal") {
+    const y = minY + f.posicion;
+    return [[minX, y - medio], [maxX, y - medio], [maxX, y + medio], [minX, y + medio]];
+  }
+  const x = minX + f.posicion;
+  return [[x - medio, minY], [x + medio, minY], [x + medio, maxY], [x - medio, maxY]];
+}
+
+/** Siguiente nombre libre: "Camino H1", "Camino H2"… */
+function nombreCamino(existentes: (string | null)[], direccion: Direccion): string {
+  const letra = direccion === "horizontal" ? "H" : "V";
+  const usados = existentes.flatMap((n) => {
+    const m = n?.match(new RegExp(`^Camino ${letra}(\\d+)$`));
+    return m ? [Number(m[1])] : [];
+  });
+  return `Camino ${letra}${Math.max(0, ...usados) + 1}`;
+}
+
+/** Ancho y sentido aproximados de un camino, para la lista del panel. */
+function describirCamino(vertices: Punto[]): string {
+  const xs = vertices.map((p) => p[0]);
+  const ys = vertices.map((p) => p[1]);
+  const dx = Math.max(...xs) - Math.min(...xs);
+  const dy = Math.max(...ys) - Math.min(...ys);
+  const horizontal = dx >= dy;
+  return `${horizontal ? "Horizontal" : "Vertical"} · ${numero(horizontal ? dy : dx)} m de ancho`;
+}
 
 function desdeLayout(l: Layout | null): Parametros {
   if (!l) return PARAMETROS_DEFECTO;
@@ -167,6 +232,10 @@ export function LayoutPage() {
   const [seleccionado, setSeleccionado] = useState<number | null>(null);
   const [guardando, setGuardando] = useState(false);
   const origenAlArrastrar = useRef<Punto | null>(null);
+  const navegar = useNavigate();
+
+  const [formCamino, setFormCamino] = useState<FormularioCamino | null>(null);
+  const [procesandoCamino, setProcesandoCamino] = useState(false);
 
   const original = useMemo<BloqueEdicion[]>(
     () => (layout?.bloques ?? []).map((b, i) => ({ clave: i, origen: b.vertices[3], paneles_ancho: b.paneles_ancho })),
@@ -330,6 +399,82 @@ export function LayoutPage() {
     };
   }, [idValido, proyectoId]);
 
+  // ─── Caminos de acceso ───────────────────────────────
+
+  function abrirFormCamino() {
+    if (!terreno) return;
+    setError(null);
+    setAviso(null);
+    const ys = terreno.vertices.map((p) => p[1]);
+    setFormCamino({
+      direccion: "horizontal",
+      posicion: String(Math.round((Math.max(...ys) - Math.min(...ys)) / 2)),
+      ancho: "4",
+      tipo: TipoCamino.ACCESO,
+    });
+  }
+
+  /** Tras cambiar un camino: terreno y layout nuevos (el layout queda desactualizado). */
+  async function recargarTrasCamino() {
+    const [t, l] = await Promise.all([obtenerTerreno(proyectoId), obtenerLayout(proyectoId)]);
+    setTerreno(t);
+    setLayout(l);
+  }
+
+  async function guardarCamino() {
+    if (!terreno || !formCamino) return;
+    const posicion = aNumero(formCamino.posicion);
+    const ancho = aNumero(formCamino.ancho);
+    if (posicion === null || Number.isNaN(posicion) || posicion < 0) {
+      setError("La posición del camino debe ser un número mayor o igual a cero.");
+      return;
+    }
+    if (ancho === null || Number.isNaN(ancho) || ancho <= 0) {
+      setError("El ancho del camino debe ser mayor que cero.");
+      return;
+    }
+    setProcesandoCamino(true);
+    setError(null);
+    try {
+      const nombre = nombreCamino(terreno.caminos.map((c) => c.nombre), formCamino.direccion);
+      await agregarCamino(proyectoId, {
+        nombre,
+        tipo: formCamino.tipo,
+        vertices: rectanguloCamino(terreno.vertices, { direccion: formCamino.direccion, posicion, ancho }),
+      });
+      await recargarTrasCamino();
+      setFormCamino(null);
+      setAviso(`${nombre} agregado.${layout ? " Vuelve a generar el layout para que lo respete." : ""}`);
+    } catch (e) {
+      setError(mensajeDeError(e, "No se pudo agregar el camino"));
+    } finally {
+      setProcesandoCamino(false);
+    }
+  }
+
+  async function quitarCamino(caminoId: number, nombre: string | null) {
+    if (!window.confirm(`¿Quitar ${nombre ?? "el camino"}?`)) return;
+    setProcesandoCamino(true);
+    setError(null);
+    try {
+      await eliminarCamino(proyectoId, caminoId);
+      await recargarTrasCamino();
+      setAviso(`${nombre ?? "Camino"} quitado.${layout ? " Vuelve a generar el layout." : ""}`);
+    } catch (e) {
+      setError(mensajeDeError(e, "No se pudo quitar el camino"));
+    } finally {
+      setProcesandoCamino(false);
+    }
+  }
+
+  /** "Ajustar B8" del prototipo: abre la edición con el primer bloque de ese tipo elegido. */
+  function ajustarTipo(tipo: string) {
+    if (!layout) return;
+    const indice = layout.bloques.findIndex((b) => b.tipo === tipo);
+    empezarEdicion();
+    if (indice >= 0) setSeleccionado(indice);
+  }
+
   function actualizar(campo: keyof Parametros, valor: string) {
     setParametros((p) => ({ ...p, [campo]: valor }));
   }
@@ -378,8 +523,8 @@ export function LayoutPage() {
         <p className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {errorCarga ?? "No se encontró el proyecto."}
         </p>
-        <Link to="/proyectos" className="mt-4 inline-block text-sm text-solar-700 hover:underline">
-          ← Volver a proyectos
+        <Link to="/historial" className="mt-4 inline-block text-sm text-solar-700 hover:underline">
+          Volver al historial
         </Link>
       </div>
     );
@@ -393,8 +538,8 @@ export function LayoutPage() {
   return (
     <div className="mx-auto max-w-7xl">
       <EncabezadoProyecto
+        paso={3}
         proyecto={proyecto}
-        titulo="Layout solar"
         onActualizado={async (p) => {
           setProyecto(p);
           // La latitud entra en la huella del layout: puede quedar desactualizado
@@ -408,7 +553,7 @@ export function LayoutPage() {
           {faltaTerreno && (
             <>
               {" "}
-              <Link to={`/proyectos/${proyecto.id}/terreno`} className="font-semibold underline">
+              <Link to={rutaPaso(proyecto.id, 1)} className="font-semibold underline">
                 el terreno
               </Link>
             </>
@@ -417,7 +562,7 @@ export function LayoutPage() {
           {faltaEquipo && (
             <>
               {" "}
-              <Link to={`/proyectos/${proyecto.id}/equipo`} className="font-semibold underline">
+              <Link to={rutaPaso(proyecto.id, 2)} className="font-semibold underline">
                 el panel y el inversor
               </Link>
             </>
@@ -596,6 +741,145 @@ export function LayoutPage() {
 
         {/* ─── Resultados ───────────────────────────────── */}
         <aside className="space-y-5">
+          {/* ─── Resumen (prototipo) ─────────────────────── */}
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { etiqueta: "paneles", valor: layout ? numero(layout.total_paneles, 0) : "–", clase: "text-sky-800" },
+              { etiqueta: "kWp", valor: layout ? numero(layout.potencia_kwp, 1) : "–", clase: "text-green-800" },
+              { etiqueta: "bloques", valor: layout ? numero(layout.bloques.length, 0) : "–", clase: "text-acero-900" },
+              {
+                etiqueta: fueraDeProporcion.length === 1 ? "advertencia" : "advertencias",
+                valor: layout ? String(fueraDeProporcion.length) : "–",
+                clase: fueraDeProporcion.length ? "text-amber-700" : "text-acero-900",
+              },
+            ].map((d) => (
+              <div key={d.etiqueta} className="rounded-xl border border-acero-200 bg-superficie px-4 py-3">
+                <p className={`text-xl font-bold ${d.clase}`}>{d.valor}</p>
+                <p className="text-xs text-acero-500">{d.etiqueta}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* ─── Caminos de acceso ───────────────────────── */}
+          {terreno && (
+            <div className="rounded-xl border border-acero-200 bg-superficie p-5">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xs font-semibold tracking-wider text-acero-400">CAMINOS DE ACCESO</h2>
+                {!formCamino && (
+                  <button
+                    type="button"
+                    onClick={abrirFormCamino}
+                    disabled={procesandoCamino || borrador !== null}
+                    className="rounded-md border border-solar-500 px-2.5 py-1 text-xs font-semibold text-solar-700 hover:bg-solar-50 disabled:opacity-50"
+                  >
+                    + Agregar
+                  </button>
+                )}
+              </div>
+
+              {terreno.caminos.length === 0 && !formCamino && (
+                <p className="mt-3 text-sm text-acero-500">Sin caminos: los bloques ocupan todo el terreno útil.</p>
+              )}
+              <ul className="mt-3 space-y-2">
+                {terreno.caminos.map((c) => (
+                  <li key={c.id} className="flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2">
+                    <span>
+                      <span className="block text-sm font-medium text-amber-900">{c.nombre ?? "Camino"}</span>
+                      <span className="block text-xs text-amber-800">
+                        {describirCamino(c.vertices)} · {ETIQUETAS_TIPO_CAMINO[c.tipo]}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void quitarCamino(c.id, c.nombre)}
+                      disabled={procesandoCamino || borrador !== null}
+                      className="text-xs text-acero-500 hover:text-red-600 disabled:opacity-50"
+                    >
+                      Quitar
+                    </button>
+                  </li>
+                ))}
+              </ul>
+
+              {formCamino && (
+                <div className="mt-3 space-y-3 rounded-lg border border-acero-200 p-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["horizontal", "vertical"] as const).map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => setFormCamino((f) => (f ? { ...f, direccion: d } : f))}
+                        className={[
+                          "rounded-lg border px-3 py-1.5 text-sm transition",
+                          formCamino.direccion === d ? "border-solar-500 bg-solar-50 text-solar-700" : "border-acero-300 text-acero-700 hover:bg-acero-100",
+                        ].join(" ")}
+                      >
+                        {d === "horizontal" ? "Horizontal" : "Vertical"}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Entrada etiqueta={formCamino.direccion === "horizontal" ? "Eje desde abajo (m)" : "Eje desde la izquierda (m)"}>
+                      <input className={CAMPO} inputMode="decimal" value={formCamino.posicion} onChange={(e) => setFormCamino((f) => (f ? { ...f, posicion: e.target.value } : f))} />
+                    </Entrada>
+                    <Entrada etiqueta="Ancho (m)">
+                      <input className={CAMPO} inputMode="decimal" value={formCamino.ancho} onChange={(e) => setFormCamino((f) => (f ? { ...f, ancho: e.target.value } : f))} />
+                    </Entrada>
+                  </div>
+                  <Entrada etiqueta="Tipo">
+                    <select className={CAMPO} value={formCamino.tipo} onChange={(e) => setFormCamino((f) => (f ? { ...f, tipo: e.target.value as TipoCamino } : f))}>
+                      {Object.values(TipoCamino).map((t) => (
+                        <option key={t} value={t}>
+                          {ETIQUETAS_TIPO_CAMINO[t]}
+                        </option>
+                      ))}
+                    </select>
+                  </Entrada>
+                  <div className="flex justify-end gap-2">
+                    <button type="button" onClick={() => setFormCamino(null)} className="rounded-lg border border-acero-300 px-3 py-1.5 text-sm text-acero-700 hover:bg-acero-100">
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void guardarCamino()}
+                      disabled={procesandoCamino}
+                      className="rounded-lg bg-solar-500 px-3 py-1.5 text-sm font-semibold text-acero-50 hover:bg-solar-600 disabled:opacity-50"
+                    >
+                      {procesandoCamino ? "Agregando…" : "Agregar camino"}
+                    </button>
+                  </div>
+                </div>
+              )}
+              <p className="mt-3 text-xs text-acero-400">
+                Los caminos se trazan rectos, de borde a borde del terreno; el área útil descuenta solo lo que cae dentro.
+              </p>
+            </div>
+          )}
+
+          {/* ─── Proporción antisísmica (prototipo) ──────── */}
+          {layout && !borrador && fueraDeProporcion.map((t) => {
+            const ideal = 3;
+            return (
+              <div key={t.tipo} className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+                <p className="font-semibold">Tipo {t.tipo}: proporción antisísmica</p>
+                <p className="mt-1 text-xs">
+                  {t.repeticiones} bloque{t.repeticiones === 1 ? "" : "s"} de {t.paneles_largo} × {t.paneles_ancho} con
+                  proporción {numero(t.proporcion)} : 1, fuera del rango de {ideal} : 1 ±{" "}
+                  {numero(layout.parametros.tolerancia_proporcion * 100, 0)} %. Ajústalo o confírmalo bajo tu
+                  responsabilidad.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => ajustarTipo(t.tipo)}
+                  disabled={layout.desactualizado}
+                  className="mt-2 rounded-md border border-amber-400 px-2.5 py-1 text-xs font-medium hover:bg-amber-100 disabled:opacity-50"
+                >
+                  Ajustar {t.tipo}
+                </button>
+              </div>
+            );
+          })}
+
           {borrador && (
             <p className="rounded-lg bg-solar-50 px-3 py-2 text-xs text-solar-800">
               Mientras editas, estos resultados son los del layout guardado. Se recalculan al guardar.
@@ -738,6 +1022,20 @@ export function LayoutPage() {
           )}
         </aside>
       </div>
+
+      <BarraPaso
+        atras={{ etiqueta: "\u2190 Anterior", onClick: () => void navegar(rutaPaso(proyectoId, 2)), deshabilitado: borrador !== null }}
+        resumen={
+          layout
+            ? `${numero(layout.total_paneles, 0)} paneles · ${numero(layout.potencia_kwp, 1)} kWp · ${layout.bloques.length} bloques`
+            : "Genera el layout para continuar"
+        }
+        adelante={{
+          etiqueta: "Confirmar layout \u2192",
+          deshabilitado: true,
+          titulo: "El diagrama de confirmación (RF-05) llega en la siguiente entrega",
+        }}
+      />
     </div>
   );
 }
