@@ -111,7 +111,7 @@ export default function App() {
             <>
               <Route path="seguridad/usuarios" element={<UsuariosPage />} />
               <Route path="seguridad/usuarios/nuevo" element={<UsuarioFormPage />} />
-              <Route path="seguridad/usuarios/:usuarioId" element={<UsuarioFormPage key="editar" />} />
+              <Route path="seguridad/usuarios/:usuarioId" element={<UsuarioFormPage />} />
             </>,
           )}
 
