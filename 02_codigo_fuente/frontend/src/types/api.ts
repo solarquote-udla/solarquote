@@ -5,22 +5,98 @@
  * actualizar el tipo correspondiente aquí. TypeScript no lo detecta solo.
  */
 
-/** Espejo de `RolUsuario` en backend/app/models/usuario.py */
-export const RolUsuario = {
-  GERENTE_GENERAL: "gerente_general",
-  PERSONAL_PRODUCCION: "personal_produccion",
+/**
+ * Espejo de `Permiso` en backend/app/core/permisos.py (RF-11).
+ * Cada permiso es una opción del menú; el Dashboard lo ve todo usuario.
+ */
+export const Permiso = {
+  GENERAR_LAYOUT: "generar_layout",
+  CARGAR_BOCETO: "cargar_boceto",
+  HISTORIAL: "historial",
+  DESPACHO: "despacho",
+  RECEPCION: "recepcion",
+  CLIENTES: "clientes",
+  INVERSORES: "inversores",
+  MATERIALES: "materiales",
+  PRECIOS: "precios",
+  PERFILES: "perfiles",
+  USUARIOS: "usuarios",
 } as const;
 
-export type RolUsuario = (typeof RolUsuario)[keyof typeof RolUsuario];
+export type Permiso = (typeof Permiso)[keyof typeof Permiso];
+
+/** Espejo de `PermisoLeer`: una opción del catálogo */
+export interface PermisoCatalogo {
+  codigo: Permiso;
+  nombre: string;
+  grupo: "CÁLCULO" | "OPERACIONES" | "CONFIGURACIÓN";
+  descripcion: string;
+}
+
+/** Espejo de `PerfilResumen` */
+export interface PerfilResumen {
+  id: number;
+  nombre: string;
+  es_sistema: boolean;
+  acceso_total: boolean;
+}
+
+/** Espejo de `PerfilLeer` */
+export interface Perfil extends PerfilResumen {
+  descripcion: string | null;
+  permisos: Permiso[];
+  total_usuarios: number;
+}
+
+/** Espejo de `PerfilCrear` / `PerfilActualizar` */
+export interface PerfilGuardar {
+  nombre?: string;
+  descripcion?: string | null;
+  permisos?: Permiso[];
+}
+
+/** "pendiente": todavía no cambia su contraseña temporal */
+export type EstadoUsuario = "activo" | "pendiente" | "inactivo";
 
 /** Espejo de `UsuarioLeer` */
 export interface Usuario {
   id: number;
   nombre: string;
   email: string;
-  rol: RolUsuario;
+  perfil: PerfilResumen;
   activo: boolean;
+  debe_cambiar_password: boolean;
+  ultimo_acceso: string | null;
   created_at: string;
+  estado: EstadoUsuario;
+  bloqueado: boolean;
+}
+
+/** Espejo de `UsuarioSesion`: el usuario autenticado con sus permisos */
+export interface UsuarioSesion extends Usuario {
+  permisos: Permiso[];
+}
+
+/** Espejo de `UsuarioCrear` */
+export interface UsuarioCrear {
+  nombre: string;
+  email: string;
+  password_temporal: string;
+  perfil_id: number;
+}
+
+/** Espejo de `UsuarioActualizar` */
+export interface UsuarioActualizar {
+  nombre?: string;
+  email?: string;
+  perfil_id?: number;
+  activo?: boolean;
+}
+
+/** Espejo de `CambioPassword` */
+export interface CambioPassword {
+  password_actual: string;
+  password_nueva: string;
 }
 
 /** Espejo de `LoginPeticion` */
@@ -34,19 +110,13 @@ export interface RespuestaToken {
   access_token: string;
   token_type: string;
   expires_in: number;
-  usuario: Usuario;
+  usuario: UsuarioSesion;
 }
 
 /** Forma de los errores que devuelve FastAPI */
 export interface ErrorApi {
   detail: string | { msg: string; loc: (string | number)[] }[];
 }
-
-/** Etiquetas legibles para mostrar en la interfaz */
-export const ETIQUETAS_ROL: Record<RolUsuario, string> = {
-  [RolUsuario.GERENTE_GENERAL]: "Gerente General",
-  [RolUsuario.PERSONAL_PRODUCCION]: "Personal de Producción",
-};
 
 // ─── Clientes ───────────────────────────────────────────
 

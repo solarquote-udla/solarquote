@@ -19,7 +19,7 @@ cada sprint en Jira.
 
 | Sprint | Fechas | Foco propuesto |
 |---|---|---|
-| 2 | 25 Sep – 9 Oct | ✅ Despliegue, RF-01, RF-02, RF-03, clientes, precios |
+| 2 | 25 Sep – 9 Oct | Despliegue, RF-01, RF-02, RF-03, clientes, precios |
 | 3 | 10 Oct – 23 Oct | Cotizar desde el layout, pantalla de cotización (RF-06), autenticación entre servicios |
 | 4 | 24 Oct – 6 Nov | Proforma Word/Excel (RF-07), inversores (RF-08), spike de IA |
 | 5 | 7 Nov – 20 Nov | RF-04 Boceto con IA y DXF |
@@ -58,7 +58,7 @@ solo corre en una máquina.
 | RF-08 | Administración de inversores | Esteban |
 | RF-09 | Administración de precios | Esteban |
 | RF-10 | Historial de cotizaciones | Esteban |
-| RF-11 | Seguridad / usuarios | ✅ hecho |
+| RF-11 | Seguridad / usuarios | Hecho |
 | RF-12 | Administración de clientes | Esteban |
 | RF-13 | Tablero | Esteban |
 
@@ -106,7 +106,7 @@ El objetivo no es funcionalidad, es **infraestructura visible**.
 - Definir cómo entra `LOG` (logística) al total
 - Despliegue de backend y calc-service en Railway
 
-### ✅ Criterio de aceptación del sprint
+### Criterio de aceptación del sprint
 Entrar a una URL pública, hacer login con un usuario real, y ver el shell
 de la aplicación. El backend responde desde Railway, no desde localhost.
 
@@ -126,7 +126,7 @@ de la aplicación. El backend responde desde Railway, no desde localhost.
 - CRUD de clientes
 - Pantallas de administración para los tres
 
-### ✅ Criterio de aceptación del sprint
+### Criterio de aceptación del sprint
 Se puede crear un cliente, crear un proyecto para ese cliente, definir su
 terreno con caminos, y elegir panel e inversor. Todo desde la interfaz.
 
@@ -153,7 +153,7 @@ del proyecto.
 - Generación de proforma en Word (`python-docx`) y Excel (`openpyxl`)
 - Descarga del archivo desde la interfaz
 
-### ✅ Criterio de aceptación del sprint
+### Criterio de aceptación del sprint
 Se genera un layout visible en pantalla, y se descarga una proforma
 editable con los materiales calculados.
 
@@ -174,7 +174,7 @@ editable con los materiales calculados.
 - Corrección de defectos
 - Preparación de evidencias para el documento
 
-### ✅ Criterio de aceptación del sprint
+### Criterio de aceptación del sprint
 Un usuario entra, crea un cliente, arma un proyecto, genera el layout,
 obtiene la cotización y descarga la proforma. Sin intervención manual
 en la base de datos.

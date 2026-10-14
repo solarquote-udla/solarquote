@@ -7,7 +7,6 @@
  */
 
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 
 import { FormularioCliente } from "@/components/FormularioCliente";
 import { mensajeDeError } from "@/services/api";
@@ -98,9 +97,7 @@ export function ClientesPage() {
   return (
     <div className="mx-auto max-w-6xl">
       <nav className="text-sm text-acero-500">
-        <Link to="/administracion" className="hover:text-solar-700 hover:underline">
-          Administración
-        </Link>
+        <span>Operaciones</span>
         <span className="mx-2">/</span>
         <span className="text-acero-700">Clientes</span>
       </nav>

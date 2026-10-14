@@ -14,7 +14,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.dependencies import requiere_gerente
+from app.core.dependencies import requiere_permiso
+from app.core.permisos import Permiso
+
+# Leer: también desde CÁLCULO (el alta de proyectos elige un cliente).
+lectura = requiere_permiso(Permiso.CLIENTES, Permiso.GENERAR_LAYOUT, Permiso.CARGAR_BOCETO)
+administrar = requiere_permiso(Permiso.CLIENTES)
 from app.models.cliente import Cliente
 from app.schemas.cliente import ClienteActualizar, ClienteCrear, ClienteLeer
 from app.services import cliente as servicio
@@ -22,7 +27,7 @@ from app.services import cliente as servicio
 router = APIRouter(
     prefix="/api/clientes",
     tags=["Clientes"],
-    dependencies=[Depends(requiere_gerente)],
+    dependencies=[Depends(lectura)],
 )
 
 
@@ -60,7 +65,7 @@ def detalle(cliente_id: int, db: Session = Depends(get_db)) -> ClienteLeer:
     return _respuesta(*resultado)
 
 
-@router.post("", response_model=ClienteLeer, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=ClienteLeer, status_code=status.HTTP_201_CREATED, dependencies=[Depends(administrar)])
 def crear(datos: ClienteCrear, db: Session = Depends(get_db)) -> ClienteLeer:
     try:
         cliente, total = servicio.crear_cliente(db, datos)
@@ -69,7 +74,7 @@ def crear(datos: ClienteCrear, db: Session = Depends(get_db)) -> ClienteLeer:
     return _respuesta(cliente, total)
 
 
-@router.patch("/{cliente_id}", response_model=ClienteLeer)
+@router.patch("/{cliente_id}", response_model=ClienteLeer, dependencies=[Depends(administrar)])
 def actualizar(cliente_id: int, datos: ClienteActualizar, db: Session = Depends(get_db)) -> ClienteLeer:
     try:
         resultado = servicio.actualizar_cliente(db, cliente_id, datos)
@@ -83,7 +88,7 @@ def actualizar(cliente_id: int, datos: ClienteActualizar, db: Session = Depends(
     return _respuesta(*resultado)
 
 
-@router.delete("/{cliente_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{cliente_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(administrar)])
 def dar_de_baja(cliente_id: int, db: Session = Depends(get_db)) -> None:
     cliente = servicio.dar_de_baja(db, cliente_id)
     if cliente is None:

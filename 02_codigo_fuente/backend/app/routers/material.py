@@ -13,7 +13,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.dependencies import requiere_gerente
+from app.core.dependencies import requiere_permiso
+from app.core.permisos import Permiso
 from app.models.material import Material, PrecioMaterial
 from app.schemas.material import MaterialLeer, PrecioActualizar, PrecioMaterialLeer
 from app.services import material as servicio
@@ -21,7 +22,7 @@ from app.services import material as servicio
 router = APIRouter(
     prefix="/api/materiales",
     tags=["Materiales"],
-    dependencies=[Depends(requiere_gerente)],
+    dependencies=[Depends(requiere_permiso(Permiso.MATERIALES, Permiso.PRECIOS))],
 )
 
 
@@ -61,7 +62,11 @@ def historial_precios(material_id: int, db: Session = Depends(get_db)) -> list[P
     return historial
 
 
-@router.patch("/{material_id}/precio", response_model=MaterialLeer)
+@router.patch(
+    "/{material_id}/precio",
+    response_model=MaterialLeer,
+    dependencies=[Depends(requiere_permiso(Permiso.PRECIOS))],
+)
 def actualizar_precio(material_id: int, datos: PrecioActualizar, db: Session = Depends(get_db)) -> MaterialLeer:
     resultado = servicio.actualizar_precio(db, material_id, datos.precio)
     if resultado is None:

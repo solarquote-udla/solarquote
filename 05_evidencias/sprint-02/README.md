@@ -29,19 +29,19 @@ login → clientes → proyecto → terreno y caminos → panel e inversor → l
 
 | Clave | Historia | Responsable | Pts | Estado | PRs |
 |---|---|---|---|---|---|
-| SQ-45 | RF-01 Definir terreno y caminos | Joseph | 13 | ✅ Hecha | #1 |
-| SQ-52 | RF-02 Seleccionar panel e inversor | Joseph | 8 | ✅ Hecha | #2 |
-| SQ-145 | Gestionar proyectos (alta, listado, detalle) | Joseph | 3 | ✅ Hecha | #1 |
-| SQ-147 | Editar datos del proyecto | Joseph | 2 | ✅ Hecha | #20 |
-| SQ-24 | Integración continua con pruebas automatizadas | Joseph | 5 | ✅ Hecha | #3, #21, #26 |
-| SQ-146 | CORS para las previews de Vercel | Joseph | 2 | ✅ Hecha | #4 |
-| SQ-134 | Definir la estrategia de pruebas | Joseph | 3 | ✅ Hecha | este cierre |
-| SQ-89 | RF-12 Administrar clientes | Esteban (backend) · Joseph (pantalla) | 8 | ✅ Hecha | #15, #17, #18, #22 |
-| SQ-93 | RF-09 Administrar precios de materiales | Esteban | 8 | ✅ Hecha | #23, #24, #25 |
-| SQ-21 | Desplegar el microservicio de cálculo | Esteban · Joseph | 3 | ✅ Hecha | despliegue en Railway |
-| SQ-37 | Autenticar la comunicación entre servicios | Esteban | 3 | ✅ Hecha | #30 |
-| SQ-72 | RF-06 Calcular materiales por proyecto | Esteban | 13 | ✅ Hecha | #5, #10–#13, #16, #19, #28 |
-| SQ-148 | Pantalla de administración de clientes (subtarea de SQ-89) | Joseph | — | ✅ Hecha | #22 |
+| SQ-45 | RF-01 Definir terreno y caminos | Joseph | 13 | Hecha | #1 |
+| SQ-52 | RF-02 Seleccionar panel e inversor | Joseph | 8 | Hecha | #2 |
+| SQ-145 | Gestionar proyectos (alta, listado, detalle) | Joseph | 3 | Hecha | #1 |
+| SQ-147 | Editar datos del proyecto | Joseph | 2 | Hecha | #20 |
+| SQ-24 | Integración continua con pruebas automatizadas | Joseph | 5 | Hecha | #3, #21, #26 |
+| SQ-146 | CORS para las previews de Vercel | Joseph | 2 | Hecha | #4 |
+| SQ-134 | Definir la estrategia de pruebas | Joseph | 3 | Hecha | este cierre |
+| SQ-89 | RF-12 Administrar clientes | Esteban (backend) · Joseph (pantalla) | 8 | Hecha | #15, #17, #18, #22 |
+| SQ-93 | RF-09 Administrar precios de materiales | Esteban | 8 | Hecha | #23, #24, #25 |
+| SQ-21 | Desplegar el microservicio de cálculo | Esteban · Joseph | 3 | Hecha | despliegue en Railway |
+| SQ-37 | Autenticar la comunicación entre servicios | Esteban | 3 | Hecha | #30 |
+| SQ-72 | RF-06 Calcular materiales por proyecto | Esteban | 13 | Hecha | #5, #10–#13, #16, #19, #28 |
+| SQ-148 | Pantalla de administración de clientes (subtarea de SQ-89) | Joseph | — | Hecha | #22 |
 
 **Sobre SQ-72:** se verificó contra sus cinco criterios de aceptación,
 todos de backend: las diez fórmulas, el rechazo de L impar, el IVA
@@ -58,8 +58,8 @@ marcadas con `*` en el informe.
 
 | Clave | Historia | Sprint previsto | Estado |
 |---|---|---|---|
-| SQ-56 | RF-03 Generar el layout solar automáticamente | Sprint 4 | ✅ Hecha (#14) |
-| SQ-64 | Editar manualmente los bloques generados | Sprint 4 | ✅ Hecha (#27) |
+| SQ-56 | RF-03 Generar el layout solar automáticamente | Sprint 4 | Hecha (#14) |
+| SQ-64 | Editar manualmente los bloques generados | Sprint 4 | Hecha (#27) |
 
 ---
 
@@ -102,14 +102,14 @@ marcadas con `*` en el informe.
 
 | Archivo | Qué capturar | Estado |
 |---|---|---|
-| `backlog.png` | Jira → Backlog, con el Sprint 2 y los siguientes | ☑ |
-| `informe-jira.png` | Jira → Reports → Sprint report, Sprint 2: historias completadas al cierre | ☑ |
-| `burndown.png` | Jira → Reports → Burndown chart, Sprint 2 | ☑ |
-| `burndown-eventos.png` | Detalle de eventos del burndown (qué se completó y cuándo) | ☑ |
-| `velocidad.png` | Jira → Reports → Velocity chart: Sprints 1 y 2 | ☐ |
-| `ci1.png`, `ci2.png` | GitHub → Actions: corridas en verde | ☑ |
-| `pull-requests.png` | GitHub → Pull requests → Closed | ☑ |
-| `retrospectiva.md` | Acuerdos de la retrospectiva | ☑ |
+| `backlog.png` | Jira → Backlog, con el Sprint 2 y los siguientes | Sí |
+| `informe-jira.png` | Jira → Reports → Sprint report, Sprint 2: historias completadas al cierre | Sí |
+| `burndown.png` | Jira → Reports → Burndown chart, Sprint 2 | Sí |
+| `burndown-eventos.png` | Detalle de eventos del burndown (qué se completó y cuándo) | Sí |
+| `velocidad.png` | Jira → Reports → Velocity chart: Sprints 1 y 2 | Sí |
+| `ci1.png`, `ci2.png` | GitHub → Actions: corridas en verde | Sí |
+| `pull-requests.png` | GitHub → Pull requests → Closed | Sí |
+| `retrospectiva.md` | Acuerdos de la retrospectiva | Sí |
 
 No hay captura del tablero al cierre: el sprint se cerró en Jira antes de
 tomarla, y el tablero pasó a mostrar el Sprint 3. El *Sprint report*
@@ -119,10 +119,10 @@ Capturas del sistema en funcionamiento → `05_evidencias/capturas/sprint-02/`:
 
 | Archivo | Pantalla | Estado |
 |---|---|---|
-| `01-login.png` | Login en `solarquote-hextructure.vercel.app` | ☑ |
-| `02-clientes.png` | Administración → Clientes | ☑ |
-| `03-precios.png` | Administración → Precios | ☑ |
-| `04-terreno.png` | Terreno con caminos y áreas | ☑ |
-| `05-equipo.png` | Panel e inversor con resultados | ☑ |
-| `06-layout.png` | Layout generado con bloques por tipo | ☑ |
-| `07-edicion-bloques.png` | Modo edición con un bloque en rojo | ☑ |
+| `01-login.png` | Login en `solarquote-hextructure.vercel.app` | Sí |
+| `02-clientes.png` | Administración → Clientes | Sí |
+| `03-precios.png` | Administración → Precios | Sí |
+| `04-terreno.png` | Terreno con caminos y áreas | Sí |
+| `05-equipo.png` | Panel e inversor con resultados | Sí |
+| `06-layout.png` | Layout generado con bloques por tipo | Sí |
+| `07-edicion-bloques.png` | Modo edición con un bloque en rojo | Sí |
