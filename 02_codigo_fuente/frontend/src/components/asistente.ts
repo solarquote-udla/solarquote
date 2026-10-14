@@ -8,10 +8,10 @@
 
 export type NumeroPaso = 1 | 2 | 3;
 
-export const PASOS: { numero: NumeroPaso; ruta: string; etiqueta: string; rf: string }[] = [
-  { numero: 1, ruta: "terreno", etiqueta: "Terreno", rf: "RF-01" },
-  { numero: 2, ruta: "equipo", etiqueta: "Panel + Inversor", rf: "RF-02" },
-  { numero: 3, ruta: "layout", etiqueta: "Caminos + Layout", rf: "RF-03" },
+export const PASOS: { numero: NumeroPaso; ruta: string; etiqueta: string }[] = [
+  { numero: 1, ruta: "terreno", etiqueta: "Terreno" },
+  { numero: 2, ruta: "equipo", etiqueta: "Panel + Inversor" },
+  { numero: 3, ruta: "layout", etiqueta: "Caminos + Layout" },
 ];
 
 /** Ruta de un paso de un proyecto ya creado. */
