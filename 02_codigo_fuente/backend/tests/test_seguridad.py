@@ -6,9 +6,12 @@ Corren contra la API real (TestClient) con la sesión de pruebas, para
 verificar también que cada endpoint aplica su permiso.
 """
 
+import threading
+import time
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from sqlalchemy import delete, event
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
@@ -17,9 +20,12 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.dependencies import DETALLE_CAMBIO_PENDIENTE
 from app.core.permisos import CATALOGO, TODOS_LOS_PERMISOS, Permiso
-from app.core.security import crear_access_token
+from app.core.security import crear_access_token, hash_password
 from app.main import app
+from app.models.perfil import Perfil
+from app.models.usuario import Usuario
 from app.schemas.usuario import UsuarioActualizar
+from app.services import auth as servicio_auth
 from app.services import seguridad
 from tests.fabricas import (
     PASSWORD,
@@ -380,7 +386,8 @@ def test_filtros_del_listado_de_usuarios(api, db):
 
 def test_sin_acceso_total_no_se_puede_tocar_a_un_gerente(api, db):
     gerente = crear_usuario(db)
-    admin = crear_usuario(db, perfil=perfil_personalizado(db, Permiso.USUARIOS))
+    # Puede administrar al personal de producción porque tiene sus mismos permisos
+    admin = crear_usuario(db, perfil=perfil_personalizado(db, Permiso.USUARIOS, Permiso.DESPACHO, Permiso.RECEPCION))
     sesion = cabecera(admin)
     nuevo_gerente = {
         "nombre": "Intruso",
@@ -458,3 +465,145 @@ def test_cambiar_correo_respeta_unicidad(api, db):
     r = api.patch(f"/api/usuarios/{otro.id}", headers=sesion, json={"email": "Nuevo@Example.com"})
     assert r.status_code == 200
     assert r.json()["email"] == "nuevo@example.com"
+
+
+# ─── No escalar privilegios (revisión de Esteban, PR #31) ──
+
+
+def test_nadie_modifica_su_propio_perfil(api, db):
+    soporte = perfil_personalizado(db, Permiso.PERFILES)
+    sesion = cabecera(crear_usuario(db, perfil=soporte))
+
+    todos = [p.value for p in Permiso]
+    assert api.patch(f"/api/perfiles/{soporte.id}", headers=sesion, json={"permisos": todos}).status_code == 403
+    assert api.patch(f"/api/perfiles/{soporte.id}", headers=sesion, json={"descripcion": "x"}).status_code == 403
+    db.refresh(soporte)
+    assert soporte.permisos == {"perfiles"}
+
+
+def test_solo_se_otorgan_permisos_propios(api, db):
+    sesion = cabecera(crear_usuario(db, perfil=perfil_personalizado(db, Permiso.PERFILES, Permiso.CLIENTES)))
+    otro = perfil_personalizado(db, Permiso.HISTORIAL, Permiso.PRECIOS)
+
+    agrega_ajeno = api.patch(f"/api/perfiles/{otro.id}", headers=sesion, json={"permisos": ["historial", "precios", "usuarios"]})
+    assert agrega_ajeno.status_code == 403
+    assert "usuarios" in agrega_ajeno.json()["detail"]
+
+    # Agregar uno propio y quitar uno ajeno sí se permite
+    r = api.patch(f"/api/perfiles/{otro.id}", headers=sesion, json={"permisos": ["historial", "clientes"]})
+    assert r.status_code == 200
+    assert r.json()["permisos"] == ["clientes", "historial"]
+
+    assert api.post("/api/perfiles", headers=sesion, json={"nombre": "Escala", "permisos": ["usuarios"]}).status_code == 403
+    assert api.post("/api/perfiles", headers=sesion, json={"nombre": "Comercial", "permisos": ["clientes"]}).status_code == 201
+
+
+def test_no_se_asigna_ni_administra_un_perfil_con_mas_permisos(api, db):
+    sesion = cabecera(crear_usuario(db, perfil=perfil_personalizado(db, Permiso.USUARIOS, Permiso.CLIENTES)))
+    mayor = perfil_personalizado(db, Permiso.CLIENTES, Permiso.PRECIOS)
+    menor = perfil_personalizado(db, Permiso.CLIENTES)
+    alta = {"nombre": "Nuevo", "email": "nuevo@example.com", "password_temporal": "Temporal1"}
+
+    assert api.post("/api/usuarios", headers=sesion, json={**alta, "perfil_id": mayor.id}).status_code == 403
+    assert api.post("/api/usuarios", headers=sesion, json={**alta, "perfil_id": menor.id}).status_code == 201
+
+    # Tomar la cuenta de alguien con más permisos tampoco
+    jefe = crear_usuario(db, perfil=mayor)
+    assert api.patch(f"/api/usuarios/{jefe.id}", headers=sesion, json={"activo": False}).status_code == 403
+    r = api.put(f"/api/usuarios/{jefe.id}/password", headers=sesion, json={"password_temporal": "Temporal1"})
+    assert r.status_code == 403
+
+
+# ─── Tiempo de respuesta del login (revisión de Esteban, PR #31) ──
+
+
+def test_login_hace_el_mismo_trabajo_exista_o_no_el_correo(db):
+    usuario = crear_usuario(db)
+    db.commit()  # dentro del savepoint del test; se revierte al final
+    conexion = db.connection()
+
+    def sentencias_de(email: str) -> list[str]:
+        vistas: list[str] = []
+
+        def anotar(conn, cursor, sentencia, parametros, contexto, many):
+            # Los SAVEPOINT son del aislamiento de las pruebas, no del login
+            if not sentencia.lstrip().upper().startswith(("SAVEPOINT", "RELEASE", "ROLLBACK")):
+                vistas.append(sentencia)
+
+        event.listen(conexion, "before_cursor_execute", anotar)
+        try:
+            with pytest.raises(servicio_auth.CredencialesInvalidas):
+                servicio_auth.autenticar(db, email, "Incorrecta1")
+        finally:
+            event.remove(conexion, "before_cursor_execute", anotar)
+        return vistas
+
+    existe = sentencias_de(usuario.email)
+    no_existe = sentencias_de("nadie-registrado@example.com")
+
+    assert existe == no_existe
+    assert any(s.lstrip().upper().startswith("UPDATE") for s in existe)
+
+
+# ─── Carrera al desactivar gerentes (revisión de Esteban, PR #31) ──
+
+
+def test_dos_desactivaciones_simultaneas_no_dejan_sin_gerente(_engine):
+    """
+    A desactiva a B mientras B desactiva a A. Sin el bloqueo, cada uno
+    cuenta 2 gerentes activos y ambos pasan. Con FOR UPDATE, la segunda
+    transacción espera y, al continuar, ya ve un solo gerente.
+    """
+    from sqlalchemy.orm import Session as Sesion
+
+    with Sesion(_engine) as preparar:
+        perfil = Perfil(nombre="Gerente carrera", clave="gerente_carrera", acceso_total=True)
+        preparar.add(perfil)
+        preparar.flush()
+        a = Usuario(nombre="A", email="carrera-a@example.com", password_hash=hash_password("Clave1234"), perfil_id=perfil.id)
+        b = Usuario(nombre="B", email="carrera-b@example.com", password_hash=hash_password("Clave1234"), perfil_id=perfil.id)
+        preparar.add_all([a, b])
+        preparar.commit()
+        ids = (a.id, b.id, perfil.id)
+
+    resultado: dict[str, object] = {}
+    primera = Sesion(_engine)
+    segunda = Sesion(_engine)
+    try:
+
+        # La primera transacción cuenta (y bloquea) antes de desactivar
+        assert seguridad._gerentes_activos(primera) >= 2
+
+        def b_desactiva_a_a():
+            try:
+                actor_b = segunda.get(Usuario, ids[1])
+                objetivo_a = segunda.get(Usuario, ids[0])
+                seguridad.actualizar_usuario(segunda, actor_b, objetivo_a, UsuarioActualizar(activo=False))
+                resultado["segunda"] = "desactivó"
+            except seguridad.Conflicto as exc:
+                resultado["segunda"] = exc.mensaje
+            finally:
+                segunda.rollback()
+
+        hilo = threading.Thread(target=b_desactiva_a_a)
+        hilo.start()
+        time.sleep(0.5)
+        assert hilo.is_alive(), "la segunda transacción debía esperar el bloqueo"
+
+        objetivo_b = primera.get(Usuario, ids[1])
+        objetivo_b.activo = False
+        primera.commit()
+
+        hilo.join(timeout=10)
+        assert "al menos un usuario activo" in str(resultado.get("segunda"))
+    finally:
+        # Cerrar siempre: una transacción abierta bloquearía el drop_all final
+        primera.rollback()
+        primera.close()
+        if "hilo" in locals():
+            hilo.join(timeout=10)
+        segunda.close()
+        with Sesion(_engine) as limpiar:
+            limpiar.execute(delete(Usuario).where(Usuario.id.in_(ids[:2])))
+            limpiar.execute(delete(Perfil).where(Perfil.id == ids[2]))
+            limpiar.commit()
