@@ -7,6 +7,8 @@
  *   - Gerente General: acceso total, solo lectura.
  *   - Perfiles del sistema: no se renombran ni se eliminan.
  *   - Un perfil con usuarios no se elimina.
+ *   - Sin acceso total: nadie modifica su propio perfil ni otorga
+ *     permisos que su perfil no tiene (sí puede quitarlos).
  * Ver DS-06 en DECISIONES-SEGURIDAD.md.
  */
 
@@ -106,7 +108,12 @@ export function PerfilesPage() {
 
   const perfil = typeof seleccion === "number" ? (perfiles.find((p) => p.id === seleccion) ?? null) : null;
   const esNuevo = seleccion === "nuevo";
-  const soloLectura = perfil?.acceso_total ?? false;
+  const tengoAccesoTotal = usuario?.perfil.acceso_total ?? false;
+  const misPermisos = useMemo(() => new Set(usuario?.permisos ?? []), [usuario]);
+  const esMiPerfil = !tengoAccesoTotal && perfil !== null && usuario?.perfil.id === perfil.id;
+  const soloLectura = (perfil?.acceso_total ?? false) || esMiPerfil;
+  /** Encender un permiso que mi perfil no tiene sería escalar privilegios. */
+  const puedoActivar = (codigo: Permiso) => tengoAccesoTotal || misPermisos.has(codigo);
   const nombreEditable = esNuevo || (perfil !== null && !perfil.es_sistema);
 
   const original = useMemo(() => borradorDe(perfil), [perfil]);
@@ -142,14 +149,15 @@ export function PerfilesPage() {
     setBorrador((b) => {
       const permisos = new Set(b.permisos);
       for (const p of catalogo.filter((c) => c.grupo === grupo)) {
-        if (activo) permisos.add(p.codigo);
-        else permisos.delete(p.codigo);
+        if (activo && puedoActivar(p.codigo)) permisos.add(p.codigo);
+        else if (!activo) permisos.delete(p.codigo);
       }
       return { ...b, permisos };
     });
   }
 
   async function guardar() {
+    if (!esNuevo && !perfil) return;
     setGuardando(true);
     setError(null);
     setAviso(null);
@@ -157,9 +165,9 @@ export function PerfilesPage() {
       const datos = {
         descripcion: borrador.descripcion.trim() || null,
         permisos: [...borrador.permisos],
-        ...(nombreEditable ? { nombre: borrador.nombre } : {}),
+        ...(nombreEditable ? { nombre: borrador.nombre.trim().replace(/\s+/g, " ") } : {}),
       };
-      const guardado = esNuevo ? await crearPerfil(datos) : await actualizarPerfil(perfil!.id, datos);
+      const guardado = perfil ? await actualizarPerfil(perfil.id, datos) : await crearPerfil(datos);
       await cargar(guardado.id);
       setAviso(esNuevo ? `Perfil «${guardado.nombre}» creado.` : `Cambios guardados en «${guardado.nombre}».`);
       // Si edité mi propio perfil, el menú cambia en el acto
@@ -314,6 +322,17 @@ export function PerfilesPage() {
                     se puede modificar.
                   </p>
                 )}
+                {esMiPerfil && (
+                  <p className="mt-4 rounded-lg border border-acero-300 bg-acero-100 px-4 py-3 text-sm text-acero-700">
+                    Es tu propio perfil: sus permisos solo los cambia un Gerente General u otro usuario con el
+                    permiso Perfiles.
+                  </p>
+                )}
+                {!soloLectura && !tengoAccesoTotal && (
+                  <p className="mt-4 text-xs text-acero-500">
+                    Solo puedes activar los permisos que tu perfil también tiene; los demás aparecen bloqueados.
+                  </p>
+                )}
                 {!soloLectura && borrador.permisos.size === 0 && (
                   <p className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                     Sin permisos, los usuarios de este perfil solo verán el Dashboard.
@@ -325,7 +344,8 @@ export function PerfilesPage() {
               <div className="divide-y divide-acero-200">
                 {GRUPOS.map((grupo) => {
                   const opciones = catalogo.filter((c) => c.grupo === grupo);
-                  const activas = opciones.filter((o) => soloLectura || borrador.permisos.has(o.codigo)).length;
+                  const activas = opciones.filter((o) => (perfil?.acceso_total ?? false) || borrador.permisos.has(o.codigo)).length;
+                  const faltanActivables = opciones.some((o) => !borrador.permisos.has(o.codigo) && puedoActivar(o.codigo));
                   return (
                     <div key={grupo} className="p-6">
                       <div className="mb-3 flex items-center justify-between">
@@ -335,10 +355,10 @@ export function PerfilesPage() {
                         {!soloLectura && (
                           <button
                             type="button"
-                            onClick={() => alternarGrupo(grupo, activas < opciones.length)}
+                            onClick={() => alternarGrupo(grupo, faltanActivables)}
                             className="text-xs font-medium text-solar-700 hover:underline"
                           >
-                            {activas < opciones.length ? "Activar todo" : "Quitar todo"}
+                            {faltanActivables ? "Activar todo" : "Quitar todo"}
                           </button>
                         )}
                       </div>
@@ -351,8 +371,8 @@ export function PerfilesPage() {
                             </div>
                             <Interruptor
                               etiqueta={opcion.nombre}
-                              activo={soloLectura || borrador.permisos.has(opcion.codigo)}
-                              deshabilitado={soloLectura}
+                              activo={(perfil?.acceso_total ?? false) || borrador.permisos.has(opcion.codigo)}
+                              deshabilitado={soloLectura || (!borrador.permisos.has(opcion.codigo) && !puedoActivar(opcion.codigo))}
                               onCambiar={(activo) => alternar(opcion.codigo, activo)}
                             />
                           </li>

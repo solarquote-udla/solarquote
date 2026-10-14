@@ -32,8 +32,19 @@ function resumenPerfil(perfil: Perfil): string {
   return `${perfil.permisos.length} opción${perfil.permisos.length === 1 ? "" : "es"} del menú`;
 }
 
+/**
+ * La clave reinicia el formulario al pasar de un usuario a otro (o al
+ * alta): sin ella quedarían los errores y campos del anterior.
+ */
 export function UsuarioFormPage() {
   const { usuarioId } = useParams();
+  return <FormularioUsuario key={usuarioId ?? "nuevo"} usuarioId={usuarioId} />;
+}
+
+const normalizarNombre = (valor: string) => valor.trim().replace(/\s+/g, " ");
+const normalizarEmail = (valor: string) => valor.trim().toLowerCase();
+
+function FormularioUsuario({ usuarioId }: { usuarioId: string | undefined }) {
   const esNuevo = usuarioId === undefined;
   const { usuario: yo, refrescarSesion } = useAuth();
   const navegar = useNavigate();
@@ -79,6 +90,10 @@ export function UsuarioFormPage() {
 
   const soyYo = original !== null && original.id === yo?.id;
   const tengoAccesoTotal = yo?.perfil.acceso_total ?? false;
+  const misPermisos = new Set(yo?.permisos ?? []);
+  /** No se asigna un perfil con más permisos que el propio (DS-06). */
+  const excedeMisPermisos = (p: Perfil) =>
+    !tengoAccesoTotal && (p.acceso_total || p.permisos.some((permiso) => !misPermisos.has(permiso)));
 
   const errores = {
     nombre: nombre.trim().length < 2 ? "Ingresa el nombre completo" : null,
@@ -98,8 +113,8 @@ export function UsuarioFormPage() {
     try {
       if (esNuevo) {
         const creado = await crearUsuario({
-          nombre,
-          email,
+          nombre: normalizarNombre(nombre),
+          email: normalizarEmail(email),
           password_temporal: password,
           perfil_id: perfilId,
         });
@@ -110,8 +125,8 @@ export function UsuarioFormPage() {
         });
       } else if (original) {
         const cambios = {
-          ...(nombre.trim() !== original.nombre ? { nombre } : {}),
-          ...(email.trim().toLowerCase() !== original.email ? { email } : {}),
+          ...(normalizarNombre(nombre) !== original.nombre ? { nombre: normalizarNombre(nombre) } : {}),
+          ...(normalizarEmail(email) !== original.email ? { email: normalizarEmail(email) } : {}),
           ...(perfilId !== original.perfil.id ? { perfil_id: perfilId } : {}),
           ...(activo !== original.activo ? { activo } : {}),
         };
@@ -246,7 +261,7 @@ export function UsuarioFormPage() {
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label="Perfil de acceso">
             {perfiles.map((p) => {
-              const bloqueado = soyYo || (p.acceso_total && !tengoAccesoTotal);
+              const bloqueado = soyYo || excedeMisPermisos(p);
               const elegido = perfilId === p.id;
               return (
                 <label
@@ -269,6 +284,9 @@ export function UsuarioFormPage() {
                     <span className="block text-sm font-semibold text-acero-900">{p.nombre}</span>
                     <span className="block text-xs text-acero-500">{p.descripcion ?? resumenPerfil(p)}</span>
                     {p.descripcion && <span className="mt-1 block text-xs text-acero-400">{resumenPerfil(p)}</span>}
+                    {!soyYo && excedeMisPermisos(p) && (
+                      <span className="mt-1 block text-xs text-acero-400">Tiene permisos que tu perfil no tiene</span>
+                    )}
                   </span>
                 </label>
               );
