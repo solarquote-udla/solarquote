@@ -4,6 +4,14 @@ Administración de perfiles y usuarios (RF-11).
 Reglas que protegen al sistema de quedarse sin administrador o de que
 alguien se otorgue más acceso del que tiene:
 
+  Nadie se otorga más de lo que tiene (quien no tiene acceso total):
+    - No modifica los permisos de su propio perfil.
+    - No otorga a un perfil permisos que su propio perfil no tiene.
+    - No asigna a un usuario un perfil con permisos que él no tiene, ni
+      administra a usuarios cuyo perfil tiene permisos que él no tiene.
+    Sin estas reglas, quien tuviera "perfiles" o "usuarios" podría
+    agregarse todo el catálogo, directamente o a través de otra cuenta.
+
   Perfiles
     - El perfil Gerente General (acceso total) no se modifica ni se elimina.
     - Los perfiles del sistema no se renombran ni se eliminan.
@@ -13,7 +21,9 @@ alguien se otorgue más acceso del que tiene:
     - Solo quien tiene acceso total puede asignar el perfil Gerente
       General, ni modificar o restablecer la contraseña de un Gerente.
     - Nadie cambia su propio perfil ni desactiva su propia cuenta.
-    - Siempre queda al menos un Gerente General activo.
+    - Siempre queda al menos un Gerente General activo. La verificación
+      bloquea las filas de los gerentes (SELECT ... FOR UPDATE) para que
+      dos desactivaciones simultáneas no dejen al sistema sin ninguno.
     - Los usuarios no se eliminan: se desactivan (baja lógica), porque
       sus proyectos y cotizaciones los referencian.
 """
@@ -58,6 +68,22 @@ class DatoInvalido(ReglaSeguridad):
     status_code = 422
 
 
+# ─── Regla de no escalar privilegios ────────────────────
+
+def _permisos_ajenos(actor: Usuario, permisos: set[str]) -> set[str]:
+    """Permisos de la lista que el actor no tiene. Vacío con acceso total."""
+    if actor.perfil.acceso_total:
+        return set()
+    return permisos - actor.permisos
+
+
+def _exigir_permisos_propios(actor: Usuario, permisos: set[str], accion: str) -> None:
+    ajenos = _permisos_ajenos(actor, permisos)
+    if ajenos:
+        lista = ", ".join(sorted(ajenos))
+        raise OperacionNoPermitida(f"No puedes {accion} con permisos que tu perfil no tiene: {lista}")
+
+
 # ─── Perfiles ───────────────────────────────────────────
 
 def _usuarios_por_perfil(db: Session) -> dict[int, int]:
@@ -93,7 +119,8 @@ def _nombre_disponible(db: Session, nombre: str, excepto_id: int | None = None) 
         raise Conflicto(f"Ya existe un perfil llamado «{nombre}»")
 
 
-def crear_perfil(db: Session, datos: PerfilCrear) -> Perfil:
+def crear_perfil(db: Session, actor: Usuario, datos: PerfilCrear) -> Perfil:
+    _exigir_permisos_propios(actor, {p.value for p in datos.permisos}, "crear un perfil")
     _nombre_disponible(db, datos.nombre)
     perfil = Perfil(nombre=datos.nombre, descripcion=datos.descripcion, acceso_total=False)
     perfil.asignar_permisos({p.value for p in datos.permisos})
@@ -103,9 +130,11 @@ def crear_perfil(db: Session, datos: PerfilCrear) -> Perfil:
     return perfil
 
 
-def actualizar_perfil(db: Session, perfil: Perfil, datos: PerfilActualizar) -> Perfil:
+def actualizar_perfil(db: Session, actor: Usuario, perfil: Perfil, datos: PerfilActualizar) -> Perfil:
     if perfil.acceso_total:
         raise Conflicto("El perfil Gerente General tiene acceso total y no se puede modificar")
+    if perfil.id == actor.perfil_id and not actor.perfil.acceso_total:
+        raise OperacionNoPermitida("No puedes modificar tu propio perfil")
 
     cambios = datos.model_dump(exclude_unset=True)
 
@@ -123,7 +152,10 @@ def actualizar_perfil(db: Session, perfil: Perfil, datos: PerfilActualizar) -> P
     if "permisos" in cambios:
         if datos.permisos is None:
             raise DatoInvalido("Envía la lista de permisos (puede estar vacía)")
-        perfil.asignar_permisos({p.value for p in datos.permisos})
+        nuevos = {p.value for p in datos.permisos}
+        # Quitar permisos siempre se puede; agregar, solo los que el actor tiene
+        _exigir_permisos_propios(actor, nuevos - perfil.permisos, "otorgar permisos")
+        perfil.asignar_permisos(nuevos)
 
     db.commit()
     db.refresh(perfil)
@@ -185,17 +217,33 @@ def _email_disponible(db: Session, email: str, excepto_id: int | None = None) ->
 
 
 def _gerentes_activos(db: Session) -> int:
-    return db.scalar(
-        select(func.count())
-        .select_from(Usuario)
+    """
+    Cuenta los gerentes activos bloqueando sus filas hasta el commit.
+
+    Sin el bloqueo, dos peticiones simultáneas que desactivan a dos
+    gerentes distintos contarían 2 cada una y ambas pasarían. Con FOR
+    UPDATE, la segunda espera a que la primera termine y, al reevaluar,
+    ya no cuenta al gerente desactivado.
+    """
+    filas = db.execute(
+        select(Usuario.id)
         .join(Perfil, Perfil.id == Usuario.perfil_id)
         .where(Perfil.acceso_total.is_(True), Usuario.activo.is_(True))
-    ) or 0
+        .with_for_update(of=Usuario)
+    ).all()
+    return len(filas)
 
 
 def _exigir_acceso_total(actor: Usuario, motivo: str) -> None:
     if not actor.perfil.acceso_total:
         raise OperacionNoPermitida(motivo)
+
+
+def _exigir_puede_administrar(actor: Usuario, perfil: Perfil, accion: str) -> None:
+    """El perfil (del usuario o el que se le asigna) no tiene más que el actor."""
+    if perfil.acceso_total:
+        _exigir_acceso_total(actor, f"Solo un Gerente General puede {accion} con el perfil Gerente General")
+    _exigir_permisos_propios(actor, perfil.permisos, accion)
 
 
 def crear_usuario(db: Session, actor: Usuario, datos: UsuarioCrear) -> Usuario:
@@ -204,8 +252,7 @@ def crear_usuario(db: Session, actor: Usuario, datos: UsuarioCrear) -> Usuario:
     perfil = db.get(Perfil, datos.perfil_id)
     if perfil is None:
         raise DatoInvalido("El perfil no existe")
-    if perfil.acceso_total:
-        _exigir_acceso_total(actor, "Solo un Gerente General puede crear otro Gerente General")
+    _exigir_puede_administrar(actor, perfil, "crear un usuario")
 
     usuario = Usuario(
         nombre=datos.nombre,
@@ -227,8 +274,8 @@ def actualizar_usuario(db: Session, actor: Usuario, usuario: Usuario, datos: Usu
         if campo in cambios and cambios[campo] is None:
             raise DatoInvalido(f"El campo {campo} no puede ser nulo")
 
-    if usuario.perfil.acceso_total:
-        _exigir_acceso_total(actor, "Solo un Gerente General puede modificar a otro Gerente General")
+    if actor.id != usuario.id:
+        _exigir_puede_administrar(actor, usuario.perfil, "modificar a un usuario")
 
     nuevo_perfil = usuario.perfil
     if "perfil_id" in cambios and cambios["perfil_id"] != usuario.perfil_id:
@@ -237,8 +284,7 @@ def actualizar_usuario(db: Session, actor: Usuario, usuario: Usuario, datos: Usu
         nuevo_perfil = db.get(Perfil, cambios["perfil_id"])
         if nuevo_perfil is None:
             raise DatoInvalido("El perfil no existe")
-        if nuevo_perfil.acceso_total:
-            _exigir_acceso_total(actor, "Solo un Gerente General puede asignar ese perfil")
+        _exigir_puede_administrar(actor, nuevo_perfil, "asignar un perfil")
 
     nuevo_activo = cambios.get("activo", usuario.activo)
     if actor.id == usuario.id and not nuevo_activo:
@@ -278,8 +324,8 @@ def restablecer_password(db: Session, actor: Usuario, usuario: Usuario, password
     """
     if actor.id == usuario.id:
         raise OperacionNoPermitida("Para tu propia cuenta usa «Cambiar contraseña»")
-    if usuario.perfil.acceso_total:
-        _exigir_acceso_total(actor, "Solo un Gerente General puede restablecer la contraseña de otro Gerente General")
+    # Restablecer la contraseña de alguien con más permisos sería tomar su cuenta
+    _exigir_puede_administrar(actor, usuario.perfil, "restablecer la contraseña de un usuario")
 
     usuario.password_hash = hash_password(password_temporal)
     usuario.debe_cambiar_password = True
