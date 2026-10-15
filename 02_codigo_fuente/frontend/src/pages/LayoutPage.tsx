@@ -24,7 +24,7 @@ import { BarraPaso } from "@/components/BarraPaso";
 import { EncabezadoProyecto } from "@/components/EncabezadoProyecto";
 import { rutaPaso } from "@/components/asistente";
 import { VistaLayout, type BloqueDibujo } from "@/components/VistaLayout";
-import { useAvisoAlSalir } from "@/hooks/useAvisoAlSalir";
+import { useCambiosSinGuardar } from "@/hooks/useCambiosSinGuardar";
 import { mensajeDeError } from "@/services/api";
 import { obtenerEquipo } from "@/services/equipo";
 import { generarLayout, guardarBloques, obtenerLayout } from "@/services/layout";
@@ -250,10 +250,10 @@ export function LayoutPage() {
   const navegar = useNavigate();
 
   const [formCamino, setFormCamino] = useState<FormularioCamino | null>(null);
-  // Las ediciones de bloques viven en un borrador hasta "Guardar cambios"
-  useAvisoAlSalir(borrador !== null);
-  const confirmarSalida = () =>
-    borrador === null || window.confirm("Tienes ediciones de bloques sin guardar. ¿Salir sin guardarlas?");
+  // Valores con que se abrió el formulario de camino: tocarlo cuenta como cambio
+  const [formCaminoInicial, setFormCaminoInicial] = useState<FormularioCamino | null>(null);
+  // "Editar datos" del encabezado tiene su propio formulario
+  const [encabezadoSucio, setEncabezadoSucio] = useState(false);
   const [procesandoCamino, setProcesandoCamino] = useState(false);
 
   const original = useMemo<BloqueEdicion[]>(
@@ -424,12 +424,14 @@ export function LayoutPage() {
     if (!terreno) return;
     setError(null);
     setAviso(null);
-    setFormCamino({
+    const inicial: FormularioCamino = {
       direccion: "horizontal",
       posicion: posicionCentrada(terreno.vertices, "horizontal"),
       ancho: "4",
       tipo: TipoCamino.ACCESO,
-    });
+    };
+    setFormCamino(inicial);
+    setFormCaminoInicial(inicial);
   }
 
   /** Tras cambiar un camino: terreno y layout nuevos (el layout queda desactualizado). */
@@ -531,6 +533,16 @@ export function LayoutPage() {
 
   // ─── Render ──────────────────────────────────────────
 
+  /**
+   * Todo lo de este paso que se perdería al salir: ediciones de bloques sin
+   * guardar, un camino a medio cargar, parámetros cambiados sin volver a
+   * generar y los datos del proyecto en edición.
+   */
+  const parametrosCambiados = JSON.stringify(aPeticion(parametros)) !== JSON.stringify(aPeticion(desdeLayout(layout)));
+  const caminoACargar = formCamino !== null && JSON.stringify(formCamino) !== JSON.stringify(formCaminoInicial);
+  const sinGuardar = borrador !== null || caminoACargar || parametrosCambiados || encabezadoSucio;
+  useCambiosSinGuardar(sinGuardar);
+
   if (!idValido) {
     return <p className="text-sm text-red-600">El identificador del proyecto no es válido.</p>;
   }
@@ -560,7 +572,7 @@ export function LayoutPage() {
       <EncabezadoProyecto
         paso={3}
         proyecto={proyecto}
-        puedeSalir={confirmarSalida}
+        onCambiosSinGuardar={setEncabezadoSucio}
         onActualizado={async (p) => {
           setProyecto(p);
           // La latitud entra en la huella del layout: puede quedar desactualizado
@@ -1052,7 +1064,8 @@ export function LayoutPage() {
       </div>
 
       <BarraPaso
-        atras={{ etiqueta: "\u2190 Anterior", onClick: () => void navegar(rutaPaso(proyectoId, 2)), deshabilitado: borrador !== null }}
+        // Con cambios sin guardar, useCambiosSinGuardar pregunta antes de salir
+        atras={{ etiqueta: "\u2190 Anterior", onClick: () => void navegar(rutaPaso(proyectoId, 2)) }}
         resumen={
           layout
             ? `${numero(layout.total_paneles, 0)} paneles · ${numero(layout.potencia_kwp, 1)} kWp · ${layout.bloques.length} bloques`
