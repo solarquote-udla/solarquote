@@ -57,6 +57,11 @@ class InversorCrear(BaseModel):
         return self
 
 
+#: Campos obligatorios en el modelo: PATCH con alguno de estos en `null`
+#: rompería el NOT NULL de la base en vez de avisar con un 422 claro.
+_CAMPOS_OBLIGATORIOS = ("marca", "modelo", "potencia_kw", "activo")
+
+
 class InversorActualizar(BaseModel):
     marca: MarcaInversor | None = None
     modelo: ModeloInversor | None = None
@@ -66,6 +71,16 @@ class InversorActualizar(BaseModel):
     mppts: int | None = Field(default=None, ge=1, le=50)
     strings_por_mppt: int | None = Field(default=None, ge=1, le=50)
     activo: bool | None = None
+
+    @model_validator(mode="after")
+    def rechazar_null_en_obligatorios(self) -> "InversorActualizar":
+        """`{"marca": null}` pasaría el tipo (marca es opcional en el PATCH
+        para poder omitirla) pero dejaría la columna NOT NULL en null."""
+        enviados = self.model_fields_set
+        nulos = [c for c in _CAMPOS_OBLIGATORIOS if c in enviados and getattr(self, c) is None]
+        if nulos:
+            raise ValueError(f"No se puede borrar: {', '.join(nulos)}")
+        return self
 
     @model_validator(mode="after")
     def validar_voltajes_si_se_envian_los_dos(self) -> "InversorActualizar":

@@ -32,10 +32,12 @@ const FORM_VACIO: FormularioInversor = {
   stringsPorMppt: "",
 };
 
-/** Número positivo opcional: "" o un valor en blanco se guarda como null. */
-function numeroOpcional(valor: string): number | null {
-  const limpio = valor.trim();
-  return limpio === "" ? null : Number(limpio);
+/** Número desde texto, aceptando coma decimal. Vacío → null. */
+function aNumero(valor: string): number | null {
+  const limpio = valor.trim().replace(",", ".");
+  if (limpio === "") return null;
+  const n = Number(limpio);
+  return Number.isFinite(n) ? n : Number.NaN;
 }
 
 function formularioDesdeInversor(inversor: InversorCatalogo): FormularioInversor {
@@ -53,18 +55,40 @@ function formularioDesdeInversor(inversor: InversorCatalogo): FormularioInversor
 function erroresDe(form: FormularioInversor): string | null {
   if (form.marca.trim().replace(/\s+/g, " ").length < 2) return "La marca debe tener al menos 2 caracteres.";
   if (form.modelo.trim().length < 1) return "El modelo es obligatorio.";
-  const potencia = Number(form.potenciaKw.trim());
-  if (!Number.isFinite(potencia) || potencia <= 0) return "La potencia debe ser un número mayor a cero.";
+
+  const potencia = aNumero(form.potenciaKw);
+  if (potencia === null || potencia <= 0) return "La potencia debe ser un número mayor a cero.";
+
   for (const [campo, etiqueta] of [
     [form.vmaxV, "Vmax"],
     [form.vminV, "Vmin"],
+  ] as const) {
+    if (campo.trim() === "") continue;
+    const n = aNumero(campo);
+    if (n === null || n <= 0) return `${etiqueta} debe ser un número mayor a cero, o dejarse en blanco.`;
+  }
+  for (const [campo, etiqueta] of [
     [form.mppts, "MPPTs"],
     [form.stringsPorMppt, "Strings por MPPT"],
   ] as const) {
     if (campo.trim() === "") continue;
-    const n = Number(campo.trim());
-    if (!Number.isFinite(n) || n <= 0) return `${etiqueta} debe ser un número mayor a cero, o dejarse en blanco.`;
+    const n = aNumero(campo);
+    if (n === null || !Number.isInteger(n) || n <= 0) {
+      return `${etiqueta} debe ser un número entero mayor a cero, o dejarse en blanco.`;
+    }
   }
+
+  // Igual que ConfiguracionEquipoGuardar: con uno solo no se pueden
+  // calcular los límites de string.
+  const vmax = aNumero(form.vmaxV);
+  const vmin = aNumero(form.vminV);
+  if ((vmax === null) !== (vmin === null)) {
+    return "Ingresa Vmax y Vmin juntos, o deja los dos en blanco.";
+  }
+  if (vmax !== null && vmin !== null && vmax <= vmin) {
+    return "Vmax debe ser mayor que Vmin.";
+  }
+
   return null;
 }
 
@@ -72,11 +96,11 @@ function datosDesdeFormulario(form: FormularioInversor): DatosInversor {
   return {
     marca: form.marca.trim().replace(/\s+/g, " "),
     modelo: form.modelo.trim(),
-    potencia_kw: Number(form.potenciaKw.trim()),
-    vmax_v: numeroOpcional(form.vmaxV),
-    vmin_v: numeroOpcional(form.vminV),
-    mppts: numeroOpcional(form.mppts),
-    strings_por_mppt: numeroOpcional(form.stringsPorMppt),
+    potencia_kw: aNumero(form.potenciaKw) as number, // ya validado por erroresDe
+    vmax_v: aNumero(form.vmaxV),
+    vmin_v: aNumero(form.vminV),
+    mppts: aNumero(form.mppts),
+    strings_por_mppt: aNumero(form.stringsPorMppt),
   };
 }
 
@@ -276,7 +300,7 @@ export function InversoresPage() {
             setMostrarForm((v) => !v);
             setFormNuevo(FORM_VACIO);
           }}
-          className="rounded-lg bg-solar-600 px-4 py-2 text-sm font-medium text-white hover:bg-solar-700"
+          className="rounded-lg bg-solar-500 px-4 py-2 text-sm font-semibold text-acero-50 transition hover:bg-solar-600"
         >
           {mostrarForm ? "Cancelar" : "+ Nuevo inversor"}
         </button>
@@ -294,14 +318,14 @@ export function InversoresPage() {
       )}
 
       {mostrarForm && (
-        <div className="mt-4 rounded-xl border border-acero-200 bg-white p-5">
+        <div className="mt-4 rounded-xl border border-acero-200 bg-superficie p-5">
           <CamposInversor form={formNuevo} onChange={setFormNuevo} />
           <div className="mt-3 flex justify-end">
             <button
               type="button"
               disabled={creando}
               onClick={crear}
-              className="rounded-md bg-solar-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-solar-700 disabled:opacity-50"
+              className="rounded-md bg-solar-500 px-4 py-1.5 text-sm font-semibold text-acero-50 hover:bg-solar-600 disabled:opacity-50"
             >
               {creando ? "Creando…" : "Crear inversor"}
             </button>
@@ -322,7 +346,7 @@ export function InversoresPage() {
         Mostrar inversores desactivados
       </label>
 
-      <div className="mt-2 overflow-hidden rounded-xl border border-acero-200 bg-white">
+      <div className="mt-2 overflow-hidden rounded-xl border border-acero-200 bg-superficie">
         {cargando ? (
           <p className="p-6 text-sm text-acero-500">Cargando inversores…</p>
         ) : inversores.length === 0 ? (
@@ -351,9 +375,13 @@ export function InversoresPage() {
                     <td className="px-4 py-3 text-right text-acero-600">{inversor.potencia_kw} kW</td>
                     <td className="px-4 py-3">
                       {inversor.activo ? (
-                        <span className="text-green-700">Activo</span>
+                        <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                          Activo
+                        </span>
                       ) : (
-                        <span className="text-acero-400">Inactivo</span>
+                        <span className="rounded-full bg-acero-200 px-2 py-0.5 text-xs font-medium text-acero-600">
+                          Inactivo
+                        </span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
@@ -393,7 +421,7 @@ export function InversoresPage() {
                             type="button"
                             disabled={guardando}
                             onClick={() => guardarEdicion(inversor)}
-                            className="rounded-md bg-solar-600 px-4 py-1.5 font-medium text-white hover:bg-solar-700 disabled:opacity-50"
+                            className="rounded-md bg-solar-500 px-4 py-1.5 font-semibold text-acero-50 hover:bg-solar-600 disabled:opacity-50"
                           >
                             {guardando ? "Guardando…" : "Guardar"}
                           </button>

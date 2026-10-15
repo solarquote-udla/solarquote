@@ -267,6 +267,20 @@ def test_ver_materiales_no_permite_cambiar_precios(api, db):
     assert r.status_code == 403
 
 
+def test_generar_layout_puede_leer_inversores_pero_no_administrarlos(api, db):
+    """Revisión del PR #37 (Joseph): el Paso 2 del asistente lee este catálogo."""
+    sesion = cabecera(crear_usuario(db, perfil=perfil_personalizado(db, Permiso.GENERAR_LAYOUT)))
+
+    assert api.get("/api/inversores", headers=sesion).status_code == 200
+    assert api.post("/api/inversores", headers=sesion, json={"marca": "Huawei", "modelo": "X", "potencia_kw": 50}).status_code == 403
+
+
+def test_sin_ningun_permiso_relacionado_no_lee_inversores(api, db):
+    sesion = cabecera(crear_usuario(db, perfil=perfil_personalizado(db, Permiso.CLIENTES)))
+
+    assert api.get("/api/inversores", headers=sesion).status_code == 403
+
+
 # ─── Perfiles ───────────────────────────────────────────
 
 

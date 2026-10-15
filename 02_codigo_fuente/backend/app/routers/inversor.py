@@ -20,10 +20,14 @@ from app.schemas.inversor import InversorActualizar, InversorCrear, InversorLeer
 from app.services import inversor as servicio
 from app.services.inversor import InversorDuplicado, VoltajesInconsistentes
 
+# Leer: también desde CÁLCULO (el asistente de layout prellena con el catálogo).
+lectura = requiere_permiso(Permiso.INVERSORES, Permiso.GENERAR_LAYOUT, Permiso.CARGAR_BOCETO)
+administrar = requiere_permiso(Permiso.INVERSORES)
+
 router = APIRouter(
     prefix="/api/inversores",
     tags=["Inversores"],
-    dependencies=[Depends(requiere_permiso(Permiso.INVERSORES))],
+    dependencies=[Depends(lectura)],
 )
 
 
@@ -43,7 +47,12 @@ def detalle(inversor_id: int, db: Session = Depends(get_db)) -> Inversor:
     return inversor
 
 
-@router.post("", response_model=InversorLeer, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=InversorLeer,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(administrar)],
+)
 def crear(datos: InversorCrear, db: Session = Depends(get_db)) -> Inversor:
     try:
         return servicio.crear_inversor(
@@ -60,7 +69,7 @@ def crear(datos: InversorCrear, db: Session = Depends(get_db)) -> Inversor:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 
-@router.patch("/{inversor_id}", response_model=InversorLeer)
+@router.patch("/{inversor_id}", response_model=InversorLeer, dependencies=[Depends(administrar)])
 def actualizar(inversor_id: int, datos: InversorActualizar, db: Session = Depends(get_db)) -> Inversor:
     try:
         resultado = servicio.actualizar_inversor(db, inversor_id, datos)
