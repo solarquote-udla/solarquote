@@ -6,6 +6,7 @@ layout (revisión del PR #34).
 """
 
 import pytest
+from sqlalchemy import event
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -64,3 +65,21 @@ def test_el_avance_distingue_terreno_equipo_y_layout(api, db):
     generado = api.post(f"/api/proyectos/{pid}/layout", headers=h, json={"paneles_largo": 4, "pasillo_m": 2, "tolerancia_proporcion": 0.2, "capacidad_deseada_kwp": None})
     assert generado.status_code == 200
     assert avance()[:3] == (True, True, True)
+
+
+def test_el_avance_se_resuelve_en_una_sola_consulta(db):
+    from app.services.proyecto import avance_de
+
+    consultas: list[str] = []
+
+    def anotar(conn, cursor, sentencia, *_):
+        if sentencia.lstrip().upper().startswith("SELECT"):
+            consultas.append(sentencia)
+
+    conexion = db.connection()
+    event.listen(conexion, "before_cursor_execute", anotar)
+    try:
+        avance_de(db, [1, 2, 3])
+    finally:
+        event.remove(conexion, "before_cursor_execute", anotar)
+    assert len(consultas) == 1

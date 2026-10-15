@@ -27,6 +27,8 @@ interface Props {
   proyecto: Proyecto | null;
   /** Recibe el proyecto actualizado, para que la página recargue lo que dependa de él */
   onActualizado?: (proyecto: Proyecto) => void | Promise<void>;
+  /** Para la barra de pasos: false cancela el cambio de paso */
+  puedeSalir?: () => boolean;
 }
 
 const texto = (v: string | number | null) => (v == null ? "" : String(v));
@@ -85,7 +87,7 @@ function Etiqueta({ texto: t, children, ancho }: { texto: string; children: Reac
   );
 }
 
-export function EncabezadoProyecto({ paso, proyecto, onActualizado }: Props) {
+export function EncabezadoProyecto({ paso, proyecto, onActualizado, puedeSalir }: Props) {
   const [editando, setEditando] = useState(false);
   const [formulario, setFormulario] = useState<Formulario>(() => (proyecto ? desdeProyecto(proyecto) : desdeProyecto(VACIO)));
   const [guardando, setGuardando] = useState(false);
@@ -154,7 +156,7 @@ export function EncabezadoProyecto({ paso, proyecto, onActualizado }: Props) {
       </nav>
 
       <div className="mt-3 border-b border-acero-200 pb-4">
-        <PasosAsistente actual={paso} proyectoId={proyecto?.id ?? null} />
+        <PasosAsistente actual={paso} proyectoId={proyecto?.id ?? null} puedeSalir={puedeSalir} />
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1">
