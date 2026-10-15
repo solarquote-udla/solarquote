@@ -1,17 +1,31 @@
-"""Schemas de Inversor — RF-08."""
+"""
+Schemas de Inversor — RF-08.
+
+Mismas reglas de voltaje que `ConfiguracionEquipoGuardar.Inversor`
+(app/schemas/equipo.py): si se registran Vmax y Vmin, van los dos juntos
+y Vmax debe ser mayor que Vmin — con uno solo no se pueden calcular los
+límites de string.
+"""
 
 from typing import Annotated
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
-
-def _colapsar_espacios(valor: object) -> object:
-    return " ".join(valor.split()) if isinstance(valor, str) else valor
-
+from app.core.texto import colapsar_espacios
 
 # Los espacios se colapsan ANTES de medir el largo: "   " no pasa como marca/modelo
-MarcaInversor = Annotated[str, BeforeValidator(_colapsar_espacios), Field(min_length=2, max_length=80)]
-ModeloInversor = Annotated[str, BeforeValidator(_colapsar_espacios), Field(min_length=1, max_length=100)]
+MarcaInversor = Annotated[str, BeforeValidator(colapsar_espacios), Field(min_length=2, max_length=80)]
+ModeloInversor = Annotated[str, BeforeValidator(colapsar_espacios), Field(min_length=1, max_length=100)]
+
+
+def _validar_voltajes(vmax_v: float | None, vmin_v: float | None) -> None:
+    if (vmax_v is None) != (vmin_v is None):
+        raise ValueError(
+            "Ingresa ambos voltajes (máximo y mínimo) o ninguno. Con uno solo no "
+            "se pueden calcular los límites de string."
+        )
+    if vmax_v is not None and vmin_v is not None and vmax_v <= vmin_v:
+        raise ValueError("El voltaje máximo debe ser mayor que el mínimo.")
 
 
 class InversorLeer(BaseModel):
@@ -31,19 +45,37 @@ class InversorLeer(BaseModel):
 class InversorCrear(BaseModel):
     marca: MarcaInversor
     modelo: ModeloInversor
-    potencia_kw: float = Field(gt=0)
-    vmax_v: float | None = Field(default=None, gt=0)
-    vmin_v: float | None = Field(default=None, gt=0)
-    mppts: int | None = Field(default=None, gt=0)
-    strings_por_mppt: int | None = Field(default=None, gt=0)
+    potencia_kw: float = Field(gt=0, le=10_000)
+    vmax_v: float | None = Field(default=None, gt=0, le=2000)
+    vmin_v: float | None = Field(default=None, gt=0, le=2000)
+    mppts: int | None = Field(default=None, ge=1, le=50)
+    strings_por_mppt: int | None = Field(default=None, ge=1, le=50)
+
+    @model_validator(mode="after")
+    def validar_voltajes(self) -> "InversorCrear":
+        _validar_voltajes(self.vmax_v, self.vmin_v)
+        return self
 
 
 class InversorActualizar(BaseModel):
     marca: MarcaInversor | None = None
     modelo: ModeloInversor | None = None
-    potencia_kw: float | None = Field(default=None, gt=0)
-    vmax_v: float | None = Field(default=None, gt=0)
-    vmin_v: float | None = Field(default=None, gt=0)
-    mppts: int | None = Field(default=None, gt=0)
-    strings_por_mppt: int | None = Field(default=None, gt=0)
+    potencia_kw: float | None = Field(default=None, gt=0, le=10_000)
+    vmax_v: float | None = Field(default=None, gt=0, le=2000)
+    vmin_v: float | None = Field(default=None, gt=0, le=2000)
+    mppts: int | None = Field(default=None, ge=1, le=50)
+    strings_por_mppt: int | None = Field(default=None, ge=1, le=50)
     activo: bool | None = None
+
+    @model_validator(mode="after")
+    def validar_voltajes_si_se_envian_los_dos(self) -> "InversorActualizar":
+        """
+        Solo valida el orden si esta petición trae los dos voltajes: es una
+        actualización parcial, así que "falta uno" no se puede juzgar acá —
+        el otro puede ya existir en la base. Esa consistencia completa la
+        revisa el servicio, con el registro ya fusionado.
+        """
+        enviados = self.model_fields_set
+        if "vmax_v" in enviados and "vmin_v" in enviados:
+            _validar_voltajes(self.vmax_v, self.vmin_v)
+        return self

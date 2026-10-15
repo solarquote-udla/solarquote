@@ -18,7 +18,7 @@ from app.core.permisos import Permiso
 from app.models.inversor import Inversor
 from app.schemas.inversor import InversorActualizar, InversorCrear, InversorLeer
 from app.services import inversor as servicio
-from app.services.inversor import InversorDuplicado
+from app.services.inversor import InversorDuplicado, VoltajesInconsistentes
 
 router = APIRouter(
     prefix="/api/inversores",
@@ -62,22 +62,12 @@ def crear(datos: InversorCrear, db: Session = Depends(get_db)) -> Inversor:
 
 @router.patch("/{inversor_id}", response_model=InversorLeer)
 def actualizar(inversor_id: int, datos: InversorActualizar, db: Session = Depends(get_db)) -> Inversor:
-    enviados = datos.model_fields_set
     try:
-        resultado = servicio.actualizar_inversor(
-            db,
-            inversor_id,
-            marca=datos.marca,
-            modelo=datos.modelo,
-            potencia_kw=datos.potencia_kw,
-            vmax_v=datos.vmax_v if "vmax_v" in enviados else ...,
-            vmin_v=datos.vmin_v if "vmin_v" in enviados else ...,
-            mppts=datos.mppts if "mppts" in enviados else ...,
-            strings_por_mppt=datos.strings_por_mppt if "strings_por_mppt" in enviados else ...,
-            activo=datos.activo,
-        )
+        resultado = servicio.actualizar_inversor(db, inversor_id, datos)
     except InversorDuplicado as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except VoltajesInconsistentes as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     if resultado is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No existe el inversor {inversor_id}")
     return resultado
