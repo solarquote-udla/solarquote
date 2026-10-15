@@ -19,6 +19,7 @@ import { BarraPaso } from "@/components/BarraPaso";
 import { EncabezadoProyecto } from "@/components/EncabezadoProyecto";
 import { rutaPaso } from "@/components/asistente";
 import { useCambiosSinGuardar } from "@/hooks/useCambiosSinGuardar";
+import { useAccionUnica } from "@/hooks/useAccionUnica";
 import { mensajeDeError } from "@/services/api";
 import { guardarEquipo, listarPanelesReferencia, obtenerEquipo } from "@/services/equipo";
 import { obtenerProyecto } from "@/services/proyectos";
@@ -256,6 +257,8 @@ export function EquipoPage() {
   // También la primera vez: sin configuración guardada, cualquier dato escrito se perdería
   const permitirSalida = useCambiosSinGuardar(hayCambios || encabezadoSucio);
 
+  const unaVez = useAccionUnica();
+
   function actualizar(campo: Campo, valor: string) {
     setFormulario((f) => ({ ...f, [campo]: valor }));
     // Editar a mano un dato del panel deja de coincidir con la ficha citada
@@ -380,7 +383,13 @@ export function EquipoPage() {
         </div>
       )}
 
-      <form onSubmit={guardar} className="mt-6 grid gap-6 lg:grid-cols-2">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void unaVez(() => guardar(e));
+        }}
+        className="mt-6 grid gap-6 lg:grid-cols-2"
+      >
         {/* ─── Panel solar ──────────────────────────────── */}
         <section className="rounded-xl border border-acero-200 bg-superficie p-5">
           <h2 className="text-sm font-semibold text-acero-900">Panel solar</h2>
@@ -627,7 +636,7 @@ export function EquipoPage() {
               setError("Guarda o cancela los cambios en los datos del proyecto antes de continuar.");
               return;
             }
-            void guardarSiHaceFalta().then((ok) => {
+            void unaVez(guardarSiHaceFalta).then((ok) => {
               if (!ok) return;
               // Recién guardado: esta navegación no debe pedir confirmación
               permitirSalida();

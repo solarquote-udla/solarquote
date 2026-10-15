@@ -28,12 +28,13 @@ import { EditorPoligonos, type CaminoDibujo } from "@/components/EditorPoligonos
 import { EncabezadoProyecto } from "@/components/EncabezadoProyecto";
 import { rutaPaso } from "@/components/asistente";
 import { useCambiosSinGuardar } from "@/hooks/useCambiosSinGuardar";
+import { useAccionUnica } from "@/hooks/useAccionUnica";
 import { mensajeDeError } from "@/services/api";
 import { listarClientes } from "@/services/clientes";
 import { actualizarProyecto, crearProyecto, obtenerProyecto } from "@/services/proyectos";
 import { actualizarTerreno, crearTerreno, obtenerTerreno } from "@/services/terreno";
 import type { ClienteListado, Proyecto, ProyectoActualizar, Punto, Terreno } from "@/types/api";
-import { formatearArea, formatearMetros, rectangulo } from "@/utils/geometria";
+import { formatearArea, formatearMetros, limitesDe, rectangulo } from "@/utils/geometria";
 
 const BOTON =
   "rounded-lg border border-acero-300 bg-superficie px-3 py-1.5 text-sm text-acero-700 transition hover:bg-acero-100 disabled:cursor-not-allowed disabled:opacity-40";
@@ -90,10 +91,8 @@ function areaPoligono(vertices: Punto[]): number {
 
 /** Extensión del contorno en x (ancho) e y (largo). */
 function extension(vertices: Punto[]): { ancho: number; largo: number } | null {
-  if (vertices.length < 3) return null;
-  const xs = vertices.map((p) => p[0]);
-  const ys = vertices.map((p) => p[1]);
-  return { ancho: Math.max(...xs) - Math.min(...xs), largo: Math.max(...ys) - Math.min(...ys) };
+  const caja = vertices.length >= 3 ? limitesDe(vertices) : null;
+  return caja ? { ancho: caja.maxX - caja.minX, largo: caja.maxY - caja.minY } : null;
 }
 
 /** Ancho y largo como texto para los campos, redondeados al centímetro. */
@@ -116,8 +115,8 @@ function esRectanguloAlineado(vertices: Punto[]): boolean {
 
 /** Esquina inferior izquierda del contorno, o el origen si no hay contorno. */
 function esquinaInferior(vertices: Punto[]): Punto {
-  if (vertices.length === 0) return [0, 0];
-  return [Math.min(...vertices.map((p) => p[0])), Math.min(...vertices.map((p) => p[1]))];
+  const caja = limitesDe(vertices);
+  return caja ? [caja.minX, caja.minY] : [0, 0];
 }
 
 const formatoFecha = new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "2-digit", year: "numeric" });
@@ -254,6 +253,7 @@ export function TerrenoPage() {
     dimensionesPendientes ||
     (dibujando && borrador.length > 0);
   const permitirSalida = useCambiosSinGuardar(sinGuardar);
+  const unaVez = useAccionUnica();
 
   /** Rectángulo con las dimensiones escritas, en la misma esquina que el contorno actual. */
   function rectanguloEscrito(): Punto[] | null {
@@ -683,7 +683,7 @@ export function TerrenoPage() {
         }
         adelante={{
           etiqueta: guardando ? "Guardando…" : "Siguiente →",
-          onClick: () => void siguiente(),
+          onClick: () => void unaVez(siguiente),
           deshabilitado: guardando || dibujando,
           titulo: dibujando ? "Termina o cancela el dibujo del contorno" : undefined,
         }}
