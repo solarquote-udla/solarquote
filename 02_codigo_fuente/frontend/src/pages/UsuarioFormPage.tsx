@@ -16,6 +16,8 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { Interruptor } from "@/components/Interruptor";
 import { useAuth } from "@/hooks/useAuth";
+import { useAccionUnica } from "@/hooks/useAccionUnica";
+import { useCambiosSinGuardar } from "@/hooks/useCambiosSinGuardar";
 import { mensajeDeError } from "@/services/api";
 import { actualizarUsuario, crearUsuario, listarPerfiles, obtenerUsuario } from "@/services/seguridad";
 import type { Perfil, Usuario } from "@/types/api";
@@ -62,6 +64,7 @@ function FormularioUsuario({ usuarioId }: { usuarioId: string | undefined }) {
   const [activo, setActivo] = useState(true);
   const [intentado, setIntentado] = useState(false);
   const [guardando, setGuardando] = useState(false);
+  const unaVez = useAccionUnica();
 
   useEffect(() => {
     let cancelado = false;
@@ -89,6 +92,15 @@ function FormularioUsuario({ usuarioId }: { usuarioId: string | undefined }) {
   }, [esNuevo, usuarioId]);
 
   const soyYo = original !== null && original.id === yo?.id;
+
+  // Lo escrito que se perdería al salir sin guardar
+  const cambiosPendientes = original
+    ? normalizarNombre(nombre) !== original.nombre ||
+      normalizarEmail(email) !== original.email ||
+      perfilId !== original.perfil.id ||
+      activo !== original.activo
+    : nombre.trim() !== "" || email.trim() !== "" || password !== "" || perfilId !== null;
+  const permitirSalida = useCambiosSinGuardar(cambiosPendientes && !cargando);
   const tengoAccesoTotal = yo?.perfil.acceso_total ?? false;
   const misPermisos = new Set(yo?.permisos ?? []);
   /** No se asigna un perfil con más permisos que el propio (DS-06). */
@@ -118,6 +130,7 @@ function FormularioUsuario({ usuarioId }: { usuarioId: string | undefined }) {
           password_temporal: password,
           perfil_id: perfilId,
         });
+        permitirSalida();
         void navegar("/seguridad/usuarios", {
           state: {
             aviso: `Usuario ${creado.nombre} creado. Entrégale la contraseña temporal por un canal seguro; deberá cambiarla al ingresar.`,
@@ -138,6 +151,7 @@ function FormularioUsuario({ usuarioId }: { usuarioId: string | undefined }) {
             aviso += " No se pudo actualizar tu sesión: recarga la página.";
           });
         }
+        permitirSalida();
         void navegar("/seguridad/usuarios", { state: { aviso } });
       }
     } catch (e) {
@@ -176,7 +190,14 @@ function FormularioUsuario({ usuarioId }: { usuarioId: string | undefined }) {
         </div>
       )}
 
-      <form onSubmit={(e) => void manejarEnvio(e)} noValidate className="mt-6 space-y-6">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void unaVez(() => manejarEnvio(e));
+        }}
+        noValidate
+        className="mt-6 space-y-6"
+      >
         <section className="rounded-xl border border-acero-200 bg-superficie p-6">
           <h2 className="text-sm font-semibold text-acero-800">Datos de la cuenta</h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">

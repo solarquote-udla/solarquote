@@ -16,6 +16,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Interruptor } from "@/components/Interruptor";
 import { useAuth } from "@/hooks/useAuth";
+import { useAccionUnica } from "@/hooks/useAccionUnica";
+import { useCambiosSinGuardar } from "@/hooks/useCambiosSinGuardar";
 import { mensajeDeError } from "@/services/api";
 import {
   actualizarPerfil,
@@ -72,6 +74,7 @@ export function PerfilesPage() {
   const [borrador, setBorrador] = useState<Borrador>(borradorDe(null));
   const [guardando, setGuardando] = useState(false);
   const [confirmandoEliminar, setConfirmandoEliminar] = useState(false);
+  const unaVez = useAccionUnica();
 
   const aplicar = useCallback((permisos: PermisoCatalogo[], lista: Perfil[], elegir?: number) => {
     setCatalogo(permisos);
@@ -125,8 +128,18 @@ export function PerfilesPage() {
 
   const nombreValido = borrador.nombre.trim().replace(/\s+/g, " ").length >= 3;
 
+  /**
+   * Lo que se perdería al cambiar de perfil o salir. `sucio` siempre es
+   * true en un perfil nuevo (habilita "Crear perfil"); aquí un perfil nuevo
+   * solo cuenta si se escribió o marcó algo.
+   */
+  const cambiosPendientes = esNuevo
+    ? borrador.nombre.trim() !== "" || borrador.descripcion.trim() !== "" || borrador.permisos.size > 0
+    : sucio;
+  useCambiosSinGuardar(cambiosPendientes);
+
   function elegir(nueva: Seleccion) {
-    if (sucio && !esNuevo && !window.confirm("Tienes cambios sin guardar en este perfil. ¿Descartarlos?")) {
+    if (cambiosPendientes && !window.confirm("Tienes cambios sin guardar en este perfil. ¿Descartarlos?")) {
       return;
     }
     setAviso(null);
@@ -424,7 +437,7 @@ export function PerfilesPage() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => void eliminar()}
+                          onClick={() => void unaVez(eliminar)}
                           disabled={guardando}
                           className="rounded-md bg-red-500 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-400 disabled:opacity-50"
                         >
@@ -452,7 +465,7 @@ export function PerfilesPage() {
                     )}
                     <button
                       type="button"
-                      onClick={() => void guardar()}
+                      onClick={() => void unaVez(guardar)}
                       disabled={!sucio || guardando || (nombreEditable && !nombreValido)}
                       className="rounded-lg bg-solar-500 px-4 py-2 text-sm font-semibold text-acero-50 transition hover:bg-solar-600 disabled:cursor-not-allowed disabled:opacity-50"
                     >

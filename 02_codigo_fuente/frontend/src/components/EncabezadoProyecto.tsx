@@ -99,6 +99,7 @@ export function EncabezadoProyecto({ paso, proyecto, onActualizado, onCambiosSin
   useEffect(() => {
     onCambiosSinGuardar?.(sucio);
   }, [sucio, onCambiosSinGuardar]);
+  useEffect(() => () => onCambiosSinGuardar?.(false), [onCambiosSinGuardar]);
 
   function abrir() {
     if (!proyecto) return;
