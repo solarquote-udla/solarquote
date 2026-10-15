@@ -143,6 +143,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # Pruebas de interfaz: páginas reales con servicios simulados
+      # (avisos de cambios sin guardar, doble envío, navegación).
+      - name: Pruebas
+        run: npm test
+
       # tsc -b + vite build: atrapa errores de tipos que Vite solo no ve.
       - name: Build
         run: npm run build
