@@ -131,8 +131,14 @@ function FormularioUsuario({ usuarioId }: { usuarioId: string | undefined }) {
           ...(activo !== original.activo ? { activo } : {}),
         };
         const guardado = await actualizarUsuario(original.id, cambios);
-        if (soyYo) await refrescarSesion();
-        void navegar("/seguridad/usuarios", { state: { aviso: `Cambios guardados en ${guardado.nombre}.` } });
+        let aviso = `Cambios guardados en ${guardado.nombre}.`;
+        if (soyYo) {
+          // Lo guardado ya está en el servidor: si refrescar la sesión falla, no es un error de guardado
+          await refrescarSesion().catch(() => {
+            aviso += " No se pudo actualizar tu sesión: recarga la página.";
+          });
+        }
+        void navegar("/seguridad/usuarios", { state: { aviso } });
       }
     } catch (e) {
       setError(mensajeDeError(e, "No se pudo guardar el usuario"));

@@ -169,6 +169,10 @@ def cambiar_password(db: Session, usuario: Usuario, actual: str, nueva: str) -> 
 
     usuario.password_hash = hash_password(nueva)
     usuario.debe_cambiar_password = False
+    # Quien cambia su contraseña con una sesión válida demuestra ser el
+    # dueño: el bloqueo por intentos ajenos ya no tiene sentido
+    usuario.intentos_fallidos = 0
+    usuario.bloqueado_hasta = None
     usuario.version_token += 1
     db.commit()
     db.refresh(usuario)
