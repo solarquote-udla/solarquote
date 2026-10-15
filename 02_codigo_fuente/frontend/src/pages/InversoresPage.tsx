@@ -57,7 +57,8 @@ function erroresDe(form: FormularioInversor): string | null {
   if (form.modelo.trim().length < 1) return "El modelo es obligatorio.";
 
   const potencia = aNumero(form.potenciaKw);
-  if (potencia === null || potencia <= 0) return "La potencia debe ser un número mayor a cero.";
+  // NaN (texto no numérico) no es > 0 pero tampoco es <= 0: !(n > 0) sí lo atrapa.
+  if (potencia === null || !(potencia > 0)) return "La potencia debe ser un número mayor a cero.";
 
   for (const [campo, etiqueta] of [
     [form.vmaxV, "Vmax"],
@@ -65,7 +66,7 @@ function erroresDe(form: FormularioInversor): string | null {
   ] as const) {
     if (campo.trim() === "") continue;
     const n = aNumero(campo);
-    if (n === null || n <= 0) return `${etiqueta} debe ser un número mayor a cero, o dejarse en blanco.`;
+    if (n === null || !(n > 0)) return `${etiqueta} debe ser un número mayor a cero, o dejarse en blanco.`;
   }
   for (const [campo, etiqueta] of [
     [form.mppts, "MPPTs"],
