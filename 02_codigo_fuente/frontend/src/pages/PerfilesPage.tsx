@@ -437,7 +437,7 @@ export function PerfilesPage() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => void unaVez(eliminar)}
+                          onClick={() => void unaVez("eliminar", eliminar)}
                           disabled={guardando}
                           className="rounded-md bg-red-500 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-400 disabled:opacity-50"
                         >
@@ -465,7 +465,7 @@ export function PerfilesPage() {
                     )}
                     <button
                       type="button"
-                      onClick={() => void unaVez(guardar)}
+                      onClick={() => void unaVez("guardar", guardar)}
                       disabled={!sucio || guardando || (nombreEditable && !nombreValido)}
                       className="rounded-lg bg-solar-500 px-4 py-2 text-sm font-semibold text-acero-50 transition hover:bg-solar-600 disabled:cursor-not-allowed disabled:opacity-50"
                     >

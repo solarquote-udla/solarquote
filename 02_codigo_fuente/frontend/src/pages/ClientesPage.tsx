@@ -38,6 +38,19 @@ export function ClientesPage() {
   const [formularioSucio, setFormularioSucio] = useState(false);
   useCambiosSinGuardar(edicion !== null && formularioSucio);
 
+  /** Abrir otro cliente reemplaza el formulario: si tenía datos sin guardar, se pregunta. */
+  function abrirEdicion(nueva: Cliente) {
+    if (
+      edicion !== null &&
+      formularioSucio &&
+      !window.confirm("El formulario tiene datos sin guardar. ¿Descartarlos y editar otro cliente?")
+    ) {
+      return;
+    }
+    setAviso(null);
+    setEdicion(nueva);
+  }
+
   useEffect(() => {
     let cancelado = false;
     const temporizador = setTimeout(() => {
@@ -234,7 +247,7 @@ export function ClientesPage() {
                           <button
                             type="button"
                             disabled={procesando === c.id}
-                            onClick={() => void unaVez(() => darDeBaja(c))}
+                            onClick={() => void unaVez(`baja-${c.id}`, () => darDeBaja(c))}
                             className="rounded-md bg-red-500 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-400 disabled:opacity-50"
                           >
                             Dar de baja
@@ -247,10 +260,7 @@ export function ClientesPage() {
                           <>
                             <button
                               type="button"
-                              onClick={() => {
-                                setAviso(null);
-                                setEdicion(c);
-                              }}
+                              onClick={() => abrirEdicion(c)}
                               className="font-medium text-solar-700 hover:underline"
                             >
                               Editar
@@ -263,7 +273,7 @@ export function ClientesPage() {
                           <button
                             type="button"
                             disabled={procesando === c.id}
-                            onClick={() => void unaVez(() => reactivar(c))}
+                            onClick={() => void unaVez(`reactivar-${c.id}`, () => reactivar(c))}
                             className="font-medium text-solar-700 hover:underline disabled:opacity-50"
                           >
                             Reactivar
