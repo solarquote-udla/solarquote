@@ -4,6 +4,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.inversor import Inversor
+from app.schemas.inversor import InversorActualizar
 
 
 class InversorDuplicado(ValueError):
@@ -13,6 +14,16 @@ class InversorDuplicado(ValueError):
         self.marca = marca
         self.modelo = modelo
         super().__init__(f"Ya existe un inversor {marca} {modelo}")
+
+
+class VoltajesInconsistentes(ValueError):
+    """Tras aplicar la actualización, el inversor quedaría con un solo voltaje."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "El inversor debe tener Vmax y Vmin juntos o ninguno: la actualización "
+            "dejaría solo uno de los dos."
+        )
 
 
 def listar_inversores(db: Session, incluir_inactivos: bool = False) -> list[Inversor]:
@@ -57,46 +68,31 @@ def crear_inversor(
     return inversor
 
 
-def actualizar_inversor(
-    db: Session,
-    inversor_id: int,
-    *,
-    marca: str | None = None,
-    modelo: str | None = None,
-    potencia_kw: float | None = None,
-    vmax_v: float | None = ...,
-    vmin_v: float | None = ...,
-    mppts: int | None = ...,
-    strings_por_mppt: int | None = ...,
-    activo: bool | None = None,
-) -> Inversor | None:
+def actualizar_inversor(db: Session, inversor_id: int, datos: InversorActualizar) -> Inversor | None:
     """
     `None` si el inversor no existe.
 
-    Los campos eléctricos opcionales usan `...` (Ellipsis) como "no
-    enviado": a diferencia de `None`, que si se manda a propósito debe
-    poder borrar un valor existente (p. ej. quitar `mppts`).
+    `exclude_unset`: solo los campos que vinieron en el request, para
+    distinguir "no lo mandaron" (queda igual) de "lo mandaron en null"
+    (se borra) — necesario para poder quitar, por ejemplo, `mppts` a
+    propósito sin tocar los demás campos opcionales.
     """
     inversor = db.get(Inversor, inversor_id)
     if inversor is None:
         return None
 
-    if marca is not None:
-        inversor.marca = marca
-    if modelo is not None:
-        inversor.modelo = modelo
-    if potencia_kw is not None:
-        inversor.potencia_kw = potencia_kw
-    if vmax_v is not ...:
-        inversor.vmax_v = vmax_v
-    if vmin_v is not ...:
-        inversor.vmin_v = vmin_v
-    if mppts is not ...:
-        inversor.mppts = mppts
-    if strings_por_mppt is not ...:
-        inversor.strings_por_mppt = strings_por_mppt
-    if activo is not None:
-        inversor.activo = activo
+    cambios = datos.model_dump(exclude_unset=True)
+    for campo, valor in cambios.items():
+        setattr(inversor, campo, valor)
+
+    # El schema solo valida el orden de los voltajes cuando el request trae
+    # los dos juntos; acá, ya con el registro fusionado, se completa la
+    # regla de "los dos o ninguno" (RF-08) para el caso en que la
+    # actualización deja colgado un solo lado (p. ej. borra vmax_v pero
+    # vmin_v seguía de antes).
+    if (inversor.vmax_v is None) != (inversor.vmin_v is None):
+        db.rollback()
+        raise VoltajesInconsistentes
 
     try:
         db.commit()

@@ -7,7 +7,6 @@
  */
 
 import { Fragment, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 
 import { mensajeDeError } from "@/services/api";
 import { actualizarInversor, crearInversor, listarInversores, type DatosInversor } from "@/services/inversores";
@@ -259,9 +258,7 @@ export function InversoresPage() {
   return (
     <div className="mx-auto max-w-5xl">
       <nav className="text-sm text-acero-500">
-        <Link to="/configuracion/materiales" className="hover:text-solar-700 hover:underline">
-          Configuración
-        </Link>
+        <span>Configuración</span>
         <span className="mx-2">/</span>
         <span className="text-acero-700">Inversores</span>
       </nav>
