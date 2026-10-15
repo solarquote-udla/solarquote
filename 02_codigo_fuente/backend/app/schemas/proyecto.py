@@ -87,5 +87,13 @@ class ProyectoLeer(BaseModel):
     tiene_terreno: bool = Field(
         description="Si ya se definió el terreno (RF-01). Guía el siguiente paso en la interfaz.",
     )
+    tiene_equipo: bool = Field(
+        default=False,
+        description="Si ya se configuraron panel e inversor (RF-02).",
+    )
+    tiene_layout: bool = Field(
+        default=False,
+        description="Si ya se generó el layout (RF-03).",
+    )
     created_at: datetime
     updated_at: datetime

@@ -5,10 +5,15 @@ Lógica de negocio de proyectos.
 servicio solo lo lee y lo crea; no altera su estructura.
 """
 
+from dataclasses import dataclass
+
+from sqlalchemy import exists, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.cliente import Cliente
 from app.models.proyecto import EstadoProyecto, Proyecto
+from app.models.equipo import ConfiguracionEquipo
+from app.models.layout import Layout
 from app.models.terreno import Terreno
 from app.models.usuario import Usuario
 from app.schemas.proyecto import ProyectoActualizar, ProyectoCrear
@@ -68,23 +73,44 @@ def listar_proyectos(db: Session) -> list[Proyecto]:
     )
 
 
-def ids_con_terreno(db: Session, proyecto_ids: list[int]) -> set[int]:
-    """
-    Cuáles de estos proyectos ya tienen terreno definido.
+@dataclass(frozen=True)
+class Avance:
+    """Qué pasos del asistente ya tienen datos guardados."""
 
-    Una sola consulta para todo el listado. Se resuelve aquí y no con una
-    relación en el modelo porque `Proyecto` es compartido: agregarle un
-    atributo exige acordarlo, y esto no lo justifica.
+    terreno: set[int]
+    equipo: set[int]
+    layout: set[int]
+
+
+def avance_de(db: Session, proyecto_ids: list[int]) -> Avance:
+    """
+    Cuáles de estos proyectos ya tienen terreno, equipo y layout.
+
+    El estado del proyecto no alcanza para esto: pasa a "en diseño" en
+    cuanto se guarda el terreno o el equipo, sin distinguir cuál. El
+    Historial lo usa para retomar cada proyecto en el paso que le falta.
+
+    Una sola consulta para todo el listado (y para un solo proyecto). Se resuelve
+    aquí y no con relaciones en el modelo porque `Proyecto` es compartido:
+    agregarle atributos exige acordarlo, y esto no lo justifica.
     """
     if not proyecto_ids:
-        return set()
+        return Avance(set(), set(), set())
 
-    filas = (
-        db.query(Terreno.proyecto_id)
-        .filter(Terreno.proyecto_id.in_(proyecto_ids))
-        .all()
+    def existe(modelo):
+        return exists().where(modelo.proyecto_id == Proyecto.id)
+
+    # Una sola consulta: un EXISTS por paso, por cada proyecto pedido
+    filas = db.execute(
+        select(Proyecto.id, existe(Terreno), existe(ConfiguracionEquipo), existe(Layout)).where(
+            Proyecto.id.in_(proyecto_ids)
+        )
+    ).all()
+    return Avance(
+        terreno={pid for pid, t, _, _ in filas if t},
+        equipo={pid for pid, _, e, _ in filas if e},
+        layout={pid for pid, _, _, l in filas if l},
     )
-    return {fila.proyecto_id for fila in filas}
 
 
 def crear_proyecto(db: Session, datos: ProyectoCrear, usuario: Usuario) -> Proyecto:

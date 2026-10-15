@@ -1,17 +1,19 @@
 /**
- * Encabezado común de las pestañas de un proyecto (terreno, equipo, layout).
+ * Encabezado común de los pasos del asistente "Generar layout solar":
+ * miga de pan (Generación > Generar layout solar > Paso N), barra de pasos
+ * y la línea del proyecto.
  *
- * Además de la miga de pan, el título y las pestañas, permite corregir los
- * datos del proyecto sin salir de la pantalla. La latitud es el caso que
- * lo motivó: sin ella no se calcula la sombra entre filas (RF-02) ni entre
- * bloques (RF-03), y antes no había forma de cargarla después del alta.
+ * En los pasos 2 y 3 permite corregir los datos del proyecto sin salir de
+ * la pantalla; en el Paso 1 esos datos están en el panel derecho. La
+ * latitud es el caso que lo motivó: sin ella no se calcula la sombra entre
+ * filas (RF-02) ni entre bloques (RF-03).
  */
 
-import { useState, type FormEvent, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
 import { EstadoProyectoBadge } from "@/components/EstadoProyectoBadge";
-import { PestanasProyecto } from "@/components/PestanasProyecto";
+import { PASOS, type NumeroPaso } from "@/components/asistente";
+import { PasosAsistente } from "@/components/PasosAsistente";
 import { mensajeDeError } from "@/services/api";
 import { actualizarProyecto } from "@/services/proyectos";
 import type { Proyecto, ProyectoActualizar } from "@/types/api";
@@ -20,15 +22,20 @@ const CAMPO =
   "mt-1 w-full rounded-lg border border-acero-300 px-3 py-2 text-sm font-normal focus:border-solar-500 focus:outline-none focus:ring-1 focus:ring-solar-500";
 
 interface Props {
-  proyecto: Proyecto;
-  titulo: string;
+  paso: NumeroPaso;
+  /** null en el Paso 1 de un proyecto nuevo */
+  proyecto: Proyecto | null;
   /** Recibe el proyecto actualizado, para que la página recargue lo que dependa de él */
-  onActualizado: (proyecto: Proyecto) => void | Promise<void>;
+  onActualizado?: (proyecto: Proyecto) => void | Promise<void>;
+  /** Avisa si el formulario "Editar datos" tiene cambios sin guardar */
+  onCambiosSinGuardar?: (hay: boolean) => void;
 }
 
 const texto = (v: string | number | null) => (v == null ? "" : String(v));
 
-function desdeProyecto(p: Proyecto) {
+const VACIO = { nombre: "", ubicacion: null, latitud: null, longitud: null, notas: null };
+
+function desdeProyecto(p: Pick<Proyecto, "nombre" | "ubicacion" | "latitud" | "longitud" | "notas">) {
   return {
     nombre: p.nombre,
     ubicacion: texto(p.ubicacion),
@@ -80,13 +87,21 @@ function Etiqueta({ texto: t, children, ancho }: { texto: string; children: Reac
   );
 }
 
-export function EncabezadoProyecto({ proyecto, titulo, onActualizado }: Props) {
+export function EncabezadoProyecto({ paso, proyecto, onActualizado, onCambiosSinGuardar }: Props) {
   const [editando, setEditando] = useState(false);
-  const [formulario, setFormulario] = useState<Formulario>(() => desdeProyecto(proyecto));
+  const [formulario, setFormulario] = useState<Formulario>(() => (proyecto ? desdeProyecto(proyecto) : desdeProyecto(VACIO)));
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // La página decide si se puede salir: el encabezado solo informa
+  const sucio =
+    editando && proyecto !== null && JSON.stringify(formulario) !== JSON.stringify(desdeProyecto(proyecto));
+  useEffect(() => {
+    onCambiosSinGuardar?.(sucio);
+  }, [sucio, onCambiosSinGuardar]);
+
   function abrir() {
+    if (!proyecto) return;
     setFormulario(desdeProyecto(proyecto));
     setError(null);
     setEditando(true);
@@ -99,6 +114,7 @@ export function EncabezadoProyecto({ proyecto, titulo, onActualizado }: Props) {
   async function guardar(evento: FormEvent) {
     evento.preventDefault();
     setError(null);
+    if (!proyecto) return;
 
     const datos = cambios(desdeProyecto(proyecto), formulario);
     if ("error" in datos) {
@@ -123,7 +139,7 @@ export function EncabezadoProyecto({ proyecto, titulo, onActualizado }: Props) {
     setEditando(false);
     try {
       // La página recarga lo que dependa del proyecto (cálculos, layout)
-      await onActualizado(actualizado);
+      await onActualizado?.(actualizado);
     } catch (e) {
       setError(mensajeDeError(e, "Los datos se guardaron, pero no se pudo refrescar la pantalla. Recárgala."));
       setEditando(true);
@@ -132,36 +148,46 @@ export function EncabezadoProyecto({ proyecto, titulo, onActualizado }: Props) {
     }
   }
 
+  const datosPaso = PASOS[paso - 1];
+
   return (
     <>
       <nav className="text-sm text-acero-500">
-        <Link to="/proyectos" className="hover:text-solar-700 hover:underline">
-          Proyectos
-        </Link>
+        <span>Generación</span>
         <span className="mx-2">/</span>
-        <span className="text-acero-700">{proyecto.nombre}</span>
+        <span>Generar layout solar</span>
+        <span className="mx-2">/</span>
+        <span className="text-acero-700">
+          Paso {paso} — {datosPaso.etiqueta}
+        </span>
       </nav>
 
-      <div className="mt-2 flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-bold text-acero-900">{titulo}</h1>
-        <EstadoProyectoBadge estado={proyecto.estado} />
+      <div className="mt-3 border-b border-acero-200 pb-4">
+        <PasosAsistente actual={paso} proyectoId={proyecto?.id ?? null} />
       </div>
 
-      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-acero-500">
-        <span>
-          {proyecto.cliente.nombre}
-          {proyecto.ubicacion ? ` · ${proyecto.ubicacion}` : ""}
-        </span>
-        <span className={proyecto.latitud == null ? "text-amber-700" : ""}>
-          {proyecto.latitud == null ? "Sin latitud" : `Lat. ${proyecto.latitud}`}
-          {proyecto.longitud != null && ` · Long. ${proyecto.longitud}`}
-        </span>
-        {!editando && (
-          <button type="button" onClick={abrir} className="font-medium text-solar-700 hover:underline">
-            Editar datos
-          </button>
-        )}
+      <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <h1 className="text-xl font-bold text-acero-900">{proyecto ? proyecto.nombre : "Proyecto nuevo"}</h1>
+        {proyecto && <EstadoProyectoBadge estado={proyecto.estado} />}
       </div>
+
+      {proyecto && (
+        <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-acero-500">
+          <span>
+            {proyecto.cliente.nombre}
+            {proyecto.ubicacion ? ` · ${proyecto.ubicacion}` : ""}
+          </span>
+          <span className={proyecto.latitud == null ? "text-amber-700" : ""}>
+            {proyecto.latitud == null ? "Sin latitud" : `Lat. ${proyecto.latitud}`}
+            {proyecto.longitud != null && ` · Long. ${proyecto.longitud}`}
+          </span>
+          {paso !== 1 && !editando && (
+            <button type="button" onClick={abrir} className="font-medium text-solar-700 hover:underline">
+              Editar datos
+            </button>
+          )}
+        </div>
+      )}
 
       {editando && (
         <form onSubmit={guardar} className="mt-4 rounded-xl border border-acero-200 bg-superficie p-5">
@@ -214,7 +240,6 @@ export function EncabezadoProyecto({ proyecto, titulo, onActualizado }: Props) {
         </form>
       )}
 
-      <PestanasProyecto proyectoId={proyecto.id} />
     </>
   );
 }

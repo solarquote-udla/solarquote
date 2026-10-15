@@ -1,5 +1,9 @@
 /**
- * Configuración de panel e inversor — RF-02.
+ * Asistente, Paso 2 — Panel + Inversor (RF-02).
+ *
+ * Como en el prototipo: a la izquierda el panel (presets en tarjetas o
+ * ingreso manual) y a la derecha el inversor y los cálculos. "Siguiente"
+ * guarda si hay cambios y pasa al Paso 3.
  *
  * El panel se ingresa a mano o desde un preset de marcas comunes; el
  * inversor, a mano (la lista de referencia de RF-08 se conectará aquí
@@ -9,9 +13,12 @@
  */
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
+import { BarraPaso } from "@/components/BarraPaso";
 import { EncabezadoProyecto } from "@/components/EncabezadoProyecto";
+import { rutaPaso } from "@/components/asistente";
+import { useCambiosSinGuardar } from "@/hooks/useCambiosSinGuardar";
 import { mensajeDeError } from "@/services/api";
 import { guardarEquipo, listarPanelesReferencia, obtenerEquipo } from "@/services/equipo";
 import { obtenerProyecto } from "@/services/proyectos";
@@ -194,6 +201,7 @@ function Fila({ nombre, valor }: { nombre: string; valor: ReactNode }) {
 export function EquipoPage() {
   const { proyectoId: parametro } = useParams();
   const proyectoId = Number(parametro);
+  const navegar = useNavigate();
   const idValido = Number.isInteger(proyectoId) && proyectoId > 0;
 
   const [proyecto, setProyecto] = useState<Proyecto | null>(null);
@@ -243,6 +251,11 @@ export function EquipoPage() {
     [formulario, guardado],
   );
 
+  // "Editar datos" del encabezado tiene su propio formulario
+  const [encabezadoSucio, setEncabezadoSucio] = useState(false);
+  // También la primera vez: sin configuración guardada, cualquier dato escrito se perdería
+  const permitirSalida = useCambiosSinGuardar(hayCambios || encabezadoSucio);
+
   function actualizar(campo: Campo, valor: string) {
     setFormulario((f) => ({ ...f, [campo]: valor }));
     // Editar a mano un dato del panel deja de coincidir con la ficha citada
@@ -265,29 +278,39 @@ export function EquipoPage() {
     setPresetAplicado(preset);
   }
 
-  async function guardar(evento: FormEvent) {
-    evento.preventDefault();
+  /** Valida y guarda. Devuelve si quedó guardado. Lo usan el formulario y "Siguiente". */
+  async function persistir(): Promise<boolean> {
     setError(null);
     setAviso(null);
 
     const resultado = aPeticion(formulario);
     if ("error" in resultado) {
       setError(resultado.error);
-      return;
+      return false;
     }
 
     setGuardando(true);
     try {
-      const configuracion = await guardarEquipo(proyectoId, resultado.datos);
-      cargarEnFormulario(configuracion);
-      // El estado del proyecto pudo avanzar (borrador → en diseño)
-      setProyecto(await obtenerProyecto(proyectoId));
-      setAviso("Configuración guardada.");
+      cargarEnFormulario(await guardarEquipo(proyectoId, resultado.datos));
     } catch (e) {
       setError(mensajeDeError(e, "No se pudo guardar la configuración"));
+      return false;
     } finally {
       setGuardando(false);
     }
+    // Ya está guardado: si refrescar el encabezado falla, no es un error de guardado
+    try {
+      // El estado del proyecto pudo avanzar (borrador → en diseño)
+      setProyecto(await obtenerProyecto(proyectoId));
+    } catch {
+      // El encabezado queda con el estado anterior hasta recargar
+    }
+    return true;
+  }
+
+  async function guardar(evento: FormEvent) {
+    evento.preventDefault();
+    if (await persistir()) setAviso("Configuración guardada.");
   }
 
   // ─── Render ──────────────────────────────────────────
@@ -304,20 +327,39 @@ export function EquipoPage() {
         <p className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {errorCarga ?? "No se encontró el proyecto."}
         </p>
-        <Link to="/proyectos" className="mt-4 inline-block text-sm text-solar-700 hover:underline">
-          ← Volver a proyectos
+        <Link to="/historial" className="mt-4 inline-block text-sm text-solar-700 hover:underline">
+          Volver al historial
         </Link>
       </div>
     );
   }
 
   const calculos = guardado?.calculos;
+  const presetElegido = presets.find(
+    (p) =>
+      p.marca === formulario.panel_marca.trim() &&
+      p.modelo === formulario.panel_modelo.trim() &&
+      String(p.potencia_wp) === formulario.panel_potencia_wp.trim(),
+  );
+  const largoMm = aNumero(formulario.panel_largo_mm);
+  const anchoMm = aNumero(formulario.panel_ancho_mm);
+  const resumen =
+    formulario.panel_marca && formulario.inversor_marca
+      ? `${formulario.panel_marca} ${formulario.panel_potencia_wp || "?"} Wp · ${formulario.inversor_marca} ${formulario.inversor_potencia_kw || "?"} kW`
+      : "Configura el panel y el inversor";
+
+  /** "Siguiente": guarda solo si hay algo nuevo y devuelve si se puede continuar. */
+  async function guardarSiHaceFalta(): Promise<boolean> {
+    if (guardado && !hayCambios) return true;
+    return persistir();
+  }
 
   return (
     <div className="mx-auto max-w-7xl">
       <EncabezadoProyecto
+        paso={2}
         proyecto={proyecto}
-        titulo="Panel e inversor"
+        onCambiosSinGuardar={setEncabezadoSucio}
         onActualizado={async (p) => {
           setProyecto(p);
           // La separación entre filas depende de la latitud: se recalcula en el backend
@@ -328,6 +370,7 @@ export function EquipoPage() {
 
       {(error || aviso) && (
         <div
+          role={error ? "alert" : "status"}
           className={[
             "mt-4 rounded-lg border px-4 py-3 text-sm",
             error ? "border-red-200 bg-red-50 text-red-700" : "border-green-200 bg-green-50 text-green-800",
@@ -337,76 +380,123 @@ export function EquipoPage() {
         </div>
       )}
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-3">
-        {/* ─── Formulario ───────────────────────────────── */}
-        <form onSubmit={guardar} className="space-y-5 lg:col-span-2">
-          <section className="rounded-xl border border-acero-200 bg-superficie p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-sm font-semibold text-acero-700">Panel solar</h2>
-              <select
-                className={`${CAMPO} max-w-xs`}
-                value=""
-                onChange={(e) => aplicarPreset(e.target.value)}
-                aria-label="Cargar datos de un panel de referencia"
+      <form onSubmit={guardar} className="mt-6 grid gap-6 lg:grid-cols-2">
+        {/* ─── Panel solar ──────────────────────────────── */}
+        <section className="rounded-xl border border-acero-200 bg-superficie p-5">
+          <h2 className="text-sm font-semibold text-acero-900">Panel solar</h2>
+          <p className="mt-3 text-xs font-semibold tracking-wider text-acero-400">PRESETS</p>
+          <ul className="mt-2 space-y-2">
+            {presets.map((p) => {
+              const elegido = presetElegido?.clave === p.clave;
+              return (
+                <li key={p.clave}>
+                  <button
+                    type="button"
+                    onClick={() => aplicarPreset(p.clave)}
+                    className={[
+                      "flex w-full items-center justify-between gap-3 rounded-lg border px-4 py-2.5 text-left transition",
+                      elegido ? "border-solar-500 bg-solar-50" : "border-acero-200 hover:border-acero-300",
+                    ].join(" ")}
+                    aria-pressed={elegido}
+                  >
+                    <span>
+                      <span className={`block text-sm font-medium ${elegido ? "text-solar-700" : "text-acero-800"}`}>
+                        {p.marca} {p.modelo}
+                      </span>
+                      <span className="block text-xs text-acero-500">
+                        {p.potencia_wp} Wp · {p.largo_mm}×{p.ancho_mm} mm
+                      </span>
+                    </span>
+                    <span
+                      className={[
+                        "h-5 w-5 shrink-0 rounded-full border-2",
+                        elegido ? "border-solar-500 bg-solar-500" : "border-acero-300",
+                      ].join(" ")}
+                      aria-hidden
+                    />
+                  </button>
+                </li>
+              );
+            })}
+            <li>
+              <button
+                type="button"
+                onClick={() => {
+                  setPresetAplicado(null);
+                  setFormulario((f) => ({ ...f, panel_marca: "", panel_modelo: "", panel_potencia_wp: "", panel_largo_mm: "", panel_ancho_mm: "", panel_voc_v: "", panel_vmp_v: "" }));
+                }}
+                className={[
+                  "w-full rounded-lg border border-dashed px-4 py-2.5 text-left text-sm transition",
+                  !presetElegido ? "border-solar-500 text-solar-700" : "border-acero-300 text-acero-500 hover:border-acero-400",
+                ].join(" ")}
               >
-                <option value="">Cargar de un panel de referencia…</option>
-                {presets.map((p) => (
-                  <option key={p.clave} value={p.clave}>
-                    {p.marca} — {p.modelo} ({p.potencia_wp} W)
-                  </option>
+                + Ingresar manualmente
+              </button>
+            </li>
+          </ul>
+
+          {presetAplicado && (
+            <p className="mt-2 text-xs text-acero-500">
+              Datos tomados de la{" "}
+              <a href={presetAplicado.fuente} target="_blank" rel="noreferrer" className="text-solar-700 hover:underline">
+                ficha técnica
+              </a>
+              . Si tu lote es de otra potencia, ajusta potencia, Voc y Vmp.
+            </p>
+          )}
+
+          <p className="mt-5 text-xs font-semibold tracking-wider text-acero-400">ESPECIFICACIONES</p>
+          <div className="mt-2 grid gap-4 sm:grid-cols-2">
+            <Entrada etiqueta="Marca">
+              <input className={CAMPO} value={formulario.panel_marca} onChange={(e) => actualizar("panel_marca", e.target.value)} maxLength={80} />
+            </Entrada>
+            <Entrada etiqueta="Modelo">
+              <input className={CAMPO} value={formulario.panel_modelo} onChange={(e) => actualizar("panel_modelo", e.target.value)} maxLength={100} />
+            </Entrada>
+          </div>
+          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+            <Entrada etiqueta="Potencia" unidad="Wp">
+              <input className={CAMPO} inputMode="decimal" value={formulario.panel_potencia_wp} onChange={(e) => actualizar("panel_potencia_wp", e.target.value)} />
+            </Entrada>
+            <Entrada etiqueta="Largo" unidad="mm, dir. L">
+              <input className={CAMPO} inputMode="decimal" value={formulario.panel_largo_mm} onChange={(e) => actualizar("panel_largo_mm", e.target.value)} />
+            </Entrada>
+            <Entrada etiqueta="Ancho" unidad="mm, dir. A">
+              <input className={CAMPO} inputMode="decimal" value={formulario.panel_ancho_mm} onChange={(e) => actualizar("panel_ancho_mm", e.target.value)} />
+            </Entrada>
+            <Entrada etiqueta="Voc" unidad="V">
+              <input className={CAMPO} inputMode="decimal" value={formulario.panel_voc_v} onChange={(e) => actualizar("panel_voc_v", e.target.value)} />
+            </Entrada>
+            <Entrada etiqueta="Vmp" unidad="V">
+              <input className={CAMPO} inputMode="decimal" value={formulario.panel_vmp_v} onChange={(e) => actualizar("panel_vmp_v", e.target.value)} />
+            </Entrada>
+            <Entrada etiqueta="Ángulo de montaje" unidad="°, 0 a 90">
+              <input className={CAMPO} inputMode="decimal" placeholder="Ej. 15" value={formulario.angulo_montaje} onChange={(e) => actualizar("angulo_montaje", e.target.value)} />
+            </Entrada>
+          </div>
+
+          {largoMm && anchoMm && largoMm > 0 && anchoMm > 0 ? (
+            <div className="mt-5 flex items-center gap-4 rounded-lg border border-acero-200 bg-acero-50 p-4">
+              <svg viewBox={`0 0 ${anchoMm} ${largoMm}`} className="h-16 w-auto" aria-hidden>
+                <rect width={anchoMm} height={largoMm} className="fill-sky-700 stroke-sky-500" strokeWidth={anchoMm * 0.03} />
+                {[1, 2].map((i) => (
+                  <line key={i} x1={0} x2={anchoMm} y1={(largoMm * i) / 3} y2={(largoMm * i) / 3} className="stroke-sky-500" strokeWidth={anchoMm * 0.015} />
                 ))}
-              </select>
+              </svg>
+              <div className="text-xs">
+                <p className="font-medium text-sky-800">
+                  {largoMm} × {anchoMm} mm
+                </p>
+                <p className="text-acero-500">{formulario.panel_potencia_wp || "?"} Wp · escala referencial</p>
+              </div>
             </div>
+          ) : null}
+        </section>
 
-            {presetAplicado && (
-              <p className="mt-2 text-xs text-acero-500">
-                Datos tomados de la{" "}
-                <a
-                  href={presetAplicado.fuente}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-solar-700 hover:underline"
-                >
-                  ficha técnica
-                </a>
-                . Si tu lote es de otra potencia, ajusta potencia, Voc y Vmp.
-              </p>
-            )}
-
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <Entrada etiqueta="Marca">
-                <input className={CAMPO} value={formulario.panel_marca} onChange={(e) => actualizar("panel_marca", e.target.value)} maxLength={80} />
-              </Entrada>
-              <Entrada etiqueta="Modelo">
-                <input className={CAMPO} value={formulario.panel_modelo} onChange={(e) => actualizar("panel_modelo", e.target.value)} maxLength={100} />
-              </Entrada>
-            </div>
-
-            <div className="mt-4 grid gap-4 sm:grid-cols-3">
-              <Entrada etiqueta="Potencia" unidad="Wp">
-                <input className={CAMPO} inputMode="decimal" value={formulario.panel_potencia_wp} onChange={(e) => actualizar("panel_potencia_wp", e.target.value)} />
-              </Entrada>
-              <Entrada etiqueta="Largo" unidad="mm, lado mayor">
-                <input className={CAMPO} inputMode="decimal" value={formulario.panel_largo_mm} onChange={(e) => actualizar("panel_largo_mm", e.target.value)} />
-              </Entrada>
-              <Entrada etiqueta="Ancho" unidad="mm">
-                <input className={CAMPO} inputMode="decimal" value={formulario.panel_ancho_mm} onChange={(e) => actualizar("panel_ancho_mm", e.target.value)} />
-              </Entrada>
-              <Entrada etiqueta="Voc" unidad="V">
-                <input className={CAMPO} inputMode="decimal" value={formulario.panel_voc_v} onChange={(e) => actualizar("panel_voc_v", e.target.value)} />
-              </Entrada>
-              <Entrada etiqueta="Vmp" unidad="V">
-                <input className={CAMPO} inputMode="decimal" value={formulario.panel_vmp_v} onChange={(e) => actualizar("panel_vmp_v", e.target.value)} />
-              </Entrada>
-              <Entrada etiqueta="Ángulo de montaje" unidad="°, 0 a 90">
-                <input className={CAMPO} inputMode="decimal" placeholder="Ej. 15" value={formulario.angulo_montaje} onChange={(e) => actualizar("angulo_montaje", e.target.value)} />
-              </Entrada>
-            </div>
-          </section>
-
+        {/* ─── Inversor y resultados ─────────────────────── */}
+        <div className="space-y-5">
           <section className="rounded-xl border border-acero-200 bg-superficie p-5">
-            <h2 className="text-sm font-semibold text-acero-700">Inversor</h2>
-
+            <h2 className="text-sm font-semibold text-acero-900">Inversor</h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-3">
               <Entrada etiqueta="Marca">
                 <input className={CAMPO} value={formulario.inversor_marca} onChange={(e) => actualizar("inversor_marca", e.target.value)} maxLength={80} />
@@ -420,11 +510,9 @@ export function EquipoPage() {
             </div>
 
             <p className="mt-5 text-xs font-medium text-acero-500">
-              Datos eléctricos <span className="font-normal text-acero-400">— opcionales</span>
+              Datos eléctricos <span className="font-normal text-acero-400">(opcionales)</span>
             </p>
-            <p className="text-xs text-acero-400">
-              Sin el voltaje máximo y mínimo no se pueden validar los límites de string.
-            </p>
+            <p className="text-xs text-acero-400">Sin el voltaje máximo y mínimo no se pueden validar los límites de string.</p>
             <div className="mt-3 grid gap-4 sm:grid-cols-4">
               <Entrada etiqueta="Voltaje máx." unidad="V">
                 <input className={CAMPO} inputMode="decimal" value={formulario.inversor_vmax_v} onChange={(e) => actualizar("inversor_vmax_v", e.target.value)} />
@@ -439,28 +527,22 @@ export function EquipoPage() {
                 <input className={CAMPO} inputMode="numeric" value={formulario.inversor_strings_por_mppt} onChange={(e) => actualizar("inversor_strings_por_mppt", e.target.value)} />
               </Entrada>
             </div>
+
+            <div className="mt-5 flex items-center justify-end gap-3">
+              {guardado && hayCambios && <span className="text-xs text-solar-700">Hay cambios sin guardar</span>}
+              <button
+                type="submit"
+                disabled={guardando || (!hayCambios && guardado !== null)}
+                className="rounded-lg border border-solar-500 px-4 py-2 text-sm font-semibold text-solar-700 transition hover:bg-solar-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {guardando ? "Guardando…" : "Guardar y calcular"}
+              </button>
+            </div>
           </section>
 
-          <div className="flex items-center justify-end gap-3">
-            {guardado && hayCambios && (
-              <span className="text-xs text-solar-700">Hay cambios sin guardar</span>
-            )}
-            <button
-              type="submit"
-              disabled={guardando || (!hayCambios && guardado !== null)}
-              className="rounded-lg bg-solar-500 px-5 py-2 text-sm font-semibold text-acero-50 transition hover:bg-solar-600 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {guardando ? "Guardando…" : guardado ? "Guardar cambios" : "Guardar configuración"}
-            </button>
-          </div>
-        </form>
-
-        {/* ─── Resultados ───────────────────────────────── */}
-        <aside className="space-y-5">
           {!calculos ? (
             <div className="rounded-xl border border-dashed border-acero-300 bg-superficie p-5 text-sm text-acero-500">
-              Guarda la configuración para ver el área por panel, la separación entre filas y los
-              límites de string.
+              Guarda la configuración para ver el área por panel, la separación entre filas y los límites de string.
             </div>
           ) : (
             <>
@@ -469,73 +551,57 @@ export function EquipoPage() {
                   Los resultados corresponden a la última versión guardada.
                 </p>
               )}
-
-              <div className="rounded-xl border border-acero-200 bg-superficie p-5">
-                <h2 className="text-sm font-semibold text-acero-700">Panel</h2>
-                <dl className="mt-3 space-y-2">
-                  <Fila nombre="Área por panel" valor={`${numero(calculos.area_panel_m2, 3)} m²`} />
-                </dl>
-              </div>
-
-              <div className="rounded-xl border border-acero-200 bg-superficie p-5">
-                <h2 className="text-sm font-semibold text-acero-700">Separación entre filas</h2>
-                {calculos.separacion ? (
-                  <>
-                    <p className="mt-1 text-xs text-acero-400">
-                      Para una fila de un panel en vertical. RF-03 la escala según los paneles en
-                      profundidad.
-                    </p>
-                    <dl className="mt-3 space-y-2">
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div className="rounded-xl border border-acero-200 bg-superficie p-5">
+                  <h2 className="text-sm font-semibold text-acero-700">Separación entre filas</h2>
+                  <dl className="mt-3 space-y-2">
+                    {/* No depende de la latitud: se muestra siempre */}
+                    <Fila nombre="Área por panel" valor={`${numero(calculos.area_panel_m2, 3)} m²`} />
+                  </dl>
+                  {calculos.separacion ? (
+                    <dl className="mt-2 space-y-2">
                       <Fila nombre="Sol más bajo al mediodía" valor={`${numero(calculos.separacion.elevacion_solar_grados)}°`} />
-                      <Fila nombre="Altura de la fila" valor={`${numero(calculos.separacion.altura_m)} m`} />
-                      <Fila nombre="Ocupación en planta" valor={`${numero(calculos.separacion.proyeccion_m)} m`} />
                       <Fila nombre="Sombra (hueco libre)" valor={`${numero(calculos.separacion.sombra_m)} m`} />
                       <div className="border-t border-acero-200 pt-2">
-                        <Fila
-                          nombre="Paso mínimo"
-                          valor={<span className="text-solar-700">{numero(calculos.separacion.paso_minimo_m)} m</span>}
-                        />
+                        <Fila nombre="Paso mínimo" valor={<span className="text-solar-700">{numero(calculos.separacion.paso_minimo_m)} m</span>} />
                       </div>
                     </dl>
-                  </>
-                ) : (
-                  <p className="mt-2 text-sm text-acero-500">Falta la latitud del proyecto.</p>
-                )}
-              </div>
-
-              <div className="rounded-xl border border-acero-200 bg-superficie p-5">
-                <h2 className="text-sm font-semibold text-acero-700">Paneles por string</h2>
-                {calculos.strings ? (
-                  calculos.strings.compatible ? (
-                    <>
-                      <p className="mt-3 text-2xl font-bold text-acero-900">
-                        {calculos.strings.paneles_min} a {calculos.strings.paneles_max}
-                        <span className="ml-2 text-sm font-normal text-acero-500">paneles</span>
-                      </p>
-                      <span className="mt-2 inline-block rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
-                        Panel e inversor compatibles
-                      </span>
-                    </>
                   ) : (
-                    <>
-                      <span className="mt-3 inline-block rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">
-                        Incompatibles
-                      </span>
-                      <p className="mt-2 text-sm text-red-700">{calculos.strings.motivo}</p>
-                    </>
-                  )
-                ) : (
-                  <p className="mt-2 text-sm text-acero-500">Faltan los voltajes del inversor.</p>
-                )}
+                    <p className="mt-2 text-sm text-acero-500">Falta la latitud del proyecto (Paso 1).</p>
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-acero-200 bg-superficie p-5">
+                  <h2 className="text-sm font-semibold text-acero-700">Paneles por string</h2>
+                  {calculos.strings ? (
+                    calculos.strings.compatible ? (
+                      <>
+                        <p className="mt-3 text-2xl font-bold text-acero-900">
+                          {calculos.strings.paneles_min} a {calculos.strings.paneles_max}
+                          <span className="ml-2 text-sm font-normal text-acero-500">paneles</span>
+                        </p>
+                        <span className="mt-2 inline-block rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+                          Panel e inversor compatibles
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="mt-3 inline-block rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800">
+                          Incompatibles
+                        </span>
+                        <p className="mt-2 text-sm text-red-700">{calculos.strings.motivo}</p>
+                      </>
+                    )
+                  ) : (
+                    <p className="mt-2 text-sm text-acero-500">Faltan los voltajes del inversor.</p>
+                  )}
+                </div>
               </div>
 
               {calculos.advertencias.length > 0 && (
                 <ul className="space-y-2">
                   {calculos.advertencias.map((a) => (
-                    <li
-                      key={a}
-                      className="rounded-lg border border-solar-200 bg-solar-50 px-3 py-2 text-xs text-solar-900"
-                    >
+                    <li key={a} className="rounded-lg border border-solar-200 bg-solar-50 px-3 py-2 text-xs text-solar-900">
                       {a}
                     </li>
                   ))}
@@ -543,8 +609,33 @@ export function EquipoPage() {
               )}
             </>
           )}
-        </aside>
-      </div>
+        </div>
+      </form>
+
+      <BarraPaso
+        atras={{
+          etiqueta: "← Anterior",
+          // Con cambios sin guardar, useCambiosSinGuardar pregunta antes de salir
+          onClick: () => void navegar(rutaPaso(proyectoId, 1)),
+        }}
+        resumen={resumen}
+        adelante={{
+          etiqueta: guardando ? "Guardando…" : "Siguiente →",
+          deshabilitado: guardando,
+          onClick: () => {
+            if (encabezadoSucio) {
+              setError("Guarda o cancela los cambios en los datos del proyecto antes de continuar.");
+              return;
+            }
+            void guardarSiHaceFalta().then((ok) => {
+              if (!ok) return;
+              // Recién guardado: esta navegación no debe pedir confirmación
+              permitirSalida();
+              void navegar(rutaPaso(proyectoId, 3));
+            });
+          },
+        }}
+      />
     </div>
   );
 }
