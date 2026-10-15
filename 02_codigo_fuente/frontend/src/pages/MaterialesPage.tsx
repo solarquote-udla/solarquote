@@ -9,6 +9,8 @@
 
 import { useEffect, useState } from "react";
 
+import { useAccionUnica } from "@/hooks/useAccionUnica";
+import { useCambiosSinGuardar } from "@/hooks/useCambiosSinGuardar";
 import { mensajeDeError } from "@/services/api";
 import { actualizarMaterial, crearMaterial, listarMateriales } from "@/services/materiales";
 import type { Material } from "@/types/api";
@@ -37,9 +39,17 @@ export function MaterialesPage() {
   const [creando, setCreando] = useState(false);
 
   const [editandoId, setEditandoId] = useState<number | null>(null);
+  const [nombreOriginal, setNombreOriginal] = useState("");
+  const [unidadOriginal, setUnidadOriginal] = useState("");
   const [nombreEditado, setNombreEditado] = useState("");
   const [unidadEditada, setUnidadEditada] = useState("");
   const [guardando, setGuardando] = useState(false);
+
+  const unaVez = useAccionUnica();
+  const nuevoSucio = mostrarForm && (nuevoCodigo.trim() !== "" || nuevoNombre.trim() !== "");
+  const edicionSucia =
+    editandoId !== null && (nombreEditado !== nombreOriginal || unidadEditada !== unidadOriginal);
+  useCambiosSinGuardar(nuevoSucio || edicionSucia);
 
   useEffect(() => {
     let cancelado = false;
@@ -89,10 +99,22 @@ export function MaterialesPage() {
   }
 
   function iniciarEdicion(material: Material) {
+    if (edicionSucia && !window.confirm("El formulario tiene datos sin guardar. ¿Descartarlos y editar otro material?")) {
+      return;
+    }
     setAviso(null);
     setEditandoId(material.id);
     setNombreEditado(material.nombre);
     setUnidadEditada(material.unidad);
+    setNombreOriginal(material.nombre);
+    setUnidadOriginal(material.unidad);
+  }
+
+  function cerrarEdicion() {
+    if (edicionSucia && !window.confirm("El formulario tiene datos sin guardar. ¿Descartarlos?")) {
+      return;
+    }
+    setEditandoId(null);
   }
 
   async function guardarEdicion(material: Material) {
@@ -159,7 +181,15 @@ export function MaterialesPage() {
         </div>
         <button
           type="button"
-          onClick={() => setMostrarForm((v) => !v)}
+          onClick={() => {
+            if (mostrarForm && nuevoSucio && !window.confirm("El formulario tiene datos sin guardar. ¿Descartarlos?")) {
+              return;
+            }
+            setMostrarForm((v) => !v);
+            setNuevoCodigo("");
+            setNuevoNombre("");
+            setNuevaUnidad("unidad");
+          }}
           className="rounded-lg bg-solar-500 px-4 py-2 text-sm font-semibold text-acero-50 transition hover:bg-solar-600"
         >
           {mostrarForm ? "Cancelar" : "+ Nuevo material"}
@@ -215,7 +245,7 @@ export function MaterialesPage() {
             <button
               type="button"
               disabled={creando}
-              onClick={crear}
+              onClick={() => void unaVez("crear-material", crear)}
               className="rounded-md bg-solar-500 px-4 py-1.5 text-sm font-semibold text-acero-50 hover:bg-solar-600 disabled:opacity-50"
             >
               {creando ? "Creando…" : "Crear material"}
@@ -298,7 +328,7 @@ export function MaterialesPage() {
                       <div className="flex justify-end gap-3 text-sm">
                         <button
                           type="button"
-                          onClick={() => setEditandoId(null)}
+                          onClick={cerrarEdicion}
                           className="text-acero-500 hover:text-acero-700"
                         >
                           Cancelar
@@ -306,7 +336,7 @@ export function MaterialesPage() {
                         <button
                           type="button"
                           disabled={guardando}
-                          onClick={() => guardarEdicion(material)}
+                          onClick={() => void unaVez(`editar-${material.id}`, () => guardarEdicion(material))}
                           className="font-medium text-solar-700 hover:underline disabled:opacity-50"
                         >
                           {guardando ? "Guardando…" : "Guardar"}
@@ -316,7 +346,7 @@ export function MaterialesPage() {
                       <div className="flex justify-end gap-3 text-sm">
                         <button
                           type="button"
-                          onClick={() => alternarActivo(material)}
+                          onClick={() => void unaVez(`activo-${material.id}`, () => alternarActivo(material))}
                           className="text-acero-500 hover:text-solar-700"
                         >
                           {material.activo ? "Desactivar" : "Activar"}
