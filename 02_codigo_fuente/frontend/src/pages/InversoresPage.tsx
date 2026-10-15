@@ -8,6 +8,8 @@
 
 import { Fragment, useEffect, useState } from "react";
 
+import { useAccionUnica } from "@/hooks/useAccionUnica";
+import { useCambiosSinGuardar } from "@/hooks/useCambiosSinGuardar";
 import { mensajeDeError } from "@/services/api";
 import { actualizarInversor, crearInversor, listarInversores, type DatosInversor } from "@/services/inversores";
 import type { InversorCatalogo } from "@/types/api";
@@ -196,8 +198,14 @@ export function InversoresPage() {
   const [creando, setCreando] = useState(false);
 
   const [editandoId, setEditandoId] = useState<number | null>(null);
+  const [formOriginalEdicion, setFormOriginalEdicion] = useState<FormularioInversor>(FORM_VACIO);
   const [formEdicion, setFormEdicion] = useState<FormularioInversor>(FORM_VACIO);
   const [guardando, setGuardando] = useState(false);
+
+  const unaVez = useAccionUnica();
+  const nuevoSucio = mostrarForm && JSON.stringify(formNuevo) !== JSON.stringify(FORM_VACIO);
+  const edicionSucia = editandoId !== null && JSON.stringify(formEdicion) !== JSON.stringify(formOriginalEdicion);
+  useCambiosSinGuardar(nuevoSucio || edicionSucia);
 
   useEffect(() => {
     let cancelado = false;
@@ -240,9 +248,21 @@ export function InversoresPage() {
   }
 
   function iniciarEdicion(inversor: InversorCatalogo) {
+    if (edicionSucia && !window.confirm("El formulario tiene datos sin guardar. ¿Descartarlos y editar otro inversor?")) {
+      return;
+    }
     setAviso(null);
     setEditandoId(inversor.id);
-    setFormEdicion(formularioDesdeInversor(inversor));
+    const form = formularioDesdeInversor(inversor);
+    setFormEdicion(form);
+    setFormOriginalEdicion(form);
+  }
+
+  function cerrarEdicion() {
+    if (edicionSucia && !window.confirm("El formulario tiene datos sin guardar. ¿Descartarlos?")) {
+      return;
+    }
+    setEditandoId(null);
   }
 
   async function guardarEdicion(inversor: InversorCatalogo) {
@@ -298,6 +318,9 @@ export function InversoresPage() {
         <button
           type="button"
           onClick={() => {
+            if (mostrarForm && nuevoSucio && !window.confirm("El formulario tiene datos sin guardar. ¿Descartarlos?")) {
+              return;
+            }
             setMostrarForm((v) => !v);
             setFormNuevo(FORM_VACIO);
           }}
@@ -325,7 +348,7 @@ export function InversoresPage() {
             <button
               type="button"
               disabled={creando}
-              onClick={crear}
+              onClick={() => void unaVez("crear-inversor", crear)}
               className="rounded-md bg-solar-500 px-4 py-1.5 text-sm font-semibold text-acero-50 hover:bg-solar-600 disabled:opacity-50"
             >
               {creando ? "Creando…" : "Crear inversor"}
@@ -389,16 +412,14 @@ export function InversoresPage() {
                       <div className="flex justify-end gap-3 text-sm">
                         <button
                           type="button"
-                          onClick={() => alternarActivo(inversor)}
+                          onClick={() => void unaVez(`activo-${inversor.id}`, () => alternarActivo(inversor))}
                           className="text-acero-500 hover:text-solar-700"
                         >
                           {inversor.activo ? "Desactivar" : "Activar"}
                         </button>
                         <button
                           type="button"
-                          onClick={() =>
-                            editandoId === inversor.id ? setEditandoId(null) : iniciarEdicion(inversor)
-                          }
+                          onClick={() => (editandoId === inversor.id ? cerrarEdicion() : iniciarEdicion(inversor))}
                           className="font-medium text-solar-700 hover:underline"
                         >
                           {editandoId === inversor.id ? "Cerrar" : "Editar"}
@@ -413,7 +434,7 @@ export function InversoresPage() {
                         <div className="mt-3 flex justify-end gap-3 text-sm">
                           <button
                             type="button"
-                            onClick={() => setEditandoId(null)}
+                            onClick={cerrarEdicion}
                             className="text-acero-500 hover:text-acero-700"
                           >
                             Cancelar
@@ -421,7 +442,7 @@ export function InversoresPage() {
                           <button
                             type="button"
                             disabled={guardando}
-                            onClick={() => guardarEdicion(inversor)}
+                            onClick={() => void unaVez(`editar-${inversor.id}`, () => guardarEdicion(inversor))}
                             className="rounded-md bg-solar-500 px-4 py-1.5 font-semibold text-acero-50 hover:bg-solar-600 disabled:opacity-50"
                           >
                             {guardando ? "Guardando…" : "Guardar"}
