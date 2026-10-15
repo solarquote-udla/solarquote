@@ -9,8 +9,9 @@
  * En edición solo envía los campos que cambiaron (PATCH parcial).
  */
 
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
+import { useAccionUnica } from "@/hooks/useAccionUnica";
 import { mensajeDeError } from "@/services/api";
 import { actualizarCliente, crearCliente } from "@/services/clientes";
 import {
@@ -34,6 +35,8 @@ interface Props {
   cliente: Cliente | null;
   onGuardado: (cliente: Cliente) => void;
   onCancelar: () => void;
+  /** Avisa a la página si hay datos escritos sin guardar */
+  onCambiosSinGuardar?: (hay: boolean) => void;
 }
 
 function desdeCliente(c: Cliente | null) {
@@ -121,9 +124,17 @@ function Campo({
   );
 }
 
-export function FormularioCliente({ cliente, onGuardado, onCancelar }: Props) {
+export function FormularioCliente({ cliente, onGuardado, onCancelar, onCambiosSinGuardar }: Props) {
   const original = desdeCliente(cliente);
   const [formulario, setFormulario] = useState<Formulario>(original);
+  const unaVez = useAccionUnica();
+
+  const sucio = JSON.stringify(formulario) !== JSON.stringify(original);
+  useEffect(() => {
+    onCambiosSinGuardar?.(sucio);
+  }, [sucio, onCambiosSinGuardar]);
+  // Al cerrarse el formulario ya no hay nada pendiente
+  useEffect(() => () => onCambiosSinGuardar?.(false), [onCambiosSinGuardar]);
   // Los errores de un campo se muestran recién cuando el usuario lo dejó o
   // intentó guardar: marcar en rojo mientras escribe la primera letra molesta.
   const [tocados, setTocados] = useState<Partial<Record<keyof Formulario, boolean>>>({});
@@ -163,7 +174,14 @@ export function FormularioCliente({ cliente, onGuardado, onCancelar }: Props) {
   }
 
   return (
-    <form onSubmit={guardar} noValidate className="rounded-xl border border-acero-200 bg-superficie p-6">
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        void unaVez("guardar", () => guardar(e));
+      }}
+      noValidate
+      className="rounded-xl border border-acero-200 bg-superficie p-6"
+    >
       <h2 className="text-sm font-semibold text-acero-700">
         {cliente ? `Editar cliente — ${cliente.nombre}` : "Nuevo cliente"}
       </h2>

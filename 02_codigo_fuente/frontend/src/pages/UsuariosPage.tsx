@@ -13,6 +13,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "@/hooks/useAuth";
+import { useAccionUnica } from "@/hooks/useAccionUnica";
+import { useCambiosSinGuardar } from "@/hooks/useCambiosSinGuardar";
 import { mensajeDeError } from "@/services/api";
 import { actualizarUsuario, listarPerfiles, listarUsuarios, restablecerPassword } from "@/services/seguridad";
 import type { EstadoUsuario, Perfil, Usuario } from "@/types/api";
@@ -73,6 +75,12 @@ export function UsuariosPage() {
   const [restableciendo, setRestableciendo] = useState<number | null>(null);
   const [restablecida, setRestablecida] = useState<Restablecida | null>(null);
   const [copiada, setCopiada] = useState(false);
+  const unaVez = useAccionUnica();
+  // Salir sin copiar la contraseña temporal obligaría a restablecerla otra vez
+  useCambiosSinGuardar(
+    restablecida !== null && !copiada,
+    "La contraseña temporal no se volverá a mostrar y no la copiaste. ¿Salir de todas formas?",
+  );
 
   // El aviso que llega desde el formulario se muestra una vez
   useEffect(() => {
@@ -154,6 +162,17 @@ export function UsuariosPage() {
     } finally {
       setProcesando(null);
     }
+  }
+
+  /**
+   * La contraseña temporal en pantalla no se vuelve a mostrar: antes de
+   * ocultarla o de abrir otro restablecimiento sin haberla copiado, se pregunta.
+   */
+  function descartarContrasenaMostrada(): boolean {
+    if (restablecida === null || copiada) return true;
+    return window.confirm(
+      `La contraseña temporal de ${restablecida.usuario.nombre} no se copió y no se volverá a mostrar. ¿Descartarla?`,
+    );
   }
 
   async function restablecer(u: Usuario) {
@@ -263,7 +282,13 @@ export function UsuariosPage() {
             >
               {copiada ? "Copiada" : "Copiar"}
             </button>
-            <button type="button" onClick={() => setRestablecida(null)} className="text-xs hover:underline">
+            <button
+              type="button"
+              onClick={() => {
+                if (descartarContrasenaMostrada()) setRestablecida(null);
+              }}
+              className="text-xs hover:underline"
+            >
               Ocultar
             </button>
           </div>
@@ -375,7 +400,7 @@ export function UsuariosPage() {
                             <button
                               type="button"
                               disabled={procesando === u.id}
-                              onClick={() => void restablecer(u)}
+                              onClick={() => void unaVez(`restablecer-${u.id}`, () => restablecer(u))}
                               className="rounded-md bg-solar-500 px-2.5 py-1 text-xs font-semibold text-acero-50 hover:bg-solar-600 disabled:opacity-50"
                             >
                               Restablecer
@@ -392,6 +417,7 @@ export function UsuariosPage() {
                               <button
                                 type="button"
                                 onClick={() => {
+                                  if (!descartarContrasenaMostrada()) return;
                                   setRestablecida(null);
                                   setRestableciendo(u.id);
                                 }}
@@ -402,7 +428,7 @@ export function UsuariosPage() {
                               <button
                                 type="button"
                                 disabled={procesando === u.id}
-                                onClick={() => void cambiarActivo(u)}
+                                onClick={() => void unaVez(`activo-${u.id}`, () => cambiarActivo(u))}
                                 className={[
                                   "disabled:opacity-50",
                                   u.activo ? "text-acero-500 hover:text-red-600" : "font-medium text-solar-700 hover:underline",

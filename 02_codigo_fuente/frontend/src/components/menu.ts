@@ -11,7 +11,8 @@ import { Permiso } from "@/types/api";
 export interface OpcionMenu {
   ruta: string;
   etiqueta: string;
-  permiso?: Permiso;
+  /** Basta con uno; debe coincidir con el de la ruta en App.tsx */
+  permiso?: Permiso | Permiso[];
 }
 
 export interface GrupoMenu {
@@ -37,7 +38,8 @@ export const MENU: GrupoMenu[] = [
       },
       {
         titulo: null,
-        opciones: [{ ruta: "/historial", etiqueta: "Historial", permiso: Permiso.HISTORIAL }],
+        // Mismos permisos que la ruta: quien genera layouts retoma sus proyectos desde aquí
+        opciones: [{ ruta: "/historial", etiqueta: "Historial", permiso: [Permiso.HISTORIAL, Permiso.GENERAR_LAYOUT] }],
       },
     ],
   },
@@ -86,7 +88,7 @@ export function menuVisible(tienePermiso: (...p: Permiso[]) => boolean): GrupoMe
     secciones: grupo.secciones
       .map((seccion) => ({
         ...seccion,
-        opciones: seccion.opciones.filter((o) => !o.permiso || tienePermiso(o.permiso)),
+        opciones: seccion.opciones.filter((o) => !o.permiso || tienePermiso(...([] as Permiso[]).concat(o.permiso))),
       }))
       .filter((seccion) => seccion.opciones.length > 0),
   })).filter((grupo) => grupo.secciones.length > 0);
