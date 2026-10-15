@@ -101,12 +101,16 @@ export function MaterialesPage() {
       setError("El nombre debe tener al menos 2 caracteres.");
       return;
     }
+    if (unidadEditada.trim() === "") {
+      setError("La unidad no puede quedar en blanco.");
+      return;
+    }
     setError(null);
     setGuardando(true);
     try {
       const actualizado = await actualizarMaterial(material.id, {
         nombre: nombreEditado.trim().replace(/\s+/g, " "),
-        unidad: unidadEditada.trim() || material.unidad,
+        unidad: unidadEditada.trim(),
       });
       setMateriales((lista) => lista.map((m) => (m.id === material.id ? actualizado : m)));
       setAviso(`${actualizado.nombre} actualizado.`);
