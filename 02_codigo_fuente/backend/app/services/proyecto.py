@@ -7,6 +7,7 @@ servicio solo lo lee y lo crea; no altera su estructura.
 
 from dataclasses import dataclass
 
+from sqlalchemy import exists, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.cliente import Cliente
@@ -89,18 +90,27 @@ def avance_de(db: Session, proyecto_ids: list[int]) -> Avance:
     cuanto se guarda el terreno o el equipo, sin distinguir cuál. El
     Historial lo usa para retomar cada proyecto en el paso que le falta.
 
-    Tres consultas para todo el listado, no tres por proyecto. Se resuelve
+    Una sola consulta para todo el listado (y para un solo proyecto). Se resuelve
     aquí y no con relaciones en el modelo porque `Proyecto` es compartido:
     agregarle atributos exige acordarlo, y esto no lo justifica.
     """
     if not proyecto_ids:
         return Avance(set(), set(), set())
 
-    def con(modelo) -> set[int]:
-        filas = db.query(modelo.proyecto_id).filter(modelo.proyecto_id.in_(proyecto_ids)).all()
-        return {fila.proyecto_id for fila in filas}
+    def existe(modelo):
+        return exists().where(modelo.proyecto_id == Proyecto.id)
 
-    return Avance(terreno=con(Terreno), equipo=con(ConfiguracionEquipo), layout=con(Layout))
+    # Una sola consulta: un EXISTS por paso, por cada proyecto pedido
+    filas = db.execute(
+        select(Proyecto.id, existe(Terreno), existe(ConfiguracionEquipo), existe(Layout)).where(
+            Proyecto.id.in_(proyecto_ids)
+        )
+    ).all()
+    return Avance(
+        terreno={pid for pid, t, _, _ in filas if t},
+        equipo={pid for pid, _, e, _ in filas if e},
+        layout={pid for pid, _, _, l in filas if l},
+    )
 
 
 def crear_proyecto(db: Session, datos: ProyectoCrear, usuario: Usuario) -> Proyecto:

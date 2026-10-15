@@ -18,6 +18,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { BarraPaso } from "@/components/BarraPaso";
 import { EncabezadoProyecto } from "@/components/EncabezadoProyecto";
 import { rutaPaso } from "@/components/asistente";
+import { useAvisoAlSalir } from "@/hooks/useAvisoAlSalir";
 import { mensajeDeError } from "@/services/api";
 import { guardarEquipo, listarPanelesReferencia, obtenerEquipo } from "@/services/equipo";
 import { obtenerProyecto } from "@/services/proyectos";
@@ -250,6 +251,11 @@ export function EquipoPage() {
     [formulario, guardado],
   );
 
+  useAvisoAlSalir(hayCambios && !guardando);
+  // También la primera vez: sin configuración guardada, cualquier dato escrito se perdería
+  const confirmarSalida = () =>
+    !hayCambios || window.confirm("Tienes cambios sin guardar en el equipo. ¿Salir sin guardarlos?");
+
   function actualizar(campo: Campo, valor: string) {
     setFormulario((f) => ({ ...f, [campo]: valor }));
     // Editar a mano un dato del panel deja de coincidir con la ficha citada
@@ -286,15 +292,20 @@ export function EquipoPage() {
     setGuardando(true);
     try {
       cargarEnFormulario(await guardarEquipo(proyectoId, resultado.datos));
-      // El estado del proyecto pudo avanzar (borrador → en diseño)
-      setProyecto(await obtenerProyecto(proyectoId));
-      return true;
     } catch (e) {
       setError(mensajeDeError(e, "No se pudo guardar la configuración"));
       return false;
     } finally {
       setGuardando(false);
     }
+    // Ya está guardado: si refrescar el encabezado falla, no es un error de guardado
+    try {
+      // El estado del proyecto pudo avanzar (borrador → en diseño)
+      setProyecto(await obtenerProyecto(proyectoId));
+    } catch {
+      // El encabezado queda con el estado anterior hasta recargar
+    }
+    return true;
   }
 
   async function guardar(evento: FormEvent) {
@@ -348,6 +359,7 @@ export function EquipoPage() {
       <EncabezadoProyecto
         paso={2}
         proyecto={proyecto}
+        puedeSalir={confirmarSalida}
         onActualizado={async (p) => {
           setProyecto(p);
           // La separación entre filas depende de la latitud: se recalcula en el backend
@@ -604,9 +616,7 @@ export function EquipoPage() {
         atras={{
           etiqueta: "← Anterior",
           onClick: () => {
-            // También la primera vez: sin configuración guardada, cualquier dato escrito se perdería
-            if (hayCambios && !window.confirm("Tienes cambios sin guardar en el equipo. ¿Volver al Paso 1 sin guardarlos?")) return;
-            void navegar(rutaPaso(proyectoId, 1));
+            if (confirmarSalida()) void navegar(rutaPaso(proyectoId, 1));
           },
         }}
         resumen={resumen}

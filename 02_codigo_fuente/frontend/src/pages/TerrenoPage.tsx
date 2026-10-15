@@ -27,6 +27,7 @@ import { BarraPaso } from "@/components/BarraPaso";
 import { EditorPoligonos, type CaminoDibujo } from "@/components/EditorPoligonos";
 import { EncabezadoProyecto } from "@/components/EncabezadoProyecto";
 import { rutaPaso } from "@/components/asistente";
+import { useAvisoAlSalir } from "@/hooks/useAvisoAlSalir";
 import { mensajeDeError } from "@/services/api";
 import { listarClientes } from "@/services/clientes";
 import { actualizarProyecto, crearProyecto, obtenerProyecto } from "@/services/proyectos";
@@ -95,6 +96,30 @@ function extension(vertices: Punto[]): { ancho: number; largo: number } | null {
   return { ancho: Math.max(...xs) - Math.min(...xs), largo: Math.max(...ys) - Math.min(...ys) };
 }
 
+/** Ancho y largo como texto para los campos, redondeados al centímetro. */
+function textoDimensiones(vertices: Punto[]): { ancho: string; largo: string } {
+  const ext = extension(vertices);
+  return ext
+    ? { ancho: String(Math.round(ext.ancho * 100) / 100), largo: String(Math.round(ext.largo * 100) / 100) }
+    : { ancho: "", largo: "" };
+}
+
+/** Rectángulo con lados paralelos a los ejes: el único que "ancho × largo" describe sin perder nada. */
+function esRectanguloAlineado(vertices: Punto[]): boolean {
+  if (vertices.length !== 4) return false;
+  const clave = (v: number) => Math.round(v * 1e6);
+  const xs = new Set(vertices.map((p) => clave(p[0])));
+  const ys = new Set(vertices.map((p) => clave(p[1])));
+  const esquinas = new Set(vertices.map((p) => `${clave(p[0])},${clave(p[1])}`));
+  return xs.size === 2 && ys.size === 2 && esquinas.size === 4;
+}
+
+/** Esquina inferior izquierda del contorno, o el origen si no hay contorno. */
+function esquinaInferior(vertices: Punto[]): Punto {
+  if (vertices.length === 0) return [0, 0];
+  return [Math.min(...vertices.map((p) => p[0])), Math.min(...vertices.map((p) => p[1]))];
+}
+
 const formatoFecha = new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "2-digit", year: "numeric" });
 
 export function TerrenoPage() {
@@ -133,8 +158,8 @@ export function TerrenoPage() {
     setVertices(terreno?.vertices ?? []);
     setOrientacion(terreno?.orientacion_norte != null ? String(terreno.orientacion_norte) : "");
     setNotas(terreno?.notas ?? "");
+    setDimensiones(textoDimensiones(terreno?.vertices ?? []));
     const ext = extension(terreno?.vertices ?? []);
-    setDimensiones(ext ? { ancho: String(Math.round(ext.ancho * 100) / 100), largo: String(Math.round(ext.largo * 100) / 100) } : { ancho: "", largo: "" });
     if (ext) setLienzo({ ancho: Math.max(10, ext.ancho), alto: Math.max(10, ext.largo) });
     setBorrador([]);
     setDibujando(false);
@@ -183,6 +208,10 @@ export function TerrenoPage() {
   const sinGuardar =
     terrenoCambio || JSON.stringify(datos) !== JSON.stringify(proyecto ? datosDe(proyecto) : DATOS_VACIOS);
 
+  useAvisoAlSalir(sinGuardar && !guardando);
+  const confirmarSalida = () =>
+    !sinGuardar || window.confirm("Hay datos sin guardar en este paso. ¿Salir sin guardarlos?");
+
   const caminos: CaminoDibujo[] = useMemo(
     () => (guardado?.caminos ?? []).map((c) => ({ clave: `c${c.id}`, nombre: c.nombre, vertices: c.vertices })),
     [guardado],
@@ -193,38 +222,85 @@ export function TerrenoPage() {
 
   // ─── Geometría ───────────────────────────────────────
 
-  function actualizarPlano() {
-    setError(null);
+  /**
+   * Única forma de cambiar el contorno: mantiene ancho y largo iguales a
+   * la extensión real, para que "Actualizar plano" nunca parta de cifras
+   * viejas (revisión del PR #34).
+   */
+  function cambiarContorno(nuevos: Punto[]) {
+    setVertices(nuevos);
+    setDimensiones(textoDimensiones(nuevos));
+  }
+
+  /** Ancho y largo escritos en los campos, si son válidos. */
+  function dimensionesEscritas(): { ancho: number; largo: number } | null {
     const ancho = numeroOpcional(dimensiones.ancho);
     const largo = numeroOpcional(dimensiones.largo);
-    if (!(ancho && ancho > 0 && largo && largo > 0)) {
+    return ancho && ancho > 0 && largo && largo > 0 ? { ancho, largo } : null;
+  }
+
+  /**
+   * Los campos tienen un ancho y largo válidos distintos de la extensión
+   * del contorno (por más de medio centímetro). Campos vacíos o inválidos
+   * no cuentan: en ese caso vale lo que está dibujado.
+   */
+  const dimensionesPendientes = (() => {
+    const escritas = dimensionesEscritas();
+    if (!escritas) return false;
+    const ext = extension(vertices);
+    return !ext || Math.abs(escritas.ancho - ext.ancho) > 0.005 || Math.abs(escritas.largo - ext.largo) > 0.005;
+  })();
+
+  /** Rectángulo con las dimensiones escritas, en la misma esquina que el contorno actual. */
+  function rectanguloEscrito(): Punto[] | null {
+    const d = dimensionesEscritas();
+    if (!d) return null;
+    const [x, y] = esquinaInferior(vertices);
+    return rectangulo(x, y, d.ancho, d.largo);
+  }
+
+  function actualizarPlano() {
+    setError(null);
+    const nuevo = rectanguloEscrito();
+    if (!nuevo) {
       setError("El ancho y el largo del terreno deben ser mayores que cero.");
       return;
     }
-    setVertices(rectangulo(0, 0, ancho, largo));
+    // Un contorno irregular no se describe con ancho y largo: reemplazarlo pierde vértices
+    if (
+      vertices.length >= 3 &&
+      !esRectanguloAlineado(vertices) &&
+      !window.confirm(
+        `El terreno tiene un contorno irregular de ${vertices.length} vértices. ¿Reemplazarlo por un rectángulo de ${dimensiones.ancho} × ${dimensiones.largo} m?`,
+      )
+    ) {
+      return;
+    }
+    cambiarContorno(nuevo);
     // Ajusta el plano a la figura para que no quede diminuta ni cortada
-    setLienzo({ ancho, alto: largo });
+    const d = dimensionesEscritas()!;
+    setLienzo({ ancho: d.ancho, alto: d.largo });
     setBorrador([]);
     setDibujando(false);
   }
 
   function cerrarBorrador() {
     if (borrador.length < 3) return;
-    setVertices(borrador);
-    const ext = extension(borrador);
-    if (ext) setDimensiones({ ancho: String(Math.round(ext.ancho * 100) / 100), largo: String(Math.round(ext.largo * 100) / 100) });
+    cambiarContorno(borrador);
     setBorrador([]);
     setDibujando(false);
   }
 
   function editarVertice(indice: number, eje: 0 | 1, valor: number) {
     if (Number.isNaN(valor)) return;
-    setVertices((actuales) => actuales.map((p, i) => (i === indice ? (eje === 0 ? [valor, p[1]] : [p[0], valor]) : p)));
+    cambiarContorno(vertices.map((p, i) => (i === indice ? (eje === 0 ? [valor, p[1]] : [p[0], valor]) : p)));
   }
 
   // ─── Siguiente: guarda proyecto y terreno ────────────
 
-  function validar(): { proyecto: ProyectoActualizar & { cliente_id?: number }; orientacion: number | null } | string {
+  function validar():
+    | { proyecto: ProyectoActualizar & { cliente_id?: number }; orientacion: number | null; vertices: Punto[] }
+    | string {
     if (datos.nombre.trim().length < 3) return "El nombre del proyecto debe tener al menos 3 caracteres.";
     if (esNuevo && !datos.clienteId) return "Elige el cliente del proyecto.";
     const latitud = numeroOpcional(datos.latitud);
@@ -232,8 +308,18 @@ export function TerrenoPage() {
     if (Number.isNaN(latitud) || Number.isNaN(longitud)) {
       return "Latitud y longitud deben ser números en grados decimales (ej. 0.3517).";
     }
-    if (vertices.length < 3) return "Define el terreno: ingresa ancho y largo, o dibuja su contorno.";
     if (dibujando) return "Termina o cancela el dibujo del contorno.";
+    // Si escribió ancho y largo sin pulsar "Actualizar plano", se aplican al guardar
+    // cuando no hay nada que perder (sin contorno o con un rectángulo); si el
+    // contorno es irregular, se pide decidir antes de pisarlo.
+    let contorno = vertices;
+    if (dimensionesPendientes) {
+      if (vertices.length >= 3 && !esRectanguloAlineado(vertices)) {
+        return "Las dimensiones escritas no coinciden con el contorno irregular: pulsa «Actualizar plano» para reemplazarlo, o deja ancho y largo como estaban.";
+      }
+      contorno = rectanguloEscrito() ?? vertices;
+    }
+    if (contorno.length < 3) return "Define el terreno: ingresa ancho y largo, o dibuja su contorno.";
     const grados = numeroOpcional(orientacion);
     if (grados !== null && (Number.isNaN(grados) || grados < 0 || grados >= 360)) {
       return "La orientación del norte debe estar entre 0 y 359,99 grados.";
@@ -246,6 +332,7 @@ export function TerrenoPage() {
         longitud,
       },
       orientacion: grados,
+      vertices: contorno,
     };
   }
 
@@ -285,10 +372,12 @@ export function TerrenoPage() {
         }
       }
 
-      const datosTerreno = { vertices, orientacion_norte: valido.orientacion, notas: notas.trim() || null };
+      const datosTerreno = { vertices: valido.vertices, orientacion_norte: valido.orientacion, notas: notas.trim() || null };
+      const terrenoDistinto =
+        terrenoCambio || JSON.stringify(valido.vertices) !== JSON.stringify(guardado?.vertices ?? []);
       if (!guardado) {
         cargarEnEditor(await crearTerreno(actual.id, { ...datosTerreno, caminos: [] }));
-      } else if (terrenoCambio) {
+      } else if (terrenoDistinto) {
         await actualizarTerreno(actual.id, datosTerreno);
         cargarEnEditor(await obtenerTerreno(actual.id));
       }
@@ -322,7 +411,7 @@ export function TerrenoPage() {
 
   return (
     <div className="mx-auto max-w-7xl">
-      <EncabezadoProyecto paso={1} proyecto={proyecto} />
+      <EncabezadoProyecto paso={1} proyecto={proyecto} puedeSalir={confirmarSalida} />
 
       {error && (
         <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -477,8 +566,13 @@ export function TerrenoPage() {
             <p className="mt-1 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-800">
               {area !== null ? formatearArea(area) : "Sin terreno"}
             </p>
-            {vertices.length > 4 && (
+            {vertices.length >= 3 && !esRectanguloAlineado(vertices) && (
               <p className="mt-1 text-xs text-acero-500">Contorno irregular de {vertices.length} vértices; ancho y largo son su extensión.</p>
+            )}
+            {dimensionesPendientes && (
+              <p className="mt-1 text-xs text-amber-700">
+                Las dimensiones escritas no coinciden con el plano: pulsa «Actualizar plano» para aplicarlas.
+              </p>
             )}
             <button type="button" className={`${BOTON} mt-3 w-full`} onClick={actualizarPlano}>
               Actualizar plano
@@ -508,7 +602,7 @@ export function TerrenoPage() {
                           </td>
                         ))}
                         <td>
-                          <button type="button" className="text-acero-400 hover:text-red-600 disabled:opacity-30" onClick={() => setVertices((vs) => vs.filter((_, j) => j !== i))} disabled={vertices.length <= 3} aria-label={`Quitar vértice ${i + 1}`}>
+                          <button type="button" className="text-acero-400 hover:text-red-600 disabled:opacity-30" onClick={() => cambiarContorno(vertices.filter((_, j) => j !== i))} disabled={vertices.length <= 3} aria-label={`Quitar vértice ${i + 1}`}>
                             ×
                           </button>
                         </td>
@@ -574,8 +668,7 @@ export function TerrenoPage() {
         atras={{
           etiqueta: "Cancelar",
           onClick: () => {
-            if (sinGuardar && !window.confirm("Hay datos sin guardar en este paso. ¿Salir sin guardarlos?")) return;
-            void navegar("/historial");
+            if (confirmarSalida()) void navegar("/historial");
           },
         }}
         resumen={
@@ -586,7 +679,8 @@ export function TerrenoPage() {
         adelante={{
           etiqueta: guardando ? "Guardando…" : "Siguiente →",
           onClick: () => void siguiente(),
-          deshabilitado: guardando,
+          deshabilitado: guardando || dibujando,
+          titulo: dibujando ? "Termina o cancela el dibujo del contorno" : undefined,
         }}
       />
     </div>

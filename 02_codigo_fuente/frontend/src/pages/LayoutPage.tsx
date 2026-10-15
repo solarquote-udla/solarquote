@@ -24,6 +24,7 @@ import { BarraPaso } from "@/components/BarraPaso";
 import { EncabezadoProyecto } from "@/components/EncabezadoProyecto";
 import { rutaPaso } from "@/components/asistente";
 import { VistaLayout, type BloqueDibujo } from "@/components/VistaLayout";
+import { useAvisoAlSalir } from "@/hooks/useAvisoAlSalir";
 import { mensajeDeError } from "@/services/api";
 import { obtenerEquipo } from "@/services/equipo";
 import { generarLayout, guardarBloques, obtenerLayout } from "@/services/layout";
@@ -249,6 +250,10 @@ export function LayoutPage() {
   const navegar = useNavigate();
 
   const [formCamino, setFormCamino] = useState<FormularioCamino | null>(null);
+  // Las ediciones de bloques viven en un borrador hasta "Guardar cambios"
+  useAvisoAlSalir(borrador !== null);
+  const confirmarSalida = () =>
+    borrador === null || window.confirm("Tienes ediciones de bloques sin guardar. ¿Salir sin guardarlas?");
   const [procesandoCamino, setProcesandoCamino] = useState(false);
 
   const original = useMemo<BloqueEdicion[]>(
@@ -438,8 +443,10 @@ export function LayoutPage() {
     if (!terreno || !formCamino) return;
     const posicion = aNumero(formCamino.posicion);
     const ancho = aNumero(formCamino.ancho);
-    if (posicion === null || Number.isNaN(posicion) || posicion < 0) {
-      setError("La posición del camino debe ser un número mayor o igual a cero.");
+    const valores = terreno.vertices.map((p) => (formCamino.direccion === "horizontal" ? p[1] : p[0]));
+    const extension = Math.max(...valores) - Math.min(...valores);
+    if (posicion === null || Number.isNaN(posicion) || posicion < 0 || posicion > extension) {
+      setError(`La posición del eje debe estar dentro del terreno: entre 0 y ${numero(extension)} m.`);
       return;
     }
     if (ancho === null || Number.isNaN(ancho) || ancho <= 0) {
@@ -553,6 +560,7 @@ export function LayoutPage() {
       <EncabezadoProyecto
         paso={3}
         proyecto={proyecto}
+        puedeSalir={confirmarSalida}
         onActualizado={async (p) => {
           setProyecto(p);
           // La latitud entra en la huella del layout: puede quedar desactualizado
