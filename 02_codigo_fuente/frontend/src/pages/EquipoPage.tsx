@@ -386,7 +386,7 @@ export function EquipoPage() {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          void unaVez(() => guardar(e));
+          void unaVez("guardar", () => guardar(e));
         }}
         className="mt-6 grid gap-6 lg:grid-cols-2"
       >
@@ -636,7 +636,7 @@ export function EquipoPage() {
               setError("Guarda o cancela los cambios en los datos del proyecto antes de continuar.");
               return;
             }
-            void unaVez(guardarSiHaceFalta).then((ok) => {
+            void unaVez("siguiente", guardarSiHaceFalta).then((ok) => {
               if (!ok) return;
               // Recién guardado: esta navegación no debe pedir confirmación
               permitirSalida();

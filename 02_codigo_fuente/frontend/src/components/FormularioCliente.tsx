@@ -177,7 +177,7 @@ export function FormularioCliente({ cliente, onGuardado, onCancelar, onCambiosSi
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        void unaVez(() => guardar(e));
+        void unaVez("guardar", () => guardar(e));
       }}
       noValidate
       className="rounded-xl border border-acero-200 bg-superficie p-6"

@@ -282,8 +282,8 @@ export function TerrenoPage() {
     }
     cambiarContorno(nuevo);
     // Ajusta el plano a la figura para que no quede diminuta ni cortada
-    const d = dimensionesEscritas()!;
-    setLienzo({ ancho: d.ancho, alto: d.largo });
+    const d = dimensionesEscritas();
+    if (d) setLienzo({ ancho: d.ancho, alto: d.largo });
     setBorrador([]);
     setDibujando(false);
   }
@@ -683,7 +683,7 @@ export function TerrenoPage() {
         }
         adelante={{
           etiqueta: guardando ? "Guardando…" : "Siguiente →",
-          onClick: () => void unaVez(siguiente),
+          onClick: () => void unaVez("siguiente", siguiente),
           deshabilitado: guardando || dibujando,
           titulo: dibujando ? "Termina o cancela el dibujo del contorno" : undefined,
         }}

@@ -193,7 +193,7 @@ function FormularioUsuario({ usuarioId }: { usuarioId: string | undefined }) {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          void unaVez(() => manejarEnvio(e));
+          void unaVez("enviar", () => manejarEnvio(e));
         }}
         noValidate
         className="mt-6 space-y-6"

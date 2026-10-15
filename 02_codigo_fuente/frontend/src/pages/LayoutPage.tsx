@@ -110,7 +110,10 @@ interface FormularioCamino {
  * puede sobresalir sin problema.
  */
 function rectanguloCamino(terreno: Punto[], f: { direccion: Direccion; posicion: number; ancho: number }): Punto[] {
-  const { minX, maxX, minY, maxY } = limitesDe(terreno)!;
+  const caja = limitesDe(terreno);
+  // Sin terreno no hay camino que trazar (guardarCamino ya lo impide antes)
+  if (!caja) return [];
+  const { minX, maxX, minY, maxY } = caja;
   const medio = f.ancho / 2;
   if (f.direccion === "horizontal") {
     const y = minY + f.posicion;
@@ -139,7 +142,8 @@ function nombreCamino(existentes: (string | null)[], direccion: Direccion): stri
  * con otro nombre (creados antes del asistente) se infiere por la forma.
  */
 function describirCamino(nombre: string | null, vertices: Punto[]): string {
-  const caja = limitesDe(vertices)!;
+  const caja = limitesDe(vertices);
+  if (!caja) return "Sin geometría";
   const dx = caja.maxX - caja.minX;
   const dy = caja.maxY - caja.minY;
   const letra = nombre?.match(/^Camino ([HV])\d+$/)?.[1];
@@ -149,7 +153,8 @@ function describirCamino(nombre: string | null, vertices: Punto[]): string {
 
 /** Cuánto mide el terreno en la dirección en que se mide la posición del eje. */
 function extensionEje(terreno: Punto[], direccion: Direccion): number {
-  const caja = limitesDe(terreno)!;
+  const caja = limitesDe(terreno);
+  if (!caja) return 0;
   return direccion === "horizontal" ? caja.maxY - caja.minY : caja.maxX - caja.minX;
 }
 
@@ -447,6 +452,10 @@ export function LayoutPage() {
 
   async function guardarCamino() {
     if (!terreno || !formCamino) return;
+    if (terreno.vertices.length < 3) {
+      setError("Define primero el contorno del terreno en el Paso 1.");
+      return;
+    }
     const posicion = aNumero(formCamino.posicion);
     const ancho = aNumero(formCamino.ancho);
     const extension = extensionEje(terreno.vertices, formCamino.direccion);
@@ -627,7 +636,7 @@ export function LayoutPage() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              void unaVez(() => generar(e));
+              void unaVez("generar", () => generar(e));
             }}
             className="rounded-xl border border-acero-200 bg-superficie p-5"
           >
@@ -719,7 +728,7 @@ export function LayoutPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => void unaVez(guardarEdicion)}
+                    onClick={() => void unaVez("bloques", guardarEdicion)}
                     disabled={guardando || cambios === 0 || problemas.size > 0 || borrador.length === 0}
                     title={problemas.size > 0 ? "Corrige los bloques en rojo antes de guardar" : undefined}
                     className="rounded-lg bg-solar-500 px-4 py-1.5 text-sm font-semibold text-acero-50 hover:bg-solar-600 disabled:cursor-not-allowed disabled:opacity-50"
@@ -833,7 +842,7 @@ export function LayoutPage() {
                     </span>
                     <button
                       type="button"
-                      onClick={() => void unaVez(() => quitarCamino(c.id, c.nombre))}
+                      onClick={() => void unaVez(`quitar-camino-${c.id}`, () => quitarCamino(c.id, c.nombre))}
                       disabled={procesandoCamino || borrador !== null}
                       className="text-xs text-acero-500 hover:text-red-600 disabled:opacity-50"
                     >
@@ -890,7 +899,7 @@ export function LayoutPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => void unaVez(guardarCamino)}
+                      onClick={() => void unaVez("agregar-camino", guardarCamino)}
                       disabled={procesandoCamino}
                       className="rounded-lg bg-solar-500 px-3 py-1.5 text-sm font-semibold text-acero-50 hover:bg-solar-600 disabled:opacity-50"
                     >
