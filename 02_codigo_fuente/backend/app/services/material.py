@@ -12,6 +12,7 @@ total porque el precio de un material cambió después.
 from datetime import datetime, timezone
 from decimal import Decimal
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.material import Material, PrecioMaterial
@@ -30,6 +31,14 @@ class MaterialNoDisponible(ValueError):
 
     def __init__(self, material_id: int) -> None:
         super().__init__(f"No existe el material {material_id}")
+
+
+class CodigoDuplicado(ValueError):
+    """Ya existe un material con ese código."""
+
+    def __init__(self, codigo: str) -> None:
+        self.codigo = codigo
+        super().__init__(f"Ya existe un material con el código {codigo}")
 
 
 def obtener_precios_vigentes(db: Session, codigos: list[str]) -> dict[str, Decimal]:
@@ -113,3 +122,41 @@ def actualizar_precio(db: Session, material_id: int, precio: Decimal) -> tuple[M
     db.commit()
     db.refresh(nuevo)
     return material, nuevo
+
+
+def crear_material(db: Session, codigo: str, nombre: str, unidad: str) -> Material:
+    """Lanza `CodigoDuplicado` si ya existe un material con ese código."""
+    material = Material(codigo=codigo, nombre=nombre, unidad=unidad)
+    db.add(material)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise CodigoDuplicado(codigo) from None
+    db.refresh(material)
+    return material
+
+
+def actualizar_material(
+    db: Session,
+    material_id: int,
+    *,
+    nombre: str | None = None,
+    unidad: str | None = None,
+    activo: bool | None = None,
+) -> tuple[Material, PrecioMaterial | None] | None:
+    """`None` si el material no existe. El código es inmutable (lo usa el cálculo)."""
+    material = db.get(Material, material_id)
+    if material is None:
+        return None
+
+    if nombre is not None:
+        material.nombre = nombre
+    if unidad is not None:
+        material.unidad = unidad
+    if activo is not None:
+        material.activo = activo
+
+    db.commit()
+    db.refresh(material)
+    return material, _precio_vigente(db, material_id)
