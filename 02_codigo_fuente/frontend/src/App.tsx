@@ -29,6 +29,7 @@ import { EquipoPage } from "@/pages/EquipoPage";
 import { InicioPage } from "@/pages/InicioPage";
 import { LayoutPage } from "@/pages/LayoutPage";
 import { LoginPage } from "@/pages/LoginPage";
+import { MaterialesPage } from "@/pages/MaterialesPage";
 import { PerfilesPage } from "@/pages/PerfilesPage";
 import { PreciosPage } from "@/pages/PreciosPage";
 import { ProyectosPage } from "@/pages/ProyectosPage";
@@ -129,10 +130,7 @@ const router = createBrowserRouter(
             Permiso.INVERSORES,
             <Route path="configuracion/inversores" element={pendiente("Inversores", "Módulo 4", "RF-08")} />,
           )}
-          {conPermiso(
-            Permiso.MATERIALES,
-            <Route path="configuracion/materiales" element={pendiente("Materiales", "Módulo 4", "RF-09")} />,
-          )}
+          {conPermiso(Permiso.MATERIALES, <Route path="configuracion/materiales" element={<MaterialesPage />} />)}
           {conPermiso(Permiso.PRECIOS, <Route path="configuracion/precios" element={<PreciosPage />} />)}
           {conPermiso(Permiso.PERFILES, <Route path="seguridad/perfiles" element={<PerfilesPage />} />)}
           {conPermiso(
