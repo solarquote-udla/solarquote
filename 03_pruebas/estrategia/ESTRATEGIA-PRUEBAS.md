@@ -37,6 +37,7 @@ cumplir un cambio para entrar a la rama principal.
 | **Migraciones** | `upgrade → downgrade → upgrade` y una sola *head* | Alembic en el CI | `.github/workflows/ci.yml` |
 | **Paridad frontend–backend** | La misma regla da el mismo resultado en TypeScript y en Python | Script con casos aleatorios | Ver §5 |
 | **Estática del frontend** | Tipos y reglas de estilo | `tsc` + ESLint | CI, job `frontend` |
+| **Interfaz** | Páginas reales con los servicios simulados: avisos de cambios sin guardar, doble envío, navegación del asistente, menú por permisos | Vitest + jsdom + Testing Library | `frontend/src/__tests__/` |
 | **Extremo a extremo** | Flujo completo del usuario en el navegador | Pendiente (Sprint 8) | — |
 | **Aceptación** | Criterios de cada historia en Jira | Revisión manual + evidencias | `05_evidencias/` |
 
@@ -53,7 +54,29 @@ menos el pasillo quedan 1,568 m → 1 panel más (bloque 4 × 1).
 Total: 9 × (2 × 96 + 4) = 1764 paneles.
 ```
 
-### 2.2 Cómo se aísla una prueba de integración
+### 2.2 Cómo se escribe una prueba de interfaz
+
+Montan la página real con un *data router* en memoria y los servicios
+(`@/services/...`) simulados con `vi.mock`, y actúan como el usuario:
+escribir, hacer clic, salir por el menú. No prueban cálculos (eso es del
+backend), sino lo que el usuario ve y lo que se envía.
+
+Para los casos que se repiten se usan matrices: en el Paso 1 del asistente,
+cada tipo de cambio sin guardar se cruza con cada forma de salir (Cancelar,
+barra de pasos, menú lateral). Así una vía nueva de salida o un campo nuevo
+no quedan sin cubrir por omisión. Nacieron de cinco rondas de revisión del
+PR #34, donde cada ronda encontraba un caso que la anterior no cubría.
+
+Para verificar que una prueba sirve, se quita a propósito la protección
+que cubre y se comprueba que falla.
+
+Algunas reglas se prueban como **inventario** en vez de caso por caso:
+`escrituras.test.tsx` recorre el código y falla si una pantalla o
+componente importa una función que escribe en el servidor sin usar el
+candado contra doble envío (`useAccionUnica`). Así una pantalla nueva no
+puede olvidarlo sin que lo detecte el CI.
+
+### 2.3 Cómo se aísla una prueba de integración
 
 El fixture `db` (`tests/conftest.py`) abre una transacción antes de cada
 prueba y la revierte al terminar. Las pruebas no dependen del orden en que
@@ -86,7 +109,7 @@ incidente real del Sprint 2 (ver el reporte del sprint).
 |---|---|
 | `backend` | Instalar dependencias → pytest → verificar una sola *head* de Alembic → `upgrade → downgrade → upgrade` |
 | `calc-service` | Instalar dependencias → pytest |
-| `frontend` | `npm ci` → ESLint → `tsc -b && vite build` |
+| `frontend` | `npm ci` → ESLint → pruebas de interfaz (`npm test`) → `tsc -b && vite build` |
 
 **Criterio de entrada a `develop` y `main`** (rulesets de GitHub):
 

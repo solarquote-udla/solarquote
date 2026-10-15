@@ -25,6 +25,7 @@ import { EncabezadoProyecto } from "@/components/EncabezadoProyecto";
 import { rutaPaso } from "@/components/asistente";
 import { VistaLayout, type BloqueDibujo } from "@/components/VistaLayout";
 import { useCambiosSinGuardar } from "@/hooks/useCambiosSinGuardar";
+import { useAccionUnica } from "@/hooks/useAccionUnica";
 import { mensajeDeError } from "@/services/api";
 import { obtenerEquipo } from "@/services/equipo";
 import { generarLayout, guardarBloques, obtenerLayout } from "@/services/layout";
@@ -47,7 +48,7 @@ import {
   type BloqueEdicion,
   type GeometriaLayout,
 } from "@/utils/edicionLayout";
-import { formatearArea } from "@/utils/geometria";
+import { formatearArea, limitesDe } from "@/utils/geometria";
 
 /** El arrastre se ajusta al centímetro: más fino no se puede replantear en obra. */
 const AJUSTE_ARRASTRE_M = 0.01;
@@ -109,9 +110,10 @@ interface FormularioCamino {
  * puede sobresalir sin problema.
  */
 function rectanguloCamino(terreno: Punto[], f: { direccion: Direccion; posicion: number; ancho: number }): Punto[] {
-  const xs = terreno.map((p) => p[0]);
-  const ys = terreno.map((p) => p[1]);
-  const [minX, maxX, minY, maxY] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const caja = limitesDe(terreno);
+  // Sin terreno no hay camino que trazar (guardarCamino ya lo impide antes)
+  if (!caja) return [];
+  const { minX, maxX, minY, maxY } = caja;
   const medio = f.ancho / 2;
   if (f.direccion === "horizontal") {
     const y = minY + f.posicion;
@@ -140,19 +142,25 @@ function nombreCamino(existentes: (string | null)[], direccion: Direccion): stri
  * con otro nombre (creados antes del asistente) se infiere por la forma.
  */
 function describirCamino(nombre: string | null, vertices: Punto[]): string {
-  const xs = vertices.map((p) => p[0]);
-  const ys = vertices.map((p) => p[1]);
-  const dx = Math.max(...xs) - Math.min(...xs);
-  const dy = Math.max(...ys) - Math.min(...ys);
+  const caja = limitesDe(vertices);
+  if (!caja) return "Sin geometría";
+  const dx = caja.maxX - caja.minX;
+  const dy = caja.maxY - caja.minY;
   const letra = nombre?.match(/^Camino ([HV])\d+$/)?.[1];
   const horizontal = letra ? letra === "H" : dx >= dy;
   return `${horizontal ? "Horizontal" : "Vertical"} · ${numero(horizontal ? dy : dx)} m de ancho`;
 }
 
+/** Cuánto mide el terreno en la dirección en que se mide la posición del eje. */
+function extensionEje(terreno: Punto[], direccion: Direccion): number {
+  const caja = limitesDe(terreno);
+  if (!caja) return 0;
+  return direccion === "horizontal" ? caja.maxY - caja.minY : caja.maxX - caja.minX;
+}
+
 /** Eje centrado del terreno en la dirección del camino, en metros desde el borde. */
 function posicionCentrada(terreno: Punto[], direccion: Direccion): string {
-  const valores = terreno.map((p) => (direccion === "horizontal" ? p[1] : p[0]));
-  return String(Math.round((Math.max(...valores) - Math.min(...valores)) / 2));
+  return String(Math.round(extensionEje(terreno, direccion) / 2));
 }
 
 function desdeLayout(l: Layout | null): Parametros {
@@ -255,6 +263,7 @@ export function LayoutPage() {
   // "Editar datos" del encabezado tiene su propio formulario
   const [encabezadoSucio, setEncabezadoSucio] = useState(false);
   const [procesandoCamino, setProcesandoCamino] = useState(false);
+  const unaVez = useAccionUnica();
 
   const original = useMemo<BloqueEdicion[]>(
     () => (layout?.bloques ?? []).map((b, i) => ({ clave: i, origen: b.vertices[3], paneles_ancho: b.paneles_ancho })),
@@ -443,10 +452,13 @@ export function LayoutPage() {
 
   async function guardarCamino() {
     if (!terreno || !formCamino) return;
+    if (terreno.vertices.length < 3) {
+      setError("Define primero el contorno del terreno en el Paso 1.");
+      return;
+    }
     const posicion = aNumero(formCamino.posicion);
     const ancho = aNumero(formCamino.ancho);
-    const valores = terreno.vertices.map((p) => (formCamino.direccion === "horizontal" ? p[1] : p[0]));
-    const extension = Math.max(...valores) - Math.min(...valores);
+    const extension = extensionEje(terreno.vertices, formCamino.direccion);
     if (posicion === null || Number.isNaN(posicion) || posicion < 0 || posicion > extension) {
       setError(`La posición del eje debe estar dentro del terreno: entre 0 y ${numero(extension)} m.`);
       return;
@@ -621,7 +633,13 @@ export function LayoutPage() {
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         {/* ─── Parámetros y plano ───────────────────────── */}
         <div className="space-y-5 lg:col-span-2">
-          <form onSubmit={generar} className="rounded-xl border border-acero-200 bg-superficie p-5">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void unaVez("generar", () => generar(e));
+            }}
+            className="rounded-xl border border-acero-200 bg-superficie p-5"
+          >
             <div className="grid gap-4 sm:grid-cols-4">
               <Entrada etiqueta="Paneles en el largo (L)" ayuda="Par: soportes en A y V">
                 <select className={CAMPO} value={parametros.L} onChange={(e) => actualizar("L", e.target.value)}>
@@ -710,7 +728,7 @@ export function LayoutPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={guardarEdicion}
+                    onClick={() => void unaVez("bloques", guardarEdicion)}
                     disabled={guardando || cambios === 0 || problemas.size > 0 || borrador.length === 0}
                     title={problemas.size > 0 ? "Corrige los bloques en rojo antes de guardar" : undefined}
                     className="rounded-lg bg-solar-500 px-4 py-1.5 text-sm font-semibold text-acero-50 hover:bg-solar-600 disabled:cursor-not-allowed disabled:opacity-50"
@@ -824,7 +842,7 @@ export function LayoutPage() {
                     </span>
                     <button
                       type="button"
-                      onClick={() => void quitarCamino(c.id, c.nombre)}
+                      onClick={() => void unaVez(`quitar-camino-${c.id}`, () => quitarCamino(c.id, c.nombre))}
                       disabled={procesandoCamino || borrador !== null}
                       className="text-xs text-acero-500 hover:text-red-600 disabled:opacity-50"
                     >
@@ -881,7 +899,7 @@ export function LayoutPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => void guardarCamino()}
+                      onClick={() => void unaVez("agregar-camino", guardarCamino)}
                       disabled={procesandoCamino}
                       className="rounded-lg bg-solar-500 px-3 py-1.5 text-sm font-semibold text-acero-50 hover:bg-solar-600 disabled:opacity-50"
                     >
