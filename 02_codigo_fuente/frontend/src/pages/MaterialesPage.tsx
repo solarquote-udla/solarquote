@@ -8,7 +8,6 @@
  */
 
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 
 import { mensajeDeError } from "@/services/api";
 import { actualizarMaterial, crearMaterial, listarMateriales } from "@/services/materiales";
@@ -123,6 +122,12 @@ export function MaterialesPage() {
   }
 
   async function alternarActivo(material: Material) {
+    if (
+      material.activo &&
+      !window.confirm(`¿Desactivar ${material.nombre}? Deja de estar disponible para cotizaciones nuevas.`)
+    ) {
+      return;
+    }
     setError(null);
     try {
       const actualizado = await actualizarMaterial(material.id, { activo: !material.activo });
@@ -140,9 +145,7 @@ export function MaterialesPage() {
   return (
     <div className="mx-auto max-w-5xl">
       <nav className="text-sm text-acero-500">
-        <Link to="/configuracion/precios" className="hover:text-solar-700 hover:underline">
-          Configuración
-        </Link>
+        <span>Configuración</span>
         <span className="mx-2">/</span>
         <span className="text-acero-700">Materiales</span>
       </nav>
@@ -157,7 +160,7 @@ export function MaterialesPage() {
         <button
           type="button"
           onClick={() => setMostrarForm((v) => !v)}
-          className="rounded-lg bg-solar-600 px-4 py-2 text-sm font-medium text-white hover:bg-solar-700"
+          className="rounded-lg bg-solar-500 px-4 py-2 text-sm font-semibold text-acero-50 transition hover:bg-solar-600"
         >
           {mostrarForm ? "Cancelar" : "+ Nuevo material"}
         </button>
@@ -175,8 +178,12 @@ export function MaterialesPage() {
       )}
 
       {mostrarForm && (
-        <div className="mt-4 rounded-xl border border-acero-200 bg-white p-5">
-          <div className="grid gap-3 sm:grid-cols-3">
+        <div className="mt-4 rounded-xl border border-acero-200 bg-superficie p-5">
+          <p className="text-xs text-acero-500">
+            Un código nuevo no entra al cálculo hasta que alguien lo agregue a las fórmulas f(L,A,B) en
+            calc-service.
+          </p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
             <label className="text-sm">
               <span className="mb-1 block text-acero-600">Código</span>
               <input
@@ -209,7 +216,7 @@ export function MaterialesPage() {
               type="button"
               disabled={creando}
               onClick={crear}
-              className="rounded-md bg-solar-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-solar-700 disabled:opacity-50"
+              className="rounded-md bg-solar-500 px-4 py-1.5 text-sm font-semibold text-acero-50 hover:bg-solar-600 disabled:opacity-50"
             >
               {creando ? "Creando…" : "Crear material"}
             </button>
@@ -230,7 +237,7 @@ export function MaterialesPage() {
         Mostrar materiales desactivados
       </label>
 
-      <div className="mt-2 overflow-hidden rounded-xl border border-acero-200 bg-white">
+      <div className="mt-2 overflow-hidden rounded-xl border border-acero-200 bg-superficie">
         {cargando ? (
           <p className="p-6 text-sm text-acero-500">Cargando materiales…</p>
         ) : materiales.length === 0 ? (
@@ -277,9 +284,13 @@ export function MaterialesPage() {
                   </td>
                   <td className="px-4 py-3">
                     {material.activo ? (
-                      <span className="text-green-700">Activo</span>
+                      <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                        Activo
+                      </span>
                     ) : (
-                      <span className="text-acero-400">Inactivo</span>
+                      <span className="rounded-full bg-acero-200 px-2 py-0.5 text-xs font-medium text-acero-600">
+                        Inactivo
+                      </span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-right">
