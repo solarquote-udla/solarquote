@@ -32,7 +32,7 @@ router = APIRouter(
 )
 
 
-def _respuesta(proyecto: Proyecto, tiene_terreno: bool) -> ProyectoLeer:
+def _respuesta(proyecto: Proyecto, avance: servicio.Avance | None = None) -> ProyectoLeer:
     return ProyectoLeer(
         id=proyecto.id,
         nombre=proyecto.nombre,
@@ -42,7 +42,9 @@ def _respuesta(proyecto: Proyecto, tiene_terreno: bool) -> ProyectoLeer:
         longitud=proyecto.longitud,
         estado=proyecto.estado,
         notas=proyecto.notas,
-        tiene_terreno=tiene_terreno,
+        tiene_terreno=avance is not None and proyecto.id in avance.terreno,
+        tiene_equipo=avance is not None and proyecto.id in avance.equipo,
+        tiene_layout=avance is not None and proyecto.id in avance.layout,
         created_at=proyecto.created_at,
         updated_at=proyecto.updated_at,
     )
@@ -52,8 +54,8 @@ def _respuesta(proyecto: Proyecto, tiene_terreno: bool) -> ProyectoLeer:
 def listar(db: Session = Depends(get_db)) -> list[ProyectoLeer]:
     """Todos los proyectos, los más recientes primero."""
     proyectos = servicio.listar_proyectos(db)
-    con_terreno = servicio.ids_con_terreno(db, [p.id for p in proyectos])
-    return [_respuesta(p, p.id in con_terreno) for p in proyectos]
+    avance = servicio.avance_de(db, [p.id for p in proyectos])
+    return [_respuesta(p, avance) for p in proyectos]
 
 
 @router.post("", response_model=ProyectoLeer, status_code=status.HTTP_201_CREATED)
@@ -73,7 +75,7 @@ def crear(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(exc),
         )
-    return _respuesta(proyecto, tiene_terreno=False)
+    return _respuesta(proyecto)
 
 
 def _proyecto_o_404(db: Session, proyecto_id: int) -> Proyecto:
@@ -89,8 +91,7 @@ def _proyecto_o_404(db: Session, proyecto_id: int) -> Proyecto:
 @router.get("/{proyecto_id}", response_model=ProyectoLeer)
 def detalle(proyecto_id: int, db: Session = Depends(get_db)) -> ProyectoLeer:
     proyecto = _proyecto_o_404(db, proyecto_id)
-    tiene_terreno = proyecto_id in servicio.ids_con_terreno(db, [proyecto_id])
-    return _respuesta(proyecto, tiene_terreno)
+    return _respuesta(proyecto, servicio.avance_de(db, [proyecto_id]))
 
 
 @router.patch("/{proyecto_id}", response_model=ProyectoLeer, dependencies=[Depends(escritura)])
@@ -104,5 +105,4 @@ def actualizar(
     editan por aquí (ver `ProyectoActualizar`).
     """
     proyecto = servicio.actualizar_proyecto(db, _proyecto_o_404(db, proyecto_id), datos)
-    tiene_terreno = proyecto_id in servicio.ids_con_terreno(db, [proyecto_id])
-    return _respuesta(proyecto, tiene_terreno)
+    return _respuesta(proyecto, servicio.avance_de(db, [proyecto_id]))
