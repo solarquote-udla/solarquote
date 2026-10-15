@@ -9,6 +9,8 @@
 
 import { Fragment, useEffect, useState } from "react";
 
+import { useAccionUnica } from "@/hooks/useAccionUnica";
+import { useCambiosSinGuardar } from "@/hooks/useCambiosSinGuardar";
 import { mensajeDeError } from "@/services/api";
 import { actualizarPrecio, listarMateriales, obtenerHistorialPrecios } from "@/services/materiales";
 import type { Material, PrecioMaterial } from "@/types/api";
@@ -36,6 +38,12 @@ export function PreciosPage() {
   const [historial, setHistorial] = useState<PrecioMaterial[]>([]);
   const [cargandoHistorial, setCargandoHistorial] = useState(false);
 
+  // Dos envíos registrarían dos precios en el historial
+  const unaVez = useAccionUnica();
+  const enEdicion = materiales.find((m) => m.id === editandoId) ?? null;
+  const precioSinGuardar = enEdicion !== null && nuevoPrecio.trim() !== (enEdicion.precio_vigente ?? "");
+  useCambiosSinGuardar(precioSinGuardar);
+
   useEffect(() => {
     listarMateriales()
       .then(setMateriales)
@@ -44,6 +52,12 @@ export function PreciosPage() {
   }, []);
 
   function iniciarEdicion(material: Material) {
+    if (
+      precioSinGuardar &&
+      !window.confirm(`El precio de ${enEdicion?.nombre} no se guardó. ¿Descartarlo y editar otro material?`)
+    ) {
+      return;
+    }
     setAviso(null);
     setEditandoId(material.id);
     setNuevoPrecio(material.precio_vigente ?? "");
@@ -173,7 +187,7 @@ export function PreciosPage() {
                           <button
                             type="button"
                             disabled={guardando}
-                            onClick={() => guardarPrecio(material)}
+                            onClick={() => void unaVez(`precio-${material.id}`, () => guardarPrecio(material))}
                             className="font-medium text-solar-700 hover:underline disabled:opacity-50"
                           >
                             {guardando ? "Guardando…" : "Guardar"}

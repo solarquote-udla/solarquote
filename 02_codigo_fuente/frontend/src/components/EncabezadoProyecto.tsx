@@ -14,6 +14,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { EstadoProyectoBadge } from "@/components/EstadoProyectoBadge";
 import { PASOS, type NumeroPaso } from "@/components/asistente";
 import { PasosAsistente } from "@/components/PasosAsistente";
+import { useAccionUnica } from "@/hooks/useAccionUnica";
 import { mensajeDeError } from "@/services/api";
 import { actualizarProyecto } from "@/services/proyectos";
 import type { Proyecto, ProyectoActualizar } from "@/types/api";
@@ -92,6 +93,7 @@ export function EncabezadoProyecto({ paso, proyecto, onActualizado, onCambiosSin
   const [formulario, setFormulario] = useState<Formulario>(() => (proyecto ? desdeProyecto(proyecto) : desdeProyecto(VACIO)));
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const unaVez = useAccionUnica();
 
   // La página decide si se puede salir: el encabezado solo informa
   const sucio =
@@ -99,6 +101,7 @@ export function EncabezadoProyecto({ paso, proyecto, onActualizado, onCambiosSin
   useEffect(() => {
     onCambiosSinGuardar?.(sucio);
   }, [sucio, onCambiosSinGuardar]);
+  useEffect(() => () => onCambiosSinGuardar?.(false), [onCambiosSinGuardar]);
 
   function abrir() {
     if (!proyecto) return;
@@ -190,7 +193,13 @@ export function EncabezadoProyecto({ paso, proyecto, onActualizado, onCambiosSin
       )}
 
       {editando && (
-        <form onSubmit={guardar} className="mt-4 rounded-xl border border-acero-200 bg-superficie p-5">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void unaVez("guardar-datos", () => guardar(e));
+          }}
+          className="mt-4 rounded-xl border border-acero-200 bg-superficie p-5"
+        >
           <h2 className="text-sm font-semibold text-acero-700">Datos del proyecto</h2>
           <p className="mt-1 text-xs text-acero-400">
             El cliente no se cambia aquí: un proyecto con cotizaciones debe conservar su cliente.

@@ -18,6 +18,25 @@ export interface Limites {
 }
 
 /**
+ * Caja exacta que contiene los puntos (sin margen ni lienzo base).
+ * Con la lista vacía devuelve null.
+ */
+export function limitesDe(puntos: Punto[]): Limites | null {
+  if (puntos.length === 0) return null;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const [x, y] of puntos) {
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x);
+    maxY = Math.max(maxY, y);
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+/**
  * Encuadre que contiene todos los puntos y, como mínimo, el lienzo base.
  *
  * Partir del lienzo base evita que la vista salte al primer clic: con un
