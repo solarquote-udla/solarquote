@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
+import { useAccionUnica } from "@/hooks/useAccionUnica";
 import { useAuth } from "@/hooks/useAuth";
 import { mensajeDeError } from "@/services/api";
 
@@ -25,6 +26,8 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [ayudaPassword, setAyudaPassword] = useState(false);
+  // Un doble Enter con la contraseña equivocada contaría dos intentos para el bloqueo
+  const unaVez = useAccionUnica();
 
   const sesionExpirada = parametros.get("expirado") === "1";
   const destino = (ubicacion.state as EstadoUbicacion | null)?.destino ?? "/";
@@ -58,7 +61,10 @@ export function LoginPage() {
           <p className="mt-2 text-sm text-acero-500">Gestión y cotización de estructuras fotovoltaicas</p>
 
           <form
-            onSubmit={(e) => void manejarEnvio(e)}
+            onSubmit={(e) => {
+              e.preventDefault();
+              void unaVez("entrar", () => manejarEnvio(e));
+            }}
             className="mt-8 rounded-xl border border-acero-200 bg-superficie p-8"
           >
             <h2 className="text-lg font-semibold text-acero-900">Iniciar sesión</h2>

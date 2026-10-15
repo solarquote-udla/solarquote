@@ -14,6 +14,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 
+import { useAccionUnica } from "@/hooks/useAccionUnica";
 import { useAuth } from "@/hooks/useAuth";
 import { mensajeDeError } from "@/services/api";
 import { problemaDePassword } from "@/utils/password";
@@ -30,6 +31,8 @@ export function CambiarPasswordPage() {
   const [confirmacion, setConfirmacion] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  // El segundo envío fallaría con "contraseña actual incorrecta" aunque el primero funcionó
+  const unaVez = useAccionUnica();
 
   if (cargando) return null;
   if (usuario === null) return <Navigate to="/login" replace />;
@@ -68,7 +71,10 @@ export function CambiarPasswordPage() {
         </div>
 
         <form
-          onSubmit={(e) => void manejarEnvio(e)}
+          onSubmit={(e) => {
+            e.preventDefault();
+            void unaVez("cambiar", () => manejarEnvio(e));
+          }}
           className="rounded-xl border border-acero-200 bg-superficie p-8 shadow-sm"
         >
           <h2 className="text-lg font-semibold text-acero-800">

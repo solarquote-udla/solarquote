@@ -19,4 +19,9 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // Las pruebas no se recargan en caliente: la regla de Fast Refresh no aplica
+    files: ['src/__tests__/**/*.{ts,tsx}'],
+    rules: { 'react-refresh/only-export-components': 'off' },
+  },
 ])
