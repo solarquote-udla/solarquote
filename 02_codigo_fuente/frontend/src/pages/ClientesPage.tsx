@@ -9,6 +9,8 @@
 import { useEffect, useState } from "react";
 
 import { FormularioCliente } from "@/components/FormularioCliente";
+import { useAccionUnica } from "@/hooks/useAccionUnica";
+import { useCambiosSinGuardar } from "@/hooks/useCambiosSinGuardar";
 import { mensajeDeError } from "@/services/api";
 import { buscarClientes, darDeBajaCliente, reactivarCliente } from "@/services/clientes";
 import { ETIQUETAS_TIPO_IDENTIFICACION, type Cliente } from "@/types/api";
@@ -32,6 +34,22 @@ export function ClientesPage() {
   const [edicion, setEdicion] = useState<Edicion>(null);
   const [confirmandoBaja, setConfirmandoBaja] = useState<number | null>(null);
   const [procesando, setProcesando] = useState<number | null>(null);
+  const unaVez = useAccionUnica();
+  const [formularioSucio, setFormularioSucio] = useState(false);
+  useCambiosSinGuardar(edicion !== null && formularioSucio);
+
+  /** Abrir otro cliente reemplaza el formulario: si tenía datos sin guardar, se pregunta. */
+  function abrirEdicion(nueva: Cliente) {
+    if (
+      edicion !== null &&
+      formularioSucio &&
+      !window.confirm("El formulario tiene datos sin guardar. ¿Descartarlos y editar otro cliente?")
+    ) {
+      return;
+    }
+    setAviso(null);
+    setEdicion(nueva);
+  }
 
   useEffect(() => {
     let cancelado = false;
@@ -140,6 +158,7 @@ export function ClientesPage() {
             cliente={edicion === "nuevo" ? null : edicion}
             onGuardado={alGuardar}
             onCancelar={() => setEdicion(null)}
+            onCambiosSinGuardar={setFormularioSucio}
           />
         </div>
       )}
@@ -228,7 +247,7 @@ export function ClientesPage() {
                           <button
                             type="button"
                             disabled={procesando === c.id}
-                            onClick={() => darDeBaja(c)}
+                            onClick={() => void unaVez(`baja-${c.id}`, () => darDeBaja(c))}
                             className="rounded-md bg-red-500 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-400 disabled:opacity-50"
                           >
                             Dar de baja
@@ -241,10 +260,7 @@ export function ClientesPage() {
                           <>
                             <button
                               type="button"
-                              onClick={() => {
-                                setAviso(null);
-                                setEdicion(c);
-                              }}
+                              onClick={() => abrirEdicion(c)}
                               className="font-medium text-solar-700 hover:underline"
                             >
                               Editar
@@ -257,7 +273,7 @@ export function ClientesPage() {
                           <button
                             type="button"
                             disabled={procesando === c.id}
-                            onClick={() => reactivar(c)}
+                            onClick={() => void unaVez(`reactivar-${c.id}`, () => reactivar(c))}
                             className="font-medium text-solar-700 hover:underline disabled:opacity-50"
                           >
                             Reactivar
