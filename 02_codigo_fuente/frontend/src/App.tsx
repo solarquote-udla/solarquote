@@ -27,6 +27,7 @@ import { ClientesPage } from "@/pages/ClientesPage";
 import { EnConstruccionPage } from "@/pages/EnConstruccionPage";
 import { EquipoPage } from "@/pages/EquipoPage";
 import { InicioPage } from "@/pages/InicioPage";
+import { InversoresPage } from "@/pages/InversoresPage";
 import { LayoutPage } from "@/pages/LayoutPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { PerfilesPage } from "@/pages/PerfilesPage";
@@ -125,10 +126,7 @@ const router = createBrowserRouter(
           {conPermiso(Permiso.CLIENTES, <Route path="clientes" element={<ClientesPage />} />)}
 
           {/* ─── CONFIGURACIÓN ──────────────────────── */}
-          {conPermiso(
-            Permiso.INVERSORES,
-            <Route path="configuracion/inversores" element={pendiente("Inversores", "Módulo 4", "RF-08")} />,
-          )}
+          {conPermiso(Permiso.INVERSORES, <Route path="configuracion/inversores" element={<InversoresPage />} />)}
           {conPermiso(
             Permiso.MATERIALES,
             <Route path="configuracion/materiales" element={pendiente("Materiales", "Módulo 4", "RF-09")} />,
