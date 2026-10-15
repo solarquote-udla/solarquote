@@ -9,7 +9,7 @@
  * filas (RF-02) ni entre bloques (RF-03).
  */
 
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
 import { EstadoProyectoBadge } from "@/components/EstadoProyectoBadge";
 import { PASOS, type NumeroPaso } from "@/components/asistente";
@@ -27,8 +27,8 @@ interface Props {
   proyecto: Proyecto | null;
   /** Recibe el proyecto actualizado, para que la página recargue lo que dependa de él */
   onActualizado?: (proyecto: Proyecto) => void | Promise<void>;
-  /** Para la barra de pasos: false cancela el cambio de paso */
-  puedeSalir?: () => boolean;
+  /** Avisa si el formulario "Editar datos" tiene cambios sin guardar */
+  onCambiosSinGuardar?: (hay: boolean) => void;
 }
 
 const texto = (v: string | number | null) => (v == null ? "" : String(v));
@@ -87,11 +87,18 @@ function Etiqueta({ texto: t, children, ancho }: { texto: string; children: Reac
   );
 }
 
-export function EncabezadoProyecto({ paso, proyecto, onActualizado, puedeSalir }: Props) {
+export function EncabezadoProyecto({ paso, proyecto, onActualizado, onCambiosSinGuardar }: Props) {
   const [editando, setEditando] = useState(false);
   const [formulario, setFormulario] = useState<Formulario>(() => (proyecto ? desdeProyecto(proyecto) : desdeProyecto(VACIO)));
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // La página decide si se puede salir: el encabezado solo informa
+  const sucio =
+    editando && proyecto !== null && JSON.stringify(formulario) !== JSON.stringify(desdeProyecto(proyecto));
+  useEffect(() => {
+    onCambiosSinGuardar?.(sucio);
+  }, [sucio, onCambiosSinGuardar]);
 
   function abrir() {
     if (!proyecto) return;
@@ -156,7 +163,7 @@ export function EncabezadoProyecto({ paso, proyecto, onActualizado, puedeSalir }
       </nav>
 
       <div className="mt-3 border-b border-acero-200 pb-4">
-        <PasosAsistente actual={paso} proyectoId={proyecto?.id ?? null} puedeSalir={puedeSalir} />
+        <PasosAsistente actual={paso} proyectoId={proyecto?.id ?? null} />
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1">

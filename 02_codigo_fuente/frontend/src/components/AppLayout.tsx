@@ -10,6 +10,7 @@ import { Link, NavLink, Outlet } from "react-router-dom";
 
 import { menuVisible } from "@/components/menu";
 import { useAuth } from "@/hooks/useAuth";
+import { hayCambiosPendientes } from "@/hooks/useCambiosSinGuardar";
 
 export function AppLayout() {
   const { usuario, cerrarSesion, tienePermiso } = useAuth();
@@ -96,7 +97,11 @@ export function AppLayout() {
 
           <button
             type="button"
-            onClick={cerrarSesion}
+            onClick={() => {
+              // Cerrar sesión desmonta la pantalla sin pasar por el router: se pregunta aquí
+              if (hayCambiosPendientes() && !window.confirm("Hay cambios sin guardar. Si cierras sesión se pierden. ¿Salir de todas formas?")) return;
+              cerrarSesion();
+            }}
             className="rounded-lg border border-acero-300 px-3 py-1.5 text-sm text-acero-600 transition hover:bg-acero-100"
           >
             Salir

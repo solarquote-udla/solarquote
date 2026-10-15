@@ -12,11 +12,10 @@ interface Props {
   actual: NumeroPaso;
   /** null mientras el proyecto no existe (Paso 1 de un proyecto nuevo) */
   proyectoId: number | null;
-  /** Se consulta antes de cambiar de paso: false cancela (hay cambios sin guardar) */
-  puedeSalir?: () => boolean;
 }
 
-export function PasosAsistente({ actual, proyectoId, puedeSalir }: Props) {
+/** Cambiar de paso con cambios sin guardar lo intercepta la página (useCambiosSinGuardar). */
+export function PasosAsistente({ actual, proyectoId }: Props) {
   return (
     <ol className="flex flex-wrap items-center gap-x-3 gap-y-2" aria-label="Pasos del asistente">
       {PASOS.map((paso, i) => {
@@ -57,13 +56,7 @@ export function PasosAsistente({ actual, proyectoId, puedeSalir }: Props) {
         return (
           <li key={paso.numero} className="flex items-center gap-3" aria-current={esActual ? "step" : undefined}>
             {proyectoId !== null && !esActual ? (
-              <Link
-                to={rutaPaso(proyectoId, paso.numero)}
-                className="rounded-md hover:opacity-80"
-                onClick={(evento) => {
-                  if (puedeSalir && !puedeSalir()) evento.preventDefault();
-                }}
-              >
+              <Link to={rutaPaso(proyectoId, paso.numero)} className="rounded-md hover:opacity-80">
                 {contenido}
               </Link>
             ) : (

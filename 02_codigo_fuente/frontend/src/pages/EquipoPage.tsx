@@ -18,7 +18,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { BarraPaso } from "@/components/BarraPaso";
 import { EncabezadoProyecto } from "@/components/EncabezadoProyecto";
 import { rutaPaso } from "@/components/asistente";
-import { useAvisoAlSalir } from "@/hooks/useAvisoAlSalir";
+import { useCambiosSinGuardar } from "@/hooks/useCambiosSinGuardar";
 import { mensajeDeError } from "@/services/api";
 import { guardarEquipo, listarPanelesReferencia, obtenerEquipo } from "@/services/equipo";
 import { obtenerProyecto } from "@/services/proyectos";
@@ -251,10 +251,10 @@ export function EquipoPage() {
     [formulario, guardado],
   );
 
-  useAvisoAlSalir(hayCambios && !guardando);
+  // "Editar datos" del encabezado tiene su propio formulario
+  const [encabezadoSucio, setEncabezadoSucio] = useState(false);
   // También la primera vez: sin configuración guardada, cualquier dato escrito se perdería
-  const confirmarSalida = () =>
-    !hayCambios || window.confirm("Tienes cambios sin guardar en el equipo. ¿Salir sin guardarlos?");
+  const permitirSalida = useCambiosSinGuardar(hayCambios || encabezadoSucio);
 
   function actualizar(campo: Campo, valor: string) {
     setFormulario((f) => ({ ...f, [campo]: valor }));
@@ -359,7 +359,7 @@ export function EquipoPage() {
       <EncabezadoProyecto
         paso={2}
         proyecto={proyecto}
-        puedeSalir={confirmarSalida}
+        onCambiosSinGuardar={setEncabezadoSucio}
         onActualizado={async (p) => {
           setProyecto(p);
           // La separación entre filas depende de la latitud: se recalcula en el backend
@@ -615,17 +615,23 @@ export function EquipoPage() {
       <BarraPaso
         atras={{
           etiqueta: "← Anterior",
-          onClick: () => {
-            if (confirmarSalida()) void navegar(rutaPaso(proyectoId, 1));
-          },
+          // Con cambios sin guardar, useCambiosSinGuardar pregunta antes de salir
+          onClick: () => void navegar(rutaPaso(proyectoId, 1)),
         }}
         resumen={resumen}
         adelante={{
           etiqueta: guardando ? "Guardando…" : "Siguiente →",
           deshabilitado: guardando,
           onClick: () => {
+            if (encabezadoSucio) {
+              setError("Guarda o cancela los cambios en los datos del proyecto antes de continuar.");
+              return;
+            }
             void guardarSiHaceFalta().then((ok) => {
-              if (ok) void navegar(rutaPaso(proyectoId, 3));
+              if (!ok) return;
+              // Recién guardado: esta navegación no debe pedir confirmación
+              permitirSalida();
+              void navegar(rutaPaso(proyectoId, 3));
             });
           },
         }}

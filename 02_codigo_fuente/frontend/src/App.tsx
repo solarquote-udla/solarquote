@@ -9,7 +9,15 @@
  */
 
 import type { ReactNode } from "react";
-import { BrowserRouter, Navigate, Route, Routes, useParams } from "react-router-dom";
+import {
+  createBrowserRouter,
+  createRoutesFromElements,
+  Navigate,
+  Outlet,
+  Route,
+  RouterProvider,
+  useParams,
+} from "react-router-dom";
 
 import { AppLayout } from "@/components/AppLayout";
 import { RutaProtegida } from "@/components/RutaProtegida";
@@ -51,11 +59,23 @@ function pendiente(titulo: string, modulo: string, requerimientos: string) {
   );
 }
 
-export default function App() {
+/** La sesión envuelve a todas las rutas. */
+function Raiz() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <Routes>
+    <AuthProvider>
+      <Outlet />
+    </AuthProvider>
+  );
+}
+
+/*
+ * "Data router" (createBrowserRouter) y no <BrowserRouter>: es el que
+ * permite `useBlocker`, con el que el asistente avisa antes de perder
+ * cambios sin guardar al salir por cualquier vía (hooks/useCambiosSinGuardar).
+ */
+const router = createBrowserRouter(
+  createRoutesFromElements(
+    <Route element={<Raiz />}>
           {/* ─── Públicas ───────────────────────────── */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/sin-permisos" element={<SinPermisosPage />} />
@@ -130,8 +150,10 @@ export default function App() {
 
           {/* Cualquier ruta desconocida vuelve al inicio */}
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </AuthProvider>
-    </BrowserRouter>
-  );
+    </Route>,
+  ),
+);
+
+export default function App() {
+  return <RouterProvider router={router} />;
 }

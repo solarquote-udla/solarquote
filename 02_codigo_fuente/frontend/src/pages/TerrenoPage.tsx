@@ -27,7 +27,7 @@ import { BarraPaso } from "@/components/BarraPaso";
 import { EditorPoligonos, type CaminoDibujo } from "@/components/EditorPoligonos";
 import { EncabezadoProyecto } from "@/components/EncabezadoProyecto";
 import { rutaPaso } from "@/components/asistente";
-import { useAvisoAlSalir } from "@/hooks/useAvisoAlSalir";
+import { useCambiosSinGuardar } from "@/hooks/useCambiosSinGuardar";
 import { mensajeDeError } from "@/services/api";
 import { listarClientes } from "@/services/clientes";
 import { actualizarProyecto, crearProyecto, obtenerProyecto } from "@/services/proyectos";
@@ -204,14 +204,6 @@ export function TerrenoPage() {
     [vertices, orientacion, notas, guardado],
   );
 
-  /** Algo escrito que todavía no está en el servidor (proyecto o terreno). */
-  const sinGuardar =
-    terrenoCambio || JSON.stringify(datos) !== JSON.stringify(proyecto ? datosDe(proyecto) : DATOS_VACIOS);
-
-  useAvisoAlSalir(sinGuardar && !guardando);
-  const confirmarSalida = () =>
-    !sinGuardar || window.confirm("Hay datos sin guardar en este paso. ¿Salir sin guardarlos?");
-
   const caminos: CaminoDibujo[] = useMemo(
     () => (guardado?.caminos ?? []).map((c) => ({ clave: `c${c.id}`, nombre: c.nombre, vertices: c.vertices })),
     [guardado],
@@ -250,6 +242,18 @@ export function TerrenoPage() {
     const ext = extension(vertices);
     return !ext || Math.abs(escritas.ancho - ext.ancho) > 0.005 || Math.abs(escritas.largo - ext.largo) > 0.005;
   })();
+
+  /**
+   * Todo lo escrito en este paso que todavía no está en el servidor:
+   * datos del proyecto, contorno, orientación, notas, ancho y largo sin
+   * aplicar y un contorno a medio dibujar.
+   */
+  const sinGuardar =
+    JSON.stringify(datos) !== JSON.stringify(proyecto ? datosDe(proyecto) : DATOS_VACIOS) ||
+    terrenoCambio ||
+    dimensionesPendientes ||
+    (dibujando && borrador.length > 0);
+  const permitirSalida = useCambiosSinGuardar(sinGuardar);
 
   /** Rectángulo con las dimensiones escritas, en la misma esquina que el contorno actual. */
   function rectanguloEscrito(): Punto[] | null {
@@ -382,6 +386,8 @@ export function TerrenoPage() {
         cargarEnEditor(await obtenerTerreno(actual.id));
       }
 
+      // Recién guardado: esta navegación no debe pedir confirmación
+      permitirSalida();
       void navegar(rutaPaso(actual.id, 2));
     } catch (e) {
       setError(mensajeDeError(e, "No se pudo guardar el proyecto"));
@@ -411,7 +417,7 @@ export function TerrenoPage() {
 
   return (
     <div className="mx-auto max-w-7xl">
-      <EncabezadoProyecto paso={1} proyecto={proyecto} puedeSalir={confirmarSalida} />
+      <EncabezadoProyecto paso={1} proyecto={proyecto} />
 
       {error && (
         <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -667,9 +673,8 @@ export function TerrenoPage() {
       <BarraPaso
         atras={{
           etiqueta: "Cancelar",
-          onClick: () => {
-            if (confirmarSalida()) void navegar("/historial");
-          },
+          // Si hay cambios sin guardar, useCambiosSinGuardar pregunta antes de salir
+          onClick: () => void navegar("/historial"),
         }}
         resumen={
           area !== null
