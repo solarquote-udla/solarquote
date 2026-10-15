@@ -128,6 +128,30 @@ def test_actualizar_inversor_que_dejaria_un_solo_voltaje_falla(db: Session) -> N
         actualizar_inversor(db, inversor.id, InversorActualizar(vmax_v=None))
 
 
+def test_actualizar_inversor_que_dejaria_vmin_mayor_que_vmax_falla(db: Session) -> None:
+    """Revisión del PR #37 (Joseph): mandar solo vmin_v podía dejarlo por encima del vmax_v guardado."""
+    inversor = crear_inversor(
+        db, marca="Huawei", modelo="SUN2000-50KTL", potencia_kw=50.0, vmax_v=1000.0, vmin_v=200.0, mppts=None, strings_por_mppt=None
+    )
+
+    with pytest.raises(VoltajesInconsistentes):
+        actualizar_inversor(db, inversor.id, InversorActualizar(vmin_v=1500.0))
+
+    db.refresh(inversor)
+    assert inversor.vmin_v == 200.0  # no quedó a medias
+
+
+def test_actualizar_inversor_con_marca_null_explicito_falla() -> None:
+    """Revisión del PR #37 (Joseph): {"marca": null} rompía el NOT NULL y se informaba como duplicado."""
+    with pytest.raises(ValidationError):
+        InversorActualizar(marca=None)
+
+
+def test_actualizar_inversor_con_activo_null_explicito_falla() -> None:
+    with pytest.raises(ValidationError):
+        InversorActualizar(activo=None)
+
+
 class TestInversorCrearSchema:
     def test_acepta_datos_validos(self) -> None:
         datos = InversorCrear(marca="Huawei", modelo="SUN2000-50KTL", potencia_kw=50.0)
