@@ -70,6 +70,12 @@ PR #34, donde cada ronda encontraba un caso que la anterior no cubría.
 Para verificar que una prueba sirve, se quita a propósito la protección
 que cubre y se comprueba que falla.
 
+Algunas reglas se prueban como **inventario** en vez de caso por caso:
+`escrituras.test.tsx` recorre el código y falla si una pantalla o
+componente importa una función que escribe en el servidor sin usar el
+candado contra doble envío (`useAccionUnica`). Así una pantalla nueva no
+puede olvidarlo sin que lo detecte el CI.
+
 ### 2.3 Cómo se aísla una prueba de integración
 
 El fixture `db` (`tests/conftest.py`) abre una transacción antes de cada
