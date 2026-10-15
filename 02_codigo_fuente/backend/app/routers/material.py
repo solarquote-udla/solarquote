@@ -20,7 +20,7 @@ from app.core.permisos import Permiso
 from app.models.material import Material, PrecioMaterial
 from app.schemas.material import MaterialActualizar, MaterialCrear, MaterialLeer, PrecioActualizar, PrecioMaterialLeer
 from app.services import material as servicio
-from app.services.material import CodigoDuplicado
+from app.services.material import CodigoDuplicado, MaterialEnUso
 
 router = APIRouter(
     prefix="/api/materiales",
@@ -77,13 +77,16 @@ def crear(datos: MaterialCrear, db: Session = Depends(get_db)) -> MaterialLeer:
     dependencies=[Depends(requiere_permiso(Permiso.MATERIALES))],
 )
 def actualizar(material_id: int, datos: MaterialActualizar, db: Session = Depends(get_db)) -> MaterialLeer:
-    resultado = servicio.actualizar_material(
-        db,
-        material_id,
-        nombre=datos.nombre,
-        unidad=datos.unidad,
-        activo=datos.activo,
-    )
+    try:
+        resultado = servicio.actualizar_material(
+            db,
+            material_id,
+            nombre=datos.nombre,
+            unidad=datos.unidad,
+            activo=datos.activo,
+        )
+    except MaterialEnUso as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     if resultado is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No existe el material {material_id}")
     return _respuesta(*resultado)

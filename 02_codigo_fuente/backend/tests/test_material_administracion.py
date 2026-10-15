@@ -11,6 +11,7 @@ from app.models.material import Material, PrecioMaterial
 from app.schemas.material import MaterialActualizar, MaterialCrear, PrecioActualizar
 from app.services.material import (
     CodigoDuplicado,
+    MaterialEnUso,
     actualizar_material,
     actualizar_precio,
     crear_material,
@@ -129,20 +130,20 @@ def test_crear_material_con_codigo_duplicado_falla(db: Session) -> None:
 
 
 def test_actualizar_material_cambia_nombre_unidad_y_activo(db: Session) -> None:
-    material = _crear_material(db, "VAR1650")
+    material = _crear_material(db, "GRAPA_X")
 
-    resultado = actualizar_material(db, material.id, nombre="Varilla 1650 mm", unidad="m", activo=False)
+    resultado = actualizar_material(db, material.id, nombre="Grapa X", unidad="m", activo=False)
 
     assert resultado is not None
     actualizado, _ = resultado
-    assert actualizado.nombre == "Varilla 1650 mm"
+    assert actualizado.nombre == "Grapa X"
     assert actualizado.unidad == "m"
     assert actualizado.activo is False
-    assert actualizado.codigo == "VAR1650"  # el código no cambia
+    assert actualizado.codigo == "GRAPA_X"  # el código no cambia
 
 
 def test_actualizar_material_parcial_no_toca_los_campos_omitidos(db: Session) -> None:
-    material = _crear_material(db, "VAR1650")
+    material = _crear_material(db, "GRAPA_X")
     material.nombre = "Nombre original"
     material.unidad = "kg"
     db.flush()
@@ -158,6 +159,24 @@ def test_actualizar_material_parcial_no_toca_los_campos_omitidos(db: Session) ->
 
 def test_actualizar_material_inexistente_devuelve_none(db: Session) -> None:
     assert actualizar_material(db, 999999, nombre="X") is None
+
+
+def test_desactivar_un_codigo_de_formula_lanza_material_en_uso(db: Session) -> None:
+    """Revisión del PR #35 (Joseph): desactivar VAR1650 rompía todas las cotizaciones."""
+    material = _crear_material(db, "VAR1650")
+
+    with pytest.raises(MaterialEnUso):
+        actualizar_material(db, material.id, activo=False)
+
+
+def test_desactivar_un_codigo_de_formula_no_cambia_nada(db: Session) -> None:
+    """El intento no debe dejar a medias otros campos que vinieran en el mismo PATCH."""
+    material = _crear_material(db, "VAR1650")
+
+    with pytest.raises(MaterialEnUso):
+        actualizar_material(db, material.id, nombre="Otro nombre", activo=False)
+
+    assert material.nombre == "VAR1650"
 
 
 class TestMaterialCrearSchema:
