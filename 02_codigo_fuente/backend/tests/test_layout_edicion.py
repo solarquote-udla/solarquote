@@ -35,7 +35,7 @@ from app.services.calculo_layout import (
     validar_bloques,
     vertices_de,
 )
-from app.services.equipo import guardar_configuracion
+from app.services.equipo import guardar_configuracion, obtener_configuracion
 from app.services.terreno import actualizar_terreno, crear_terreno
 
 LARGO = 9.112   # 4 × 2,278 m, a 0°
@@ -175,7 +175,7 @@ def proyecto(db: Session) -> Proyecto:
                     "largo_mm": 2278, "ancho_mm": 1134, "voc_v": 52.31, "vmp_v": 43.35,
                 },
                 "angulo_montaje": 0,
-                "inversor": {"marca": "X", "modelo": "Y", "potencia_kw": 250, "vmax_v": 1100, "vmin_v": 200},
+                "inversores": [{"marca": "X", "modelo": "Y", "potencia_kw": 250, "vmax_v": 1100, "vmin_v": 200}],
             }
         ),
     )
@@ -212,9 +212,9 @@ def test_eliminar_un_bloque_recalcula_todo(db, proyecto):
     assert editado.potencia_kwp == pytest.approx((1764 - 96) * 0.58, abs=0.01)
     assert len(editado.bloques) == 26
     assert editado.resumen["ediciones_manuales"] == 1
-    # 1668 / 21 = 79 strings, sobran 9
-    assert editado.resumen["electrica"]["strings_totales"] == 79
-    respuesta = servicio.a_respuesta(editado, editado.huella)
+    respuesta = servicio.a_respuesta(editado, editado.huella, obtener_configuracion(db, proyecto.id))
+    # 1668 / 21 = 79 strings, sobran 9 (un solo inversor)
+    assert (respuesta.inversores[0].strings, respuesta.inversores[0].paneles_sin_string) == (79, 9)
     assert {(t.paneles_ancho, t.repeticiones) for t in respuesta.tipos} == {(24, 17), (1, 9)}
 
 
@@ -224,7 +224,7 @@ def test_acortar_un_bloque_cambia_su_tipo(db, proyecto):
     editado = servicio.editar_bloques(db, proyecto, _como_edicion(layout, cambiar={0: (origen, 20)}))
 
     assert editado.total_paneles == 1764 - 16
-    respuesta = servicio.a_respuesta(editado, editado.huella)
+    respuesta = servicio.a_respuesta(editado, editado.huella, obtener_configuracion(db, proyecto.id))
     assert (20, 1) in {(t.paneles_ancho, t.repeticiones) for t in respuesta.tipos}
     # Lo que queda del bloque reconstruido mide 20 paneles de alto
     assert Polygon(respuesta.bloques[0].vertices).bounds[3] - origen[1] == pytest.approx(20 * LADO_MENOR, abs=1e-3)
@@ -270,7 +270,7 @@ def test_backend_valida_con_el_mismo_largo_que_entrega_la_api(db, proyecto):
     equipo.angulo_montaje = 22.0
     db.flush()
     layout = servicio.generar(db, proyecto, LayoutGenerar())
-    largo_api = servicio.a_respuesta(layout, layout.huella).largo_bloque_m
+    largo_api = servicio.a_respuesta(layout, layout.huella, equipo).largo_bloque_m
     assert largo_api == 8.448
 
     x, y = layout.bloques[0].vertices[3]

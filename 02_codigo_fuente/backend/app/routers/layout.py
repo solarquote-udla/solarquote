@@ -4,6 +4,7 @@ Endpoints del layout solar — RF-03.
   GET  /api/proyectos/{id}/layout           → último layout generado
   POST /api/proyectos/{id}/layout           → generar (reemplaza el anterior)
   PUT  /api/proyectos/{id}/layout/bloques   → guardar la edición manual (SQ-64)
+  POST /api/proyectos/{id}/layout/reagrupar → repartir los bloques entre los inversores
 
 POST y no PUT: el cliente no envía el layout, envía parámetros y el
 servidor lo calcula. Dos POST con los mismos parámetros dan el mismo
@@ -21,6 +22,7 @@ from app.core.permisos import Permiso
 from app.schemas.layout import LayoutEditar, LayoutGenerar, LayoutLeer
 from app.services import layout as servicio
 from app.services.calculo_layout import EdicionInvalida, LayoutImposible
+from app.services.equipo import obtener_configuracion
 from app.services.proyecto import obtener_proyecto
 
 router = APIRouter(
@@ -50,7 +52,9 @@ def consultar_layout(proyecto_id: int, db: Session = Depends(get_db)) -> LayoutL
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"El proyecto {proyecto_id} todavía no tiene layout generado",
         )
-    return servicio.a_respuesta(layout, servicio.huella_actual(db, proyecto))
+    return servicio.a_respuesta(
+        layout, servicio.huella_actual(db, proyecto), obtener_configuracion(db, proyecto_id)
+    )
 
 
 @router.post("", response_model=LayoutLeer)
@@ -74,7 +78,7 @@ def generar_layout(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)
         ) from error
-    return servicio.a_respuesta(layout, layout.huella)
+    return servicio.a_respuesta(layout, layout.huella, obtener_configuracion(db, proyecto_id))
 
 
 @router.put("/bloques", response_model=LayoutLeer)
@@ -99,4 +103,21 @@ def editar_bloques(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)
         ) from error
-    return servicio.a_respuesta(layout, layout.huella)
+    return servicio.a_respuesta(layout, layout.huella, obtener_configuracion(db, proyecto_id))
+
+
+@router.post("/reagrupar", response_model=LayoutLeer)
+def reagrupar(proyecto_id: int, db: Session = Depends(get_db)) -> LayoutLeer:
+    """
+    Reparte de nuevo todos los bloques entre los inversores del equipo,
+    en proporción a su potencia y por sectores de la planta. No cambia
+    la geometría.
+
+    409 si no hay layout o está desactualizado.
+    """
+    proyecto = _proyecto_o_404(db, proyecto_id)
+    try:
+        layout = servicio.reagrupar(db, proyecto)
+    except servicio.LayoutNoEditable as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+    return servicio.a_respuesta(layout, layout.huella, obtener_configuracion(db, proyecto_id))

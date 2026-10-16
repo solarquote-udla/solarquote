@@ -19,12 +19,13 @@ from app.models.terreno import Terreno
 from app.schemas.layout import (
     BloqueLeer,
     CapacidadLeer,
-    ElectricaLeer,
+    InversorLayoutLeer,
     LayoutEditar,
     LayoutGenerar,
     LayoutLeer,
     TipoBloqueLeer,
 )
+from app.services.calculo_equipo import inversores_sugeridos
 from app.services.calculo_layout import (
     Bloque,
     InversorLayout,
@@ -32,9 +33,10 @@ from app.services.calculo_layout import (
     ParametrosLayout,
     advertencia_proporcion,
     agrupar_por_tipo,
-    configuracion_electrica,
+    asignar_inversores,
     construir_bloque,
     cumple_proporcion,
+    electrica_inversor,
     generar_layout,
     proporcion_bloque,
     validar_bloques,
@@ -71,6 +73,10 @@ def calcular_huella(
     deja de coincidir y el layout se informa como desactualizado.
     Los caminos se ordenan por id para que la huella no dependa del
     orden en que los devuelva la consulta.
+
+    Los inversores no entran: no cambian dónde van los bloques, solo a
+    qué inversor se conecta cada uno, y eso se reparte de nuevo sin
+    volver a generar (`reagrupar`).
     """
     datos = {
         "latitud": float(proyecto.latitud) if proyecto.latitud is not None else None,
@@ -91,12 +97,6 @@ def calcular_huella(
                 equipo.panel_voc_v,
                 equipo.panel_vmp_v,
                 equipo.angulo_montaje,
-            ],
-            "inversor": [
-                equipo.inversor_vmax_v,
-                equipo.inversor_vmin_v,
-                equipo.inversor_mppts,
-                equipo.inversor_strings_por_mppt,
             ],
         },
     }
@@ -151,14 +151,11 @@ def generar(db: Session, proyecto: Proyecto, datos: LayoutGenerar) -> Layout:
         ),
         orientacion_norte=terreno.orientacion_norte,
         latitud=float(proyecto.latitud) if proyecto.latitud is not None else None,
-        inversor=InversorLayout(
-            vmax_v=equipo.inversor_vmax_v,
-            vmin_v=equipo.inversor_vmin_v,
-            mppts=equipo.inversor_mppts,
-            strings_por_mppt=equipo.inversor_strings_por_mppt,
-        ),
-        panel_voc=equipo.panel_voc_v,
-        panel_vmp=equipo.panel_vmp_v,
+    )
+    asignacion = asignar_inversores(
+        [(b.vertices, b.paneles) for b in resultado.bloques],
+        [i.potencia_kw for i in equipo.inversores],
+        resultado.angulo_norte,
     )
 
     layout = obtener_layout(db, proyecto.id)
@@ -181,7 +178,6 @@ def generar(db: Session, proyecto: Proyecto, datos: LayoutGenerar) -> Layout:
         "area_util_m2": resultado.area_util_m2,
         "area_ocupada_m2": resultado.area_ocupada_m2,
         "capacidad": asdict(resultado.capacidad) if resultado.capacidad else None,
-        "electrica": asdict(resultado.electrica),
         "advertencias": resultado.advertencias,
         "angulo_norte": resultado.angulo_norte,
         "lado_menor_m": resultado.lado_menor_m,
@@ -207,8 +203,9 @@ def generar(db: Session, proyecto: Proyecto, datos: LayoutGenerar) -> Layout:
             paneles_ancho=b.paneles_ancho,
             proporcion=b.proporcion,
             en_proporcion=b.en_proporcion,
+            inversor=inversor,
         )
-        for i, b in enumerate(resultado.bloques)
+        for i, (b, inversor) in enumerate(zip(resultado.bloques, asignacion))
     ]
 
     db.commit()
@@ -329,21 +326,26 @@ def editar_bloques(db: Session, proyecto: Proyecto, datos: LayoutEditar) -> Layo
             )
         resumen["capacidad"] = capacidad
 
+    # ─── Inversor de cada bloque ─────────────────────────────
+    # Se respeta lo que manda la pantalla (el bloque movido sigue en su
+    # inversor, o el usuario lo pasó a otro). Si algún bloque viene sin
+    # inversor o con uno que ya no existe, se reparte todo de nuevo.
+    cantidad = len(equipo.inversores)
+    pedidos = [b.inversor for b in datos.bloques]
+    if all(i is not None and i < cantidad for i in pedidos):
+        asignacion = pedidos
+    else:
+        asignacion = asignar_inversores(
+            [(b.vertices, b.paneles) for b in bloques],
+            [i.potencia_kw for i in equipo.inversores],
+            angulo,
+        )
+
+    # Los layouts anteriores a varios inversores guardaban aquí la
+    # eléctrica; ahora se calcula al leer.
+    resumen.pop("electrica", None)
     resumen.update(
         area_ocupada_m2=round(sum(p.area for p in poligonos), 2),
-        electrica=asdict(
-            configuracion_electrica(
-                total,
-                equipo.panel_voc_v,
-                equipo.panel_vmp_v,
-                InversorLayout(
-                    vmax_v=equipo.inversor_vmax_v,
-                    vmin_v=equipo.inversor_vmin_v,
-                    mppts=equipo.inversor_mppts,
-                    strings_por_mppt=equipo.inversor_strings_por_mppt,
-                ),
-            )
-        ),
         advertencias=advertencias,
         angulo_norte=angulo,
         lado_menor_m=lado_menor,
@@ -362,8 +364,9 @@ def editar_bloques(db: Session, proyecto: Proyecto, datos: LayoutEditar) -> Layo
             paneles_ancho=b.paneles_ancho,
             proporcion=b.proporcion,
             en_proporcion=b.en_proporcion,
+            inversor=inversor,
         )
-        for i, b in enumerate(bloques)
+        for i, (b, inversor) in enumerate(zip(bloques, asignacion))
     ]
 
     db.commit()
@@ -371,14 +374,105 @@ def editar_bloques(db: Session, proyecto: Proyecto, datos: LayoutEditar) -> Layo
     return layout
 
 
+# ─── Inversores (PR B) ──────────────────────────────────────────────
+
+
+def _repartir(layout: Layout, equipo: ConfiguracionEquipo) -> None:
+    """Reparte todos los bloques entre los inversores del equipo, sin guardar."""
+    asignacion = asignar_inversores(
+        [(b.vertices, b.paneles_largo * b.paneles_ancho) for b in layout.bloques],
+        [i.potencia_kw for i in equipo.inversores],
+        _angulo_del_layout(layout),
+    )
+    for bloque, inversor in zip(layout.bloques, asignacion):
+        bloque.inversor = inversor
+
+
+def reagrupar(db: Session, proyecto: Proyecto) -> Layout:
+    """
+    "Reagrupar" del prototipo: reparte de nuevo todos los bloques entre
+    los inversores, en proporción a su potencia y por sectores.
+
+    Descarta los cambios de inversor hechos a mano. No cuenta como
+    edición manual: la geometría no cambia.
+    """
+    layout = obtener_layout(db, proyecto.id)
+    if layout is None:
+        raise LayoutNoEditable("El proyecto todavía no tiene layout generado.")
+    if layout.huella != huella_actual(db, proyecto):
+        raise LayoutNoEditable(
+            "El terreno, los caminos, el equipo o la latitud cambiaron después de generar "
+            "el layout. Vuelve a generarlo antes de reagrupar."
+        )
+    _repartir(layout, obtener_configuracion(db, proyecto.id))
+    db.commit()
+    db.refresh(layout)
+    return layout
+
+
+def reagrupar_si_hay_layout(db: Session, proyecto: Proyecto, equipo: ConfiguracionEquipo) -> None:
+    """
+    La cantidad de inversores cambió al guardar el equipo: los bloques se
+    reparten entre los nuevos, para que ninguno apunte a un inversor que
+    ya no existe. No hace commit: lo hace quien guarda el equipo.
+    """
+    layout = obtener_layout(db, proyecto.id)
+    if layout is not None:
+        _repartir(layout, equipo)
+
+
 # ─── Respuesta ──────────────────────────────────────────────────────
 
 
-def a_respuesta(layout: Layout, huella: str) -> LayoutLeer:
+def _inversores_del_layout(layout: Layout, equipo: ConfiguracionEquipo | None) -> list[InversorLayoutLeer]:
+    """Bloques, paneles y strings de cada inversor, con el equipo actual."""
+    if equipo is None or not equipo.inversores:
+        return []
+    ultimo = len(equipo.inversores) - 1
+    bloques = [0] * len(equipo.inversores)
+    paneles = [0] * len(equipo.inversores)
+    for b in layout.bloques:
+        # Por si acaso: un número fuera de rango no debe romper la lectura
+        i = min(b.inversor, ultimo)
+        bloques[i] += 1
+        paneles[i] += b.paneles_largo * b.paneles_ancho
+
+    resultado = []
+    for i, inversor in enumerate(equipo.inversores):
+        kwp = paneles[i] * equipo.panel_potencia_wp / 1000
+        e = electrica_inversor(
+            paneles[i],
+            equipo.panel_voc_v,
+            equipo.panel_vmp_v,
+            InversorLayout(
+                vmax_v=inversor.vmax_v,
+                vmin_v=inversor.vmin_v,
+                mppts=inversor.mppts,
+                strings_por_mppt=inversor.strings_por_mppt,
+            ),
+        )
+        resultado.append(
+            InversorLayoutLeer(
+                numero=i + 1,
+                marca=inversor.marca,
+                modelo=inversor.modelo,
+                potencia_kw=inversor.potencia_kw,
+                bloques=bloques[i],
+                paneles=paneles[i],
+                potencia_kwp=round(kwp, 2),
+                relacion_dc_ac=round(kwp / inversor.potencia_kw, 2) if inversor.potencia_kw else None,
+                **asdict(e),
+            )
+        )
+    return resultado
+
+
+def a_respuesta(layout: Layout, huella: str, equipo: ConfiguracionEquipo | None) -> LayoutLeer:
     """
     Arma la respuesta. Los tipos se recalculan desde los bloques
     guardados, para que sigan siendo correctos cuando RF-05 permita
-    editarlos.
+    editarlos. Los strings de cada inversor se calculan con el equipo
+    actual.
     """
     bloques, tipos = agrupar_por_tipo(
         [
@@ -411,8 +505,9 @@ def a_respuesta(layout: Layout, huella: str) -> LayoutLeer:
                 proporcion=b.proporcion,
                 en_proporcion=b.en_proporcion,
                 tipo=b.tipo,
+                inversor=fila.inversor,
             )
-            for b in bloques
+            for b, fila in zip(bloques, layout.bloques)
         ],
         tipos=[
             TipoBloqueLeer(
@@ -436,7 +531,8 @@ def a_respuesta(layout: Layout, huella: str) -> LayoutLeer:
         area_util_m2=resumen["area_util_m2"],
         area_ocupada_m2=resumen["area_ocupada_m2"],
         capacidad=CapacidadLeer(**resumen["capacidad"]) if resumen["capacidad"] else None,
-        electrica=ElectricaLeer(**resumen["electrica"]),
+        inversores=_inversores_del_layout(layout, equipo),
+        inversores_sugeridos=inversores_sugeridos(layout.total_paneles),
         advertencias=resumen["advertencias"],
         angulo_norte=_angulo_del_layout(layout),
         lado_menor_m=_lado_menor_del_layout(layout),
