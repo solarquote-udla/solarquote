@@ -119,6 +119,12 @@ class BloqueLayout(Base):
     proporcion: Mapped[float] = mapped_column(nullable=False)
     en_proporcion: Mapped[bool] = mapped_column(nullable=False)
 
+    # A qué inversor va conectado: el `orden` de InversorEquipo (0 =
+    # "Inversor 1"). Número y no clave foránea: guardar el equipo
+    # reemplaza los inversores, y el bloque debe seguir apuntando al
+    # "Inversor 2" aunque su fila sea otra.
+    inversor: Mapped[int] = mapped_column(nullable=False, server_default="0")
+
     layout: Mapped[Layout] = relationship(back_populates="bloques")
 
     def __repr__(self) -> str:

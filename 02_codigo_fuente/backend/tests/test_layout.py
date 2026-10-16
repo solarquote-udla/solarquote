@@ -16,6 +16,7 @@ import itertools
 import math
 
 import pytest
+from shapely.affinity import rotate
 from shapely.geometry import Polygon
 
 from app.services.calculo_layout import (
@@ -23,7 +24,9 @@ from app.services.calculo_layout import (
     LayoutImposible,
     PanelLayout,
     ParametrosLayout,
+    asignar_inversores,
     cumple_proporcion,
+    electrica_inversor,
     generar_layout,
     paneles_ancho_ideal,
     proporcion_bloque,
@@ -241,48 +244,122 @@ def test_capacidad_que_no_cabe_devuelve_la_maxima():
 # ─── Configuración eléctrica ────────────────────────────────────────
 
 
-def test_electrica_con_datos_completos():
-    """
-    1764 paneles; string máx floor(1100 / 52,31) = 21, mín ceil(200 / 43,35) = 5.
-    Strings: 1764 / 21 = 84 exactos. Inversores: ceil(1764 / 400) = 5.
-    Por MPPT: ceil(84 / (5 × 2)) = 9, admite 10 → compatible.
-    """
-    r = generar_layout(
-        rectangulo(100, 60),
-        [],
-        PANEL_PLANO,
-        ParametrosLayout(),
-        orientacion_norte=0,
-        inversor=InversorLayout(vmax_v=1100, vmin_v=200, mppts=2, strings_por_mppt=10),
-        panel_voc=52.31,
-        panel_vmp=43.35,
-    )
-    e = r.electrica
+# Jinko JKM580N con un inversor de 1100 / 200 V:
+# string máx floor(1100 / 52,31) = 21, mín ceil(200 / 43,35) = 5.
+VOC, VMP = 52.31, 43.35
+INVERSOR_2_MPPT = InversorLayout(vmax_v=1100, vmin_v=200, mppts=2, strings_por_mppt=10)
+
+
+def test_electrica_inversor_con_datos_completos():
+    """420 paneles = 20 strings de 21; 20 / 2 MPPT = 10 por MPPT, admite 10."""
+    e = electrica_inversor(420, VOC, VMP, INVERSOR_2_MPPT)
     assert (e.paneles_por_string_min, e.paneles_por_string_max) == (5, 21)
-    assert (e.strings_totales, e.paneles_sin_string) == (84, 0)
-    assert e.inversores == 5
-    assert e.strings_por_mppt == 9
-    assert e.compatible
+    assert (e.paneles_por_string, e.strings, e.paneles_sin_string) == (21, 20, 0)
+    assert e.strings_por_mppt == 10
+    assert e.compatible is True
+    assert e.motivo is None
 
 
-def test_electrica_sugiere_mas_inversores():
-    r = generar_layout(
-        rectangulo(100, 60),
-        [],
-        PANEL_PLANO,
-        ParametrosLayout(),
-        orientacion_norte=0,
-        inversor=InversorLayout(vmax_v=1100, vmin_v=200, mppts=2, strings_por_mppt=2),
-        panel_voc=52.31,
-        panel_vmp=43.35,
-    )
-    assert r.electrica.compatible is False
-    # 84 strings / (2 MPPT × 2 strings) = 21 inversores
-    assert "21 inversores" in r.electrica.motivo
+def test_electrica_inversor_sobrecargado():
+    """441 paneles = 21 strings → 11 por MPPT y admite 10: tope 2 × 10 × 21 = 420."""
+    e = electrica_inversor(441, VOC, VMP, INVERSOR_2_MPPT)
+    assert e.compatible is False
+    assert e.strings_por_mppt == 11
+    assert "admite hasta 420 paneles y tiene 441" in e.motivo
 
 
-def test_electrica_sin_voltajes_no_inventa_strings():
+def test_electrica_inversor_informa_paneles_sin_string():
+    e = electrica_inversor(30, VOC, VMP, INVERSOR_2_MPPT)
+    assert (e.strings, e.paneles_sin_string) == (1, 9)
+
+
+def test_electrica_inversor_sin_voltajes_no_inventa_strings():
+    e = electrica_inversor(420, VOC, VMP, InversorLayout())
+    assert e.compatible is None
+    assert e.strings is None
+    assert "Vmax y Vmin" in e.motivo
+
+
+def test_electrica_inversor_sin_bloques():
+    e = electrica_inversor(0, VOC, VMP, INVERSOR_2_MPPT)
+    assert e.compatible is None
+    assert "No tiene bloques" in e.motivo
+
+
+def test_electrica_inversor_incompatible_con_el_panel():
+    e = electrica_inversor(100, VOC, VMP, InversorLayout(vmax_v=40, vmin_v=10))
+    assert e.compatible is False
+    assert e.strings is None
+
+
+# ─── Asignación de bloques a inversores ─────────────────────────────
+
+
+def _planta_100x60():
+    """27 bloques: 9 franjas de 2 bloques 4 × 24 y uno corto 4 × 1 arriba."""
     r = generar_layout(rectangulo(100, 60), [], PANEL_PLANO, ParametrosLayout(), orientacion_norte=0)
-    assert r.electrica.compatible is None
-    assert r.electrica.strings_totales is None
-    assert r.electrica.inversores == 5  # la regla de 400 sí aplica
+    return [(b.vertices, b.paneles) for b in r.bloques]
+
+
+def _orden_oeste_a_este(bloques):
+    return sorted(range(len(bloques)), key=lambda i: (round(bloques[i][0][3][0], 1), bloques[i][0][3][1]))
+
+
+def test_un_inversor_se_lleva_todo():
+    bloques = _planta_100x60()
+    assert asignar_inversores(bloques, [250]) == [0] * len(bloques)
+
+
+def test_dos_inversores_iguales_se_reparten_mitad_y_mitad():
+    """
+    1764 paneles, corte en 882. Cada franja suma 196: tras 4 franjas van
+    784. En la quinta, el bloque de abajo (96) termina en 880 y su punto
+    medio (832) cae antes del corte: Inversor 1. El siguiente ya no.
+    """
+    bloques = _planta_100x60()
+    asignacion = asignar_inversores(bloques, [160, 160])
+    paneles = [sum(p for (_, p), i in zip(bloques, asignacion) if i == k) for k in (0, 1)]
+    assert paneles == [880, 884]
+
+
+def test_cada_inversor_recibe_un_sector_seguido():
+    """Recorriendo de oeste a este, el número de inversor nunca vuelve atrás."""
+    bloques = _planta_100x60()
+    asignacion = asignar_inversores(bloques, [100, 100, 100, 100])
+    en_orden = [asignacion[i] for i in _orden_oeste_a_este(bloques)]
+    assert en_orden == sorted(en_orden)
+    assert set(en_orden) == {0, 1, 2, 3}
+
+
+def test_el_reparto_sigue_la_potencia_de_cada_inversor():
+    bloques = _planta_100x60()
+    asignacion = asignar_inversores(bloques, [200, 100])
+    grande = sum(p for (_, p), i in zip(bloques, asignacion) if i == 0)
+    # Dos tercios de 1764 = 1176, con el margen de medio bloque (48)
+    assert abs(grande - 1176) <= 48
+
+
+def test_la_asignacion_usa_el_norte_del_layout():
+    """
+    El mismo layout girado 30° (norte a 30°) debe repartirse igual: el
+    orden por franjas se toma en el marco con el norte hacia arriba.
+    """
+    bloques = _planta_100x60()
+    # Norte a 30° en sentido horario: el terreno es el original girado −30°
+    girados = [
+        ([list(c) for c in rotate(Polygon(v), -30, origin=(0, 0)).exterior.coords[:4]], p)
+        for v, p in bloques
+    ]
+    assert asignar_inversores(girados, [160, 160], 30) == asignar_inversores(bloques, [160, 160], 0)
+
+
+def test_mas_inversores_que_bloques():
+    bloques = _planta_100x60()[:2]
+    asignacion = asignar_inversores(bloques, [100] * 5)
+    assert len(asignacion) == 2
+    assert all(0 <= i < 5 for i in asignacion)
+    assert asignacion[0] != asignacion[1]
+
+
+def test_sin_bloques():
+    assert asignar_inversores([], [100, 100]) == []
