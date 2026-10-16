@@ -1,12 +1,14 @@
 """
-Endpoints de materiales y precios — RF-09.
+Endpoints de materiales y precios — RF-06 y RF-09.
 
   GET   /api/materiales               → listado (?incluir_inactivos=)
   GET   /api/materiales/{id}          → detalle
+  POST  /api/materiales               → alta de un material en el catálogo
+  PATCH /api/materiales/{id}          → nombre, unidad, activo (el código es fijo)
   GET   /api/materiales/{id}/precios  → historial de precios
   PATCH /api/materiales/{id}/precio   → registrar un precio nuevo
 
-Solo Gerente General.
+No hay DELETE: un material descontinuado se desactiva (baja lógica).
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -16,8 +18,9 @@ from app.core.database import get_db
 from app.core.dependencies import requiere_permiso
 from app.core.permisos import Permiso
 from app.models.material import Material, PrecioMaterial
-from app.schemas.material import MaterialLeer, PrecioActualizar, PrecioMaterialLeer
+from app.schemas.material import MaterialActualizar, MaterialCrear, MaterialLeer, PrecioActualizar, PrecioMaterialLeer
 from app.services import material as servicio
+from app.services.material import CodigoDuplicado, MaterialEnUso
 
 router = APIRouter(
     prefix="/api/materiales",
@@ -49,6 +52,41 @@ def listar(
 @router.get("/{material_id}", response_model=MaterialLeer)
 def detalle(material_id: int, db: Session = Depends(get_db)) -> MaterialLeer:
     resultado = servicio.obtener_material(db, material_id)
+    if resultado is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No existe el material {material_id}")
+    return _respuesta(*resultado)
+
+
+@router.post(
+    "",
+    response_model=MaterialLeer,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(requiere_permiso(Permiso.MATERIALES))],
+)
+def crear(datos: MaterialCrear, db: Session = Depends(get_db)) -> MaterialLeer:
+    try:
+        material = servicio.crear_material(db, datos.codigo, datos.nombre, datos.unidad)
+    except CodigoDuplicado as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    return _respuesta(material, None)
+
+
+@router.patch(
+    "/{material_id}",
+    response_model=MaterialLeer,
+    dependencies=[Depends(requiere_permiso(Permiso.MATERIALES))],
+)
+def actualizar(material_id: int, datos: MaterialActualizar, db: Session = Depends(get_db)) -> MaterialLeer:
+    try:
+        resultado = servicio.actualizar_material(
+            db,
+            material_id,
+            nombre=datos.nombre,
+            unidad=datos.unidad,
+            activo=datos.activo,
+        )
+    except MaterialEnUso as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     if resultado is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No existe el material {material_id}")
     return _respuesta(*resultado)

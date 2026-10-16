@@ -21,3 +21,16 @@ export async function actualizarPrecio(materialId: number, precio: string): Prom
   const { data } = await api.patch<Material>(`/api/materiales/${materialId}/precio`, { precio });
   return data;
 }
+
+export async function crearMaterial(datos: { codigo: string; nombre: string; unidad: string }): Promise<Material> {
+  const { data } = await api.post<Material>("/api/materiales", datos);
+  return data;
+}
+
+export async function actualizarMaterial(
+  materialId: number,
+  datos: Partial<{ nombre: string; unidad: string; activo: boolean }>,
+): Promise<Material> {
+  const { data } = await api.patch<Material>(`/api/materiales/${materialId}`, datos);
+  return data;
+}

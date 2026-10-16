@@ -12,9 +12,29 @@ total porque el precio de un material cambió después.
 from datetime import datetime, timezone
 from decimal import Decimal
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.material import Material, PrecioMaterial
+
+# Códigos que usan las fórmulas f(L,A,B) de calc-service
+# (calc-service/app/services/calculo_materiales.py::calcular_materiales).
+# Una cotización siempre los necesita, sin importar L/A/B, así que un
+# material con uno de estos códigos no se puede desactivar.
+CODIGOS_FORMULA = frozenset(
+    {
+        "VAR1650",
+        "VAR1350",
+        "HEX_V18MM",
+        "SOP_A",
+        "SOP_V",
+        "SOP_V_E",
+        "ANT_B",
+        "ANT_VAR",
+        "CLAMP_F",
+        "CLAMP_I",
+    }
+)
 
 
 class PrecioVigenteFaltante(ValueError):
@@ -30,6 +50,22 @@ class MaterialNoDisponible(ValueError):
 
     def __init__(self, material_id: int) -> None:
         super().__init__(f"No existe el material {material_id}")
+
+
+class CodigoDuplicado(ValueError):
+    """Ya existe un material con ese código."""
+
+    def __init__(self, codigo: str) -> None:
+        self.codigo = codigo
+        super().__init__(f"Ya existe un material con el código {codigo}")
+
+
+class MaterialEnUso(ValueError):
+    """El código lo usan las fórmulas del cálculo: no se puede desactivar."""
+
+    def __init__(self, codigo: str) -> None:
+        self.codigo = codigo
+        super().__init__(f"{codigo} lo usan las fórmulas f(L,A,B); no se puede desactivar")
 
 
 def obtener_precios_vigentes(db: Session, codigos: list[str]) -> dict[str, Decimal]:
@@ -53,6 +89,25 @@ def obtener_precios_vigentes(db: Session, codigos: list[str]) -> dict[str, Decim
         raise PrecioVigenteFaltante(faltantes)
 
     return precios
+
+
+def obtener_precios_vigentes_opcionales(db: Session, codigos: list[str]) -> dict[str, Decimal]:
+    """
+    Como `obtener_precios_vigentes`, pero sin exigir que todos tengan
+    precio: solo devuelve los activos que sí lo tienen. Para códigos como
+    `LOG`, que una cotización usa si existen pero no son obligatorios.
+    """
+    filas = (
+        db.query(Material.codigo, PrecioMaterial.precio)
+        .join(PrecioMaterial, PrecioMaterial.material_id == Material.id)
+        .filter(
+            Material.codigo.in_(codigos),
+            Material.activo.is_(True),
+            PrecioMaterial.vigente_hasta.is_(None),
+        )
+        .all()
+    )
+    return {codigo: precio for codigo, precio in filas}
 
 
 def _precio_vigente(db: Session, material_id: int) -> PrecioMaterial | None:
@@ -113,3 +168,44 @@ def actualizar_precio(db: Session, material_id: int, precio: Decimal) -> tuple[M
     db.commit()
     db.refresh(nuevo)
     return material, nuevo
+
+
+def crear_material(db: Session, codigo: str, nombre: str, unidad: str) -> Material:
+    """Lanza `CodigoDuplicado` si ya existe un material con ese código."""
+    material = Material(codigo=codigo, nombre=nombre, unidad=unidad)
+    db.add(material)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise CodigoDuplicado(codigo) from None
+    db.refresh(material)
+    return material
+
+
+def actualizar_material(
+    db: Session,
+    material_id: int,
+    *,
+    nombre: str | None = None,
+    unidad: str | None = None,
+    activo: bool | None = None,
+) -> tuple[Material, PrecioMaterial | None] | None:
+    """`None` si el material no existe. El código es inmutable (lo usa el cálculo)."""
+    material = db.get(Material, material_id)
+    if material is None:
+        return None
+
+    if activo is False and material.codigo in CODIGOS_FORMULA:
+        raise MaterialEnUso(material.codigo)
+
+    if nombre is not None:
+        material.nombre = nombre
+    if unidad is not None:
+        material.unidad = unidad
+    if activo is not None:
+        material.activo = activo
+
+    db.commit()
+    db.refresh(material)
+    return material, _precio_vigente(db, material_id)
