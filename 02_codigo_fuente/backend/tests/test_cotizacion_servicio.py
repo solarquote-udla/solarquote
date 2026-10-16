@@ -16,7 +16,7 @@ from app.models.usuario import Usuario
 from tests.fabricas import perfil_gerente
 from app.schemas.cotizacion import CotizacionCrear, ItemCalculoEntrada
 from app.services.cotizacion import ProyectoNoDisponible, crear_cotizacion
-from app.services.material import PrecioVigenteFaltante
+from app.services.material import CODIGOS_FORMULA, PrecioVigenteFaltante
 from app.services.proyecto import ClienteNoDisponible
 
 AYER = datetime.now(timezone.utc) - timedelta(days=1)
@@ -56,6 +56,17 @@ def _crear_material_con_precio(db: Session, codigo: str, precio: Decimal, activo
     return material
 
 
+def _sembrar_materiales_de_formula(db: Session, *, precio_var1650: Decimal = Decimal("7.20")) -> None:
+    """
+    `crear_cotizacion` pide el precio vigente de TODOS los códigos de
+    CODIGOS_FORMULA (los usa calc-service, sin importar L/A/B), así que
+    cualquier prueba que llegue a invocarlo necesita los diez con precio.
+    """
+    for codigo in CODIGOS_FORMULA:
+        precio = precio_var1650 if codigo == "VAR1650" else Decimal("1.00")
+        _crear_material_con_precio(db, codigo, precio)
+
+
 def _crear_usuario(db: Session) -> Usuario:
     usuario = Usuario(
         nombre="Gerente de prueba",
@@ -92,7 +103,7 @@ def test_cliente_nombre_es_obligatorio_sin_cliente_id() -> None:
 
 
 def test_crea_la_cotizacion_y_persiste_los_items(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
-    _crear_material_con_precio(db, "VAR1650", Decimal("7.20"))
+    _sembrar_materiales_de_formula(db)
     _crear_material_con_precio(db, "LOG", Decimal("35.00"))
     usuario = _crear_usuario(db)
     llamada = _mock_calc_service_ok(monkeypatch)
@@ -113,7 +124,7 @@ def test_crea_la_cotizacion_y_persiste_los_items(db: Session, monkeypatch: pytes
 
 
 def test_persiste_el_desglose_en_la_cotizacion(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
-    _crear_material_con_precio(db, "VAR1650", Decimal("7.20"))
+    _sembrar_materiales_de_formula(db)
     _crear_material_con_precio(db, "LOG", Decimal("35.00"))
     usuario = _crear_usuario(db)
     _mock_calc_service_ok(monkeypatch)
@@ -130,7 +141,7 @@ def test_persiste_el_desglose_en_la_cotizacion(db: Session, monkeypatch: pytest.
 def test_persiste_la_cantidad_y_precio_unitario_de_cada_material(
     db: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _crear_material_con_precio(db, "VAR1650", Decimal("7.20"))
+    _sembrar_materiales_de_formula(db)
     _crear_material_con_precio(db, "LOG", Decimal("35.00"))
     usuario = _crear_usuario(db)
     _mock_calc_service_ok(monkeypatch)
@@ -147,7 +158,7 @@ def test_persiste_la_cantidad_y_precio_unitario_de_cada_material(
 def test_no_manda_cargo_fijo_de_logistica_si_no_esta_activo(
     db: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _crear_material_con_precio(db, "VAR1650", Decimal("7.20"))
+    _sembrar_materiales_de_formula(db)
     _crear_material_con_precio(db, "LOG", Decimal("35.00"), activo=False)
     usuario = _crear_usuario(db)
     llamada = _mock_calc_service_ok(monkeypatch)
@@ -175,7 +186,7 @@ def test_lanza_si_falta_precio_vigente_de_un_material_activo(
 def test_cliente_id_inexistente_lanza_cliente_no_disponible(
     db: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _crear_material_con_precio(db, "VAR1650", Decimal("7.20"))
+    _sembrar_materiales_de_formula(db)
     usuario = _crear_usuario(db)
     _mock_calc_service_ok(monkeypatch)
 
@@ -192,7 +203,7 @@ def test_cliente_id_inexistente_lanza_cliente_no_disponible(
 def test_cliente_id_existente_se_asocia_a_la_cotizacion(
     db: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _crear_material_con_precio(db, "VAR1650", Decimal("7.20"))
+    _sembrar_materiales_de_formula(db)
     usuario = _crear_usuario(db)
     cliente = Cliente(
         nombre="Cliente catalogado",
@@ -221,7 +232,7 @@ def test_snapshot_del_cliente_viene_de_la_base_y_no_del_request(
     db: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Si mandan cliente_id, lo que venga en cliente_nombre/email se ignora."""
-    _crear_material_con_precio(db, "VAR1650", Decimal("7.20"))
+    _sembrar_materiales_de_formula(db)
     usuario = _crear_usuario(db)
     cliente = Cliente(
         nombre="Nombre real en el catálogo",
@@ -249,7 +260,7 @@ def test_snapshot_del_cliente_viene_de_la_base_y_no_del_request(
 def test_cliente_dado_de_baja_lanza_cliente_no_disponible(
     db: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _crear_material_con_precio(db, "VAR1650", Decimal("7.20"))
+    _sembrar_materiales_de_formula(db)
     usuario = _crear_usuario(db)
     cliente = Cliente(
         nombre="Cliente de baja",
@@ -273,7 +284,7 @@ def test_cliente_dado_de_baja_lanza_cliente_no_disponible(
 def test_proyecto_id_inexistente_lanza_proyecto_no_disponible(
     db: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _crear_material_con_precio(db, "VAR1650", Decimal("7.20"))
+    _sembrar_materiales_de_formula(db)
     usuario = _crear_usuario(db)
     _mock_calc_service_ok(monkeypatch)
 
@@ -290,7 +301,7 @@ def test_proyecto_id_inexistente_lanza_proyecto_no_disponible(
 def test_proyecto_id_existente_se_asocia_a_la_cotizacion(
     db: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _crear_material_con_precio(db, "VAR1650", Decimal("7.20"))
+    _sembrar_materiales_de_formula(db)
     usuario = _crear_usuario(db)
     cliente = Cliente(
         nombre="Cliente del proyecto",
@@ -318,7 +329,7 @@ def test_proyecto_id_existente_se_asocia_a_la_cotizacion(
 def test_crear_cotizacion_avanza_el_proyecto_a_cotizado(
     db: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _crear_material_con_precio(db, "VAR1650", Decimal("7.20"))
+    _sembrar_materiales_de_formula(db)
     usuario = _crear_usuario(db)
     cliente = Cliente(
         nombre="Cliente del proyecto",
@@ -350,10 +361,32 @@ def test_crear_cotizacion_avanza_el_proyecto_a_cotizado(
 
 def test_crear_cotizacion_sin_proyecto_id_no_falla(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
     """Cotizar a un cliente sin proyecto asociado no tiene nada que avanzar."""
-    _crear_material_con_precio(db, "VAR1650", Decimal("7.20"))
+    _sembrar_materiales_de_formula(db)
     usuario = _crear_usuario(db)
     _mock_calc_service_ok(monkeypatch)
 
     cotizacion, _ = crear_cotizacion(db, _datos_minimos(), usuario)
 
     assert cotizacion.proyecto_id is None
+
+
+def test_un_material_nuevo_sin_precio_no_bloquea_la_cotizacion(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """
+    Revisión del PR #35 (Joseph): antes se pedía el precio de TODO
+    material activo, así que uno recién creado sin precio (no participa
+    de las fórmulas) tumbaba cualquier cotización hasta que alguien le
+    pusiera precio en Precios unitarios.
+    """
+    _sembrar_materiales_de_formula(db)
+    material = Material(codigo="GRAPA_X", nombre="Grapa nueva", activo=True)
+    db.add(material)
+    db.flush()
+    # Sin PrecioMaterial asociado: todavía no entra al cálculo.
+    usuario = _crear_usuario(db)
+    _mock_calc_service_ok(monkeypatch)
+
+    cotizacion, _ = crear_cotizacion(db, _datos_minimos(), usuario)
+
+    assert cotizacion.id is not None

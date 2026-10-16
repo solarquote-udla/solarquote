@@ -18,7 +18,11 @@ from app.models.proyecto import Proyecto
 from app.models.usuario import Usuario
 from app.schemas.cotizacion import CotizacionCrear, ItemCalculoEntrada, ResultadoCalculoCotizacion
 from app.services.calc_service import calcular_via_calc_service
-from app.services.material import obtener_precios_vigentes
+from app.services.material import (
+    CODIGOS_FORMULA,
+    obtener_precios_vigentes,
+    obtener_precios_vigentes_opcionales,
+)
 from app.services.proyecto import ClienteNoDisponible, avanzar_a_cotizado
 
 # Cantidad fija de logística por cotización (SQ-76): no escala con L/A/B.
@@ -51,10 +55,14 @@ def crear_cotizacion(
         if proyecto is None:
             raise ProyectoNoDisponible(f"No existe el proyecto {datos.proyecto_id}")
 
-    filas = db.query(Material.id, Material.codigo).filter(Material.activo.is_(True)).all()
+    # Los precios se piden solo de los códigos que usan las fórmulas (+ LOG),
+    # no de "todo material activo": un material nuevo sin precio todavía, o
+    # uno que no participa del cálculo, no debe bloquear ninguna cotización.
+    filas = db.query(Material.id, Material.codigo).all()
     material_id_por_codigo = {fila.codigo: fila.id for fila in filas}
-    codigos_activos = list(material_id_por_codigo)
-    precios = obtener_precios_vigentes(db, codigos_activos)
+
+    precios = obtener_precios_vigentes(db, sorted(CODIGOS_FORMULA))
+    precios.update(obtener_precios_vigentes_opcionales(db, [CODIGO_LOGISTICA]))
 
     cargos_fijos = {CODIGO_LOGISTICA: CANTIDAD_LOGISTICA} if CODIGO_LOGISTICA in precios else {}
 
