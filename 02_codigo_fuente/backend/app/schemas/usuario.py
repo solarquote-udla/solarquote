@@ -14,6 +14,7 @@ from pydantic import AfterValidator, BaseModel, BeforeValidator, ConfigDict, Ema
 
 from app.core.permisos import Permiso
 from app.core.security import LONGITUD_MAX_PASSWORD
+from app.core.texto import colapsar_espacios
 
 # ─── Política de contraseñas ────────────────────────────
 
@@ -42,12 +43,8 @@ def _normalizar_email(valor: str) -> str:
     return valor.strip().lower()
 
 
-def _colapsar_espacios(valor: object) -> object:
-    return " ".join(valor.split()) if isinstance(valor, str) else valor
-
-
 # Los espacios se colapsan ANTES de medir el largo: "   " no pasa como nombre
-NombrePersona = Annotated[str, BeforeValidator(_colapsar_espacios), Field(min_length=2, max_length=120)]
+NombrePersona = Annotated[str, BeforeValidator(colapsar_espacios), Field(min_length=2, max_length=120)]
 
 
 # ─── Perfiles ───────────────────────────────────────────

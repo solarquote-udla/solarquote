@@ -18,6 +18,7 @@ from app.routers import (
     cotizacion,
     equipo,
     health,
+    inversor,
     layout,
     material,
     perfiles,
@@ -59,6 +60,7 @@ app.include_router(usuarios.router)
 # MODELOS-COMPARTIDOS.md).
 app.include_router(cliente.router)
 app.include_router(material.router)
+app.include_router(inversor.router)
 
 # Proyectos: raíz del trabajo técnico. Cada router trae su propio
 # prefijo porque el terreno cuelga del proyecto: /api/proyectos/{id}/terreno

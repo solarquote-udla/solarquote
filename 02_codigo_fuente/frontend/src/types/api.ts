@@ -210,6 +210,23 @@ export interface PrecioMaterial {
   created_at: string;
 }
 
+// ─── Catálogo de inversores (RF-08) ─────────────────────
+// No confundir con `Inversor` (snapshot que guarda ConfiguracionEquipo,
+// más abajo): este es el catálogo administrable en Configuración.
+
+/** Espejo de `InversorLeer` (backend/app/schemas/inversor.py) */
+export interface InversorCatalogo {
+  id: number;
+  marca: string;
+  modelo: string;
+  potencia_kw: number;
+  vmax_v: number | null;
+  vmin_v: number | null;
+  mppts: number | null;
+  strings_por_mppt: number | null;
+  activo: boolean;
+}
+
 // ─── Proyectos ──────────────────────────────────────────
 
 /** Espejo de `EstadoProyecto` en backend/app/models/proyecto.py */
