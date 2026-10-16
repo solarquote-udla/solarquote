@@ -19,7 +19,7 @@ from tests.fabricas import crear_usuario
 EQUIPO = {
     "panel": {"marca": "Canadian Solar", "modelo": "CS6W-580TB-AG", "potencia_wp": 580, "largo_mm": 2278, "ancho_mm": 1134, "voc_v": 52.2, "vmp_v": 43.1},
     "angulo_montaje": 15,
-    "inversor": {"marca": "Huawei", "modelo": "Ejemplo", "potencia_kw": 160, "vmax_v": 1500, "vmin_v": 500, "mppts": 9, "strings_por_mppt": 2},
+    "inversores": [{"marca": "Huawei", "modelo": "Ejemplo", "potencia_kw": 160, "vmax_v": 1500, "vmin_v": 500, "mppts": 9, "strings_por_mppt": 2}],
 }
 
 

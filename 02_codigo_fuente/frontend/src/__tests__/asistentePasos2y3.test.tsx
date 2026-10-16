@@ -19,7 +19,13 @@ vi.mock("@/services/equipo", () => ({
   guardarEquipo: vi.fn(),
   listarPanelesReferencia: vi.fn(async () => []),
 }));
-vi.mock("@/services/layout", () => ({ obtenerLayout: vi.fn(async () => null), generarLayout: vi.fn(), guardarBloques: vi.fn() }));
+vi.mock("@/services/layout", () => ({
+  obtenerLayout: vi.fn(async () => null),
+  generarLayout: vi.fn(),
+  guardarBloques: vi.fn(),
+  reagruparLayout: vi.fn(),
+}));
+vi.mock("@/services/inversores", () => ({ listarInversores: vi.fn(async () => []) }));
 vi.mock("@/services/terreno", async () => {
   const { TERRENO } = await import("./utilidades");
   return {
@@ -38,8 +44,9 @@ const CONFIG = {
   proyecto_id: 5,
   panel: { marca: "A", modelo: "B", potencia_wp: 580, largo_mm: 2278, ancho_mm: 1134, voc_v: 52, vmp_v: 43 },
   angulo_montaje: 15,
-  inversor: { marca: "H", modelo: "M", potencia_kw: 160, vmax_v: null, vmin_v: null, mppts: null, strings_por_mppt: null },
-  calculos: { area_panel_m2: 2.58, separacion: null, strings: null, advertencias: [] },
+  inversores: [{ marca: "H", modelo: "M", potencia_kw: 160, vmax_v: null, vmin_v: null, mppts: null, strings_por_mppt: null }],
+  potencia_objetivo_kwp: null,
+  calculos: { area_panel_m2: 2.58, separacion: null, strings: [null], sugerencia: null, advertencias: [] },
 };
 
 afterEach(() => {
@@ -66,7 +73,8 @@ async function intentarSalir(salir: () => void) {
 
 function llenarEquipo() {
   const textos = screen.getAllByRole("textbox");
-  ["A", "B", "580", "2278", "1134", "52", "43", "15", "H", "M", "160"].forEach((v, i) =>
+  // Panel (8 campos), potencia objetivo (vacía) e Inversor 1
+  ["A", "B", "580", "2278", "1134", "52", "43", "15", "", "H", "M", "160"].forEach((v, i) =>
     fireEvent.change(textos[i], { target: { value: v } }),
   );
 }

@@ -122,12 +122,13 @@ incidente real del Sprint 2 (ver el reporte del sprint).
 
 ## 5. Pruebas de paridad
 
-Dos reglas existen a la vez en el backend y en el frontend:
+Tres reglas existen a la vez en el backend y en el frontend:
 
 | Regla | Backend | Frontend | Verificación |
 |---|---|---|---|
 | Cédula, RUC, pasaporte y teléfono | `services/validaciones_identificacion.py` | `utils/identificacion.ts` | 21 009 identificaciones y 1 509 teléfonos, 0 diferencias |
 | Validez de un bloque editado | `services/calculo_layout.py` (`validar_bloques`) | `utils/edicionLayout.ts` | 4 000 escenarios con terrenos cóncavos, caminos, rotación y casos a milímetros del límite, 0 diferencias |
+| Sugerencia de inversores (~400 paneles c/u) | `services/calculo_equipo.py` (`sugerencia_inversores`) | `utils/inversores.ts` | 20 000 combinaciones de potencia objetivo y panel, 30 % con potencias exactas (donde el redondeo podría sumar un panel), 0 diferencias |
 
 **Procedimiento:** se generan casos al azar con semilla fija, se
 evalúan con ambas implementaciones y se comparan uno a uno. Se repite

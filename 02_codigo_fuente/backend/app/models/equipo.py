@@ -12,14 +12,15 @@ si mañana se corrige un inversor en la lista de RF-08, los proyectos ya
 configurados no cambian. Es el mismo criterio de snapshot que usa la
 cotización con los datos del cliente.
 
-Una sola tabla con panel e inversor juntos: la relación es uno a uno
-con el proyecto y siempre se leen a la vez. Separarlos solo agregaría
-un join sin beneficio.
+El panel va en la misma tabla que la configuración: es uno solo por
+proyecto. Los inversores van en una tabla aparte porque una planta
+grande usa varios (regla de HEXtructure: ~400 paneles por inversor) y
+cada bloque del layout queda asignado a uno de ellos.
 """
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, func
+from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -50,18 +51,10 @@ class ConfiguracionEquipo(Base):
     # Inclinación respecto a la horizontal, en grados.
     angulo_montaje: Mapped[float] = mapped_column(nullable=False)
 
-    # ─── Inversor ───────────────────────────────────────────────
-    inversor_marca: Mapped[str] = mapped_column(String(80), nullable=False)
-    inversor_modelo: Mapped[str] = mapped_column(String(100), nullable=False)
-    inversor_potencia_kw: Mapped[float] = mapped_column(nullable=False)
-
-    # Datos eléctricos opcionales, igual que en RF-08. Sin Vmax y Vmin no
-    # se pueden calcular los límites de string; la configuración se
-    # guarda igual y la interfaz avisa qué falta.
-    inversor_vmax_v: Mapped[float | None] = mapped_column(nullable=True)
-    inversor_vmin_v: Mapped[float | None] = mapped_column(nullable=True)
-    inversor_mppts: Mapped[int | None] = mapped_column(nullable=True)
-    inversor_strings_por_mppt: Mapped[int | None] = mapped_column(nullable=True)
+    # Potencia que pide el cliente, en kWp. Opcional: con ella el Paso 2
+    # sugiere cuántos inversores usar y el Paso 3 la propone como
+    # capacidad deseada del layout.
+    potencia_objetivo_kwp: Mapped[float | None] = mapped_column(nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -78,9 +71,52 @@ class ConfiguracionEquipo(Base):
 
     proyecto: Mapped["Proyecto"] = relationship()  # noqa: F821
 
+    inversores: Mapped[list["InversorEquipo"]] = relationship(
+        back_populates="configuracion",
+        cascade="all, delete-orphan",
+        order_by="InversorEquipo.orden",
+    )
+
     def __repr__(self) -> str:
         return (
             f"<ConfiguracionEquipo proyecto={self.proyecto_id} "
-            f"{self.panel_marca} {self.panel_modelo} / "
-            f"{self.inversor_marca} {self.inversor_modelo}>"
+            f"{self.panel_marca} {self.panel_modelo} / {len(self.inversores)} inversor(es)>"
         )
+
+
+class InversorEquipo(Base):
+    """
+    Un inversor de la planta, con sus datos copiados al proyecto.
+
+    `orden` es su número en la planta (0 = "Inversor 1"). Los bloques del
+    layout guardan ese número para saber a qué inversor van conectados.
+    """
+
+    __tablename__ = "inversores_equipo"
+    __table_args__ = (UniqueConstraint("configuracion_id", "orden", name="ux_inversor_equipo_orden"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    configuracion_id: Mapped[int] = mapped_column(
+        ForeignKey("configuraciones_equipo.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    orden: Mapped[int] = mapped_column(nullable=False)
+
+    marca: Mapped[str] = mapped_column(String(80), nullable=False)
+    modelo: Mapped[str] = mapped_column(String(100), nullable=False)
+    potencia_kw: Mapped[float] = mapped_column(nullable=False)
+
+    # Datos eléctricos opcionales, igual que en RF-08. Sin Vmax y Vmin no
+    # se pueden calcular los límites de string; la configuración se
+    # guarda igual y la interfaz avisa qué falta.
+    vmax_v: Mapped[float | None] = mapped_column(nullable=True)
+    vmin_v: Mapped[float | None] = mapped_column(nullable=True)
+    mppts: Mapped[int | None] = mapped_column(nullable=True)
+    strings_por_mppt: Mapped[int | None] = mapped_column(nullable=True)
+
+    configuracion: Mapped[ConfiguracionEquipo] = relationship(back_populates="inversores")
+
+    def __repr__(self) -> str:
+        return f"<InversorEquipo {self.orden + 1}: {self.marca} {self.modelo} {self.potencia_kw} kW>"
