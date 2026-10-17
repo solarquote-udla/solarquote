@@ -281,6 +281,21 @@ def test_sin_ningun_permiso_relacionado_no_lee_inversores(api, db):
     assert api.get("/api/inversores", headers=sesion).status_code == 403
 
 
+def test_tablero_lo_lee_quien_tiene_historial_o_generar_layout(api, db):
+    """El tablero (RF-13) es un reporte de las cotizaciones: mismo permiso que el historial."""
+    con_historial = cabecera(crear_usuario(db, perfil=perfil_personalizado(db, Permiso.HISTORIAL)))
+    con_generar = cabecera(crear_usuario(db, perfil=perfil_personalizado(db, Permiso.GENERAR_LAYOUT)))
+
+    assert api.get("/api/tablero", headers=con_historial).status_code == 200
+    assert api.get("/api/tablero", headers=con_generar).status_code == 200
+
+
+def test_tablero_no_lo_lee_cualquier_otro_permiso(api, db):
+    sesion = cabecera(crear_usuario(db, perfil=perfil_personalizado(db, Permiso.CLIENTES)))
+
+    assert api.get("/api/tablero", headers=sesion).status_code == 403
+
+
 # ─── Perfiles ───────────────────────────────────────────
 
 
