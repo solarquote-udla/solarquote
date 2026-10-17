@@ -8,11 +8,13 @@ sus ítems (L, A, B) y el desglose (subtotal, IVA, total, y la cantidad
 ese momento — es un snapshot, no se recalcula después.
 """
 
-from sqlalchemy.orm import Session
+from datetime import date, datetime, time, timezone
+
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import settings
 from app.models.cliente import Cliente
-from app.models.cotizacion import Cotizacion, ItemCotizacion, MaterialCotizado
+from app.models.cotizacion import Cotizacion, EstadoCotizacion, ItemCotizacion, MaterialCotizado
 from app.models.material import Material
 from app.models.proyecto import Proyecto
 from app.models.usuario import Usuario
@@ -133,3 +135,57 @@ def crear_cotizacion(
     db.refresh(cotizacion)
 
     return cotizacion, resultado
+
+
+# ─── Historial (RF-10) ───────────────────────────────────────────────
+
+
+def listar_cotizaciones(
+    db: Session,
+    *,
+    buscar: str | None = None,
+    estado: EstadoCotizacion | None = None,
+    desde: date | None = None,
+    hasta: date | None = None,
+    pagina: int = 1,
+    por_pagina: int = 20,
+) -> tuple[list[Cotizacion], int]:
+    """
+    Listado del historial, del más reciente al más antiguo.
+
+    `buscar` es texto libre contra el nombre del cliente en el snapshot
+    (no contra el catálogo `Cliente`): así cubre también las cotizaciones
+    hechas al vuelo, sin `cliente_id`. `desde`/`hasta` filtran por la
+    fecha de emisión (`created_at`), inclusive en los dos extremos.
+    """
+    query = db.query(Cotizacion)
+    if buscar:
+        query = query.filter(Cotizacion.cliente_nombre.ilike(f"%{buscar}%"))
+    if estado is not None:
+        query = query.filter(Cotizacion.estado == estado)
+    if desde is not None:
+        query = query.filter(Cotizacion.created_at >= datetime.combine(desde, time.min, tzinfo=timezone.utc))
+    if hasta is not None:
+        query = query.filter(Cotizacion.created_at <= datetime.combine(hasta, time.max, tzinfo=timezone.utc))
+
+    total = query.count()
+    cotizaciones = (
+        query.order_by(Cotizacion.created_at.desc(), Cotizacion.id.desc())
+        .offset((pagina - 1) * por_pagina)
+        .limit(por_pagina)
+        .all()
+    )
+    return cotizaciones, total
+
+
+def obtener_cotizacion(db: Session, cotizacion_id: int) -> Cotizacion | None:
+    """Detalle completo de una cotización, con sus ítems y materiales."""
+    return (
+        db.query(Cotizacion)
+        .options(
+            selectinload(Cotizacion.items),
+            selectinload(Cotizacion.materiales).selectinload(MaterialCotizado.material),
+        )
+        .filter(Cotizacion.id == cotizacion_id)
+        .one_or_none()
+    )
