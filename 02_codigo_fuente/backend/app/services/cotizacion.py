@@ -8,7 +8,7 @@ sus ítems (L, A, B) y el desglose (subtotal, IVA, total, y la cantidad
 ese momento — es un snapshot, no se recalcula después.
 """
 
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 from sqlalchemy.orm import Session, selectinload
 
@@ -30,6 +30,9 @@ from app.services.proyecto import ClienteNoDisponible, avanzar_a_cotizado
 # Cantidad fija de logística por cotización (SQ-76): no escala con L/A/B.
 CODIGO_LOGISTICA = "LOG"
 CANTIDAD_LOGISTICA = 1
+
+# Ecuador no usa horario de verano: UTC-5 todo el año.
+ZONA_ECUADOR = timezone(timedelta(hours=-5))
 
 
 class ProyectoNoDisponible(ValueError):
@@ -164,9 +167,9 @@ def listar_cotizaciones(
     if estado is not None:
         query = query.filter(Cotizacion.estado == estado)
     if desde is not None:
-        query = query.filter(Cotizacion.created_at >= datetime.combine(desde, time.min, tzinfo=timezone.utc))
+        query = query.filter(Cotizacion.created_at >= datetime.combine(desde, time.min, tzinfo=ZONA_ECUADOR))
     if hasta is not None:
-        query = query.filter(Cotizacion.created_at <= datetime.combine(hasta, time.max, tzinfo=timezone.utc))
+        query = query.filter(Cotizacion.created_at <= datetime.combine(hasta, time.max, tzinfo=ZONA_ECUADOR))
 
     total = query.count()
     cotizaciones = (

@@ -24,6 +24,7 @@ import { listarProyectos } from "@/services/proyectos";
 import {
   ETIQUETAS_ESTADO_COTIZACION,
   EstadoCotizacion,
+  EstadoProyecto,
   Permiso,
   type CotizacionResumen,
   type Proyecto,
@@ -120,7 +121,8 @@ function ProyectosEnCurso() {
   }, []);
 
   const texto = buscar.trim().toLowerCase();
-  const visibles = proyectos.filter(
+  const sinCotizar = proyectos.filter((p) => p.estado !== EstadoProyecto.COTIZADO);
+  const visibles = sinCotizar.filter(
     (p) => !texto || p.nombre.toLowerCase().includes(texto) || p.cliente.nombre.toLowerCase().includes(texto),
   );
   const puedeEditar = tienePermiso(Permiso.GENERAR_LAYOUT);
@@ -156,9 +158,9 @@ function ProyectosEnCurso() {
         ) : visibles.length === 0 ? (
           <div className="p-10 text-center">
             <p className="text-sm font-medium text-acero-700">
-              {proyectos.length === 0 ? "Todavía no hay proyectos sin cotizar" : "Ningún proyecto coincide con la búsqueda"}
+              {sinCotizar.length === 0 ? "Todavía no hay proyectos sin cotizar" : "Ningún proyecto coincide con la búsqueda"}
             </p>
-            {proyectos.length === 0 && (
+            {sinCotizar.length === 0 && (
               <p className="mt-1 text-sm text-acero-500">Créalo desde Generar layout solar.</p>
             )}
           </div>
@@ -215,35 +217,43 @@ function CotizacionesHistorial() {
   const [error, setError] = useState<string | null>(null);
 
   const [buscar, setBuscar] = useState("");
+  const [buscarDebounced, setBuscarDebounced] = useState("");
   const [estado, setEstado] = useState<EstadoCotizacion | "">("");
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
   const [pagina, setPagina] = useState(1);
 
+  // Solo el texto libre espera a que el usuario deje de escribir.
+  useEffect(() => {
+    const temporizador = setTimeout(() => setBuscarDebounced(buscar), 300);
+    return () => clearTimeout(temporizador);
+  }, [buscar]);
+
+  // Estado, rango de fechas y paginación consultan de inmediato.
   useEffect(() => {
     let cancelado = false;
-    const temporizador = setTimeout(() => {
+    Promise.resolve().then(() => {
+      if (cancelado) return;
       setCargando(true);
-      listarCotizaciones({ buscar, estado, desde, hasta, pagina, porPagina: POR_PAGINA })
-        .then((respuesta) => {
-          if (cancelado) return;
-          setResultados(respuesta.resultados);
-          setTotal(respuesta.total);
-          setTotalPaginas(respuesta.total_paginas);
-          setError(null);
-        })
-        .catch((e) => {
-          if (!cancelado) setError(mensajeDeError(e, "No se pudieron cargar las cotizaciones"));
-        })
-        .finally(() => {
-          if (!cancelado) setCargando(false);
-        });
-    }, 300);
+    });
+    listarCotizaciones({ buscar: buscarDebounced, estado, desde, hasta, pagina, porPagina: POR_PAGINA })
+      .then((respuesta) => {
+        if (cancelado) return;
+        setResultados(respuesta.resultados);
+        setTotal(respuesta.total);
+        setTotalPaginas(respuesta.total_paginas);
+        setError(null);
+      })
+      .catch((e) => {
+        if (!cancelado) setError(mensajeDeError(e, "No se pudieron cargar las cotizaciones"));
+      })
+      .finally(() => {
+        if (!cancelado) setCargando(false);
+      });
     return () => {
       cancelado = true;
-      clearTimeout(temporizador);
     };
-  }, [buscar, estado, desde, hasta, pagina]);
+  }, [buscarDebounced, estado, desde, hasta, pagina]);
 
   // Cualquier cambio de filtro vuelve a la primera página
   function cambiarBuscar(valor: string) {
