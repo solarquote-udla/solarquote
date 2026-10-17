@@ -23,6 +23,7 @@ from app.routers import (
     material,
     perfiles,
     proyectos,
+    tablero,
     terreno,
     usuarios,
 )
@@ -73,6 +74,9 @@ app.include_router(layout.router)
 
 # Módulo 3 — Cotización
 app.include_router(cotizacion.router)
+
+# Módulo 4 — Administración: tablero de indicadores (RF-13)
+app.include_router(tablero.router)
 
 # A medida que avancemos, cada módulo registra su router aquí:
 # app.include_router(boceto.router,     prefix="/api/boceto",    tags=["Módulo 2 — Boceto"])
