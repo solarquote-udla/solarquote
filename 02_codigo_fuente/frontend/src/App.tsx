@@ -24,8 +24,10 @@ import { RutaProtegida } from "@/components/RutaProtegida";
 import { AuthProvider } from "@/context/AuthProvider";
 import { CambiarPasswordPage } from "@/pages/CambiarPasswordPage";
 import { ClientesPage } from "@/pages/ClientesPage";
+import { CotizacionDetallePage } from "@/pages/CotizacionDetallePage";
 import { EnConstruccionPage } from "@/pages/EnConstruccionPage";
 import { EquipoPage } from "@/pages/EquipoPage";
+import { HistorialPage } from "@/pages/HistorialPage";
 import { InicioPage } from "@/pages/InicioPage";
 import { InversoresPage } from "@/pages/InversoresPage";
 import { LayoutPage } from "@/pages/LayoutPage";
@@ -33,7 +35,6 @@ import { LoginPage } from "@/pages/LoginPage";
 import { MaterialesPage } from "@/pages/MaterialesPage";
 import { PerfilesPage } from "@/pages/PerfilesPage";
 import { PreciosPage } from "@/pages/PreciosPage";
-import { ProyectosPage } from "@/pages/ProyectosPage";
 import { SinPermisosPage } from "@/pages/SinPermisosPage";
 import { TerrenoPage } from "@/pages/TerrenoPage";
 import { UsuarioFormPage } from "@/pages/UsuarioFormPage";
@@ -109,8 +110,13 @@ const router = createBrowserRouter(
             Permiso.CARGAR_BOCETO,
             <Route path="bocetos" element={pendiente("Cargar boceto", "Módulo 2", "RF-04 y RF-05")} />,
           )}
-          {/* Provisional: proyectos en curso hasta que llegue RF-10 */}
-          {conPermiso([Permiso.HISTORIAL, Permiso.GENERAR_LAYOUT], <Route path="historial" element={<ProyectosPage />} />)}
+          {conPermiso(
+            [Permiso.HISTORIAL, Permiso.GENERAR_LAYOUT],
+            <>
+              <Route path="historial" element={<HistorialPage />} />
+              <Route path="cotizaciones/:cotizacionId" element={<CotizacionDetallePage />} />
+            </>,
+          )}
 
           {/* ─── OPERACIONES ────────────────────────── */}
           {conPermiso(

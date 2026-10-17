@@ -281,6 +281,38 @@ def test_sin_ningun_permiso_relacionado_no_lee_inversores(api, db):
     assert api.get("/api/inversores", headers=sesion).status_code == 403
 
 
+def test_historial_lo_lee_quien_tiene_historial_o_generar_layout(api, db):
+    """Revisión del PR #39 (RF-10): misma regla que la ruta /historial del frontend."""
+    con_historial = cabecera(crear_usuario(db, perfil=perfil_personalizado(db, Permiso.HISTORIAL)))
+    con_generar_layout = cabecera(crear_usuario(db, perfil=perfil_personalizado(db, Permiso.GENERAR_LAYOUT)))
+
+    assert api.get("/api/cotizaciones", headers=con_historial).status_code == 200
+    assert api.get("/api/cotizaciones", headers=con_generar_layout).status_code == 200
+
+
+def test_historial_no_lo_lee_cualquier_otro_permiso(api, db):
+    sesion = cabecera(crear_usuario(db, perfil=perfil_personalizado(db, Permiso.CLIENTES)))
+
+    assert api.get("/api/cotizaciones", headers=sesion).status_code == 403
+    assert api.get("/api/cotizaciones/1", headers=sesion).status_code == 403
+
+
+def test_historial_no_permite_crear_cotizaciones(api, db):
+    """HISTORIAL es de solo lectura: crear sigue exigiendo generar_layout o cargar_boceto."""
+    sesion = cabecera(crear_usuario(db, perfil=perfil_personalizado(db, Permiso.HISTORIAL)))
+
+    r = api.post("/api/cotizaciones", headers=sesion, json={"cliente_nombre": "X", "items": []})
+    assert r.status_code == 403
+
+
+def test_cargar_boceto_puede_cotizar_pero_no_lee_el_historial(api, db):
+    sesion = cabecera(crear_usuario(db, perfil=perfil_personalizado(db, Permiso.CARGAR_BOCETO)))
+
+    assert api.get("/api/cotizaciones", headers=sesion).status_code == 403
+    r = api.post("/api/cotizaciones", headers=sesion, json={"cliente_nombre": "X", "items": []})
+    assert r.status_code != 403
+
+
 # ─── Perfiles ───────────────────────────────────────────
 
 
