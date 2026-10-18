@@ -8,11 +8,15 @@ sus ítems (L, A, B) y el desglose (subtotal, IVA, total, y la cantidad
 ese momento — es un snapshot, no se recalcula después.
 """
 
-from sqlalchemy.orm import Session
+from datetime import date, datetime, time, timedelta, timezone
+
+from sqlalchemy import or_
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import settings
+from app.core.texto import escapar_comodines_ilike
 from app.models.cliente import Cliente
-from app.models.cotizacion import Cotizacion, ItemCotizacion, MaterialCotizado
+from app.models.cotizacion import Cotizacion, EstadoCotizacion, ItemCotizacion, MaterialCotizado
 from app.models.material import Material
 from app.models.proyecto import Proyecto
 from app.models.usuario import Usuario
@@ -28,6 +32,9 @@ from app.services.proyecto import ClienteNoDisponible, avanzar_a_cotizado
 # Cantidad fija de logística por cotización (SQ-76): no escala con L/A/B.
 CODIGO_LOGISTICA = "LOG"
 CANTIDAD_LOGISTICA = 1
+
+# Ecuador no usa horario de verano: UTC-5 todo el año.
+ZONA_ECUADOR = timezone(timedelta(hours=-5))
 
 
 class ProyectoNoDisponible(ValueError):
@@ -133,3 +140,65 @@ def crear_cotizacion(
     db.refresh(cotizacion)
 
     return cotizacion, resultado
+
+
+# ─── Historial (RF-10) ───────────────────────────────────────────────
+
+
+def listar_cotizaciones(
+    db: Session,
+    *,
+    buscar: str | None = None,
+    estado: EstadoCotizacion | None = None,
+    desde: date | None = None,
+    hasta: date | None = None,
+    pagina: int = 1,
+    por_pagina: int = 20,
+) -> tuple[list[Cotizacion], int]:
+    """
+    Listado del historial, del más reciente al más antiguo.
+
+    `buscar` es texto libre contra el nombre del cliente en el snapshot
+    (no contra el catálogo `Cliente`): así cubre también las cotizaciones
+    hechas al vuelo, sin `cliente_id`. También busca en `numero_proforma`,
+    ya que RF-10 pide poder encontrar una cotización por su proforma.
+    `desde`/`hasta` filtran por la fecha de emisión (`created_at`),
+    inclusive en los dos extremos.
+    """
+    query = db.query(Cotizacion)
+    if buscar:
+        patron = f"%{escapar_comodines_ilike(buscar)}%"
+        query = query.filter(
+            or_(
+                Cotizacion.cliente_nombre.ilike(patron, escape="\\"),
+                Cotizacion.numero_proforma.ilike(patron, escape="\\"),
+            )
+        )
+    if estado is not None:
+        query = query.filter(Cotizacion.estado == estado)
+    if desde is not None:
+        query = query.filter(Cotizacion.created_at >= datetime.combine(desde, time.min, tzinfo=ZONA_ECUADOR))
+    if hasta is not None:
+        query = query.filter(Cotizacion.created_at <= datetime.combine(hasta, time.max, tzinfo=ZONA_ECUADOR))
+
+    total = query.count()
+    cotizaciones = (
+        query.order_by(Cotizacion.created_at.desc(), Cotizacion.id.desc())
+        .offset((pagina - 1) * por_pagina)
+        .limit(por_pagina)
+        .all()
+    )
+    return cotizaciones, total
+
+
+def obtener_cotizacion(db: Session, cotizacion_id: int) -> Cotizacion | None:
+    """Detalle completo de una cotización, con sus ítems y materiales."""
+    return (
+        db.query(Cotizacion)
+        .options(
+            selectinload(Cotizacion.items),
+            selectinload(Cotizacion.materiales).selectinload(MaterialCotizado.material),
+        )
+        .filter(Cotizacion.id == cotizacion_id)
+        .one_or_none()
+    )

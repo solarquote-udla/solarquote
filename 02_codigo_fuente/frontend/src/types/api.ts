@@ -545,3 +545,90 @@ export interface Layout {
   created_at: string;
   updated_at: string;
 }
+
+// ─── Cotizaciones (RF-10) ───────────────────────────────
+
+/** Espejo de `EstadoCotizacion` en backend/app/models/cotizacion.py */
+export const EstadoCotizacion = {
+  COTIZADA: "cotizada",
+  DESPACHADA: "despachada",
+  RECIBIDA: "recibida",
+  INSTALADA: "instalada",
+} as const;
+
+export type EstadoCotizacion = (typeof EstadoCotizacion)[keyof typeof EstadoCotizacion];
+
+export const ETIQUETAS_ESTADO_COTIZACION: Record<EstadoCotizacion, string> = {
+  [EstadoCotizacion.COTIZADA]: "Cotizada",
+  [EstadoCotizacion.DESPACHADA]: "Despachada",
+  [EstadoCotizacion.RECIBIDA]: "Recibida",
+  [EstadoCotizacion.INSTALADA]: "Instalada",
+};
+
+/** Espejo de `CotizacionResumenLeer`: una fila del historial */
+export interface CotizacionResumen {
+  id: number;
+  numero_proforma: string | null;
+  estado: EstadoCotizacion;
+  cliente_nombre: string;
+  cliente_empresa: string | null;
+  proyecto_id: number | null;
+  proyecto_nombre: string | null;
+  total: string | null;
+  created_at: string;
+}
+
+/** Espejo de `CotizacionesPaginaLeer` */
+export interface CotizacionesPagina {
+  resultados: CotizacionResumen[];
+  total: number;
+  pagina: number;
+  por_pagina: number;
+  total_paginas: number;
+}
+
+/** Espejo de `ItemCotizacionLeer` */
+export interface ItemCotizacion {
+  paneles_largo: number;
+  paneles_ancho: number;
+  bloques: number;
+}
+
+/** Espejo de `MaterialCotizadoLeer`: tal como se emitió, no el catálogo actual */
+export interface MaterialCotizado {
+  material_id: number;
+  codigo: string;
+  nombre: string;
+  unidad: string;
+  cantidad: number;
+  precio_unitario: string;
+}
+
+/** Espejo de `CotizacionDetalleLeer` */
+export interface CotizacionDetalle {
+  id: number;
+  numero_proforma: string | null;
+  estado: EstadoCotizacion;
+
+  cliente_id: number | null;
+  cliente_nombre: string;
+  cliente_empresa: string | null;
+  cliente_email: string | null;
+  cliente_telefono: string | null;
+
+  proyecto_id: number | null;
+  proyecto_nombre: string | null;
+
+  addendum_porcentaje: string;
+  subtotal: string | null;
+  addendum_monto: string | null;
+  iva_porcentaje: string | null;
+  iva_monto: string | null;
+  total: string | null;
+
+  created_at: string;
+  updated_at: string;
+
+  items: ItemCotizacion[];
+  materiales: MaterialCotizado[];
+}
