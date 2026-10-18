@@ -5,12 +5,13 @@ Lógica de negocio de proyectos.
 servicio solo lo lee y lo crea; no altera su estructura.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from sqlalchemy import exists, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.cliente import Cliente
+from app.models.cotizacion import Cotizacion
 from app.models.proyecto import EstadoProyecto, Proyecto
 from app.models.equipo import ConfiguracionEquipo
 from app.models.layout import Layout
@@ -80,6 +81,8 @@ class Avance:
     terreno: set[int]
     equipo: set[int]
     layout: set[int]
+    # Cotización emitida de cada proyecto: (id, número de proforma)
+    cotizacion: dict[int, tuple[int, str | None]] = field(default_factory=dict)
 
 
 def avance_de(db: Session, proyecto_ids: list[int]) -> Avance:
@@ -100,16 +103,32 @@ def avance_de(db: Session, proyecto_ids: list[int]) -> Avance:
     def existe(modelo):
         return exists().where(modelo.proyecto_id == Proyecto.id)
 
-    # Una sola consulta: un EXISTS por paso, por cada proyecto pedido
-    filas = db.execute(
-        select(Proyecto.id, existe(Terreno), existe(ConfiguracionEquipo), existe(Layout)).where(
-            Proyecto.id.in_(proyecto_ids)
+    def ultima_cotizacion(columna):
+        # La más reciente del proyecto (hoy se emite una sola por proyecto)
+        return (
+            select(columna)
+            .where(Cotizacion.proyecto_id == Proyecto.id)
+            .order_by(Cotizacion.created_at.desc(), Cotizacion.id.desc())
+            .limit(1)
+            .scalar_subquery()
         )
+
+    # Una sola consulta: un EXISTS por paso y la última cotización, por cada proyecto pedido
+    filas = db.execute(
+        select(
+            Proyecto.id,
+            existe(Terreno),
+            existe(ConfiguracionEquipo),
+            existe(Layout),
+            ultima_cotizacion(Cotizacion.id),
+            ultima_cotizacion(Cotizacion.numero_proforma),
+        ).where(Proyecto.id.in_(proyecto_ids))
     ).all()
     return Avance(
-        terreno={pid for pid, t, _, _ in filas if t},
-        equipo={pid for pid, _, e, _ in filas if e},
-        layout={pid for pid, _, _, l in filas if l},
+        terreno={pid for pid, t, _, _, _, _ in filas if t},
+        equipo={pid for pid, _, e, _, _, _ in filas if e},
+        layout={pid for pid, _, _, l, _, _ in filas if l},
+        cotizacion={pid: (cid, numero) for pid, _, _, _, cid, numero in filas if cid is not None},
     )
 
 

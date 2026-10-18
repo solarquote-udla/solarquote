@@ -261,6 +261,9 @@ export interface Proyecto {
   tiene_equipo: boolean;
   /** Layout generado (RF-03) */
   tiene_layout: boolean;
+  /** Cotización emitida al confirmar el layout (RF-05); null si aún no se cotizó */
+  cotizacion_id: number | null;
+  numero_proforma: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -512,6 +515,20 @@ export interface InversorLayout {
   strings_por_mppt: number | null;
   compatible: boolean | null;
   motivo: string | null;
+}
+
+/** Espejo de `ConfirmarLayout`: confirmación explícita del diseño (RF-05) */
+export interface ConfirmarLayout {
+  /** Acepta bajo su responsabilidad los bloques fuera de proporción */
+  acepta_fuera_de_proporcion: boolean;
+  addendum_porcentaje?: number;
+}
+
+/** Espejo de `CotizacionEmitidaLeer` */
+export interface CotizacionEmitida {
+  id: number;
+  numero_proforma: string | null;
+  total: string | null;
 }
 
 /** Espejo de `LayoutLeer` */

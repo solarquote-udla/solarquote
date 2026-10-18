@@ -27,7 +27,7 @@ camino no modifica `updated_at` del terreno: son filas de otra tabla.
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, String, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -95,6 +95,8 @@ class Layout(Base):
 
 class BloqueLayout(Base):
     __tablename__ = "bloques_layout"
+    # Revisión del PR #38 (Esteban): un número negativo no se puede guardar
+    __table_args__ = (CheckConstraint("inversor >= 0", name="ck_bloques_layout_inversor_no_negativo"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
 

@@ -22,7 +22,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { BarraPaso } from "@/components/BarraPaso";
 import { EncabezadoProyecto } from "@/components/EncabezadoProyecto";
@@ -275,6 +275,9 @@ export function LayoutPage() {
   const [reagrupando, setReagrupando] = useState(false);
   const origenAlArrastrar = useRef<Punto | null>(null);
   const navegar = useNavigate();
+  // "Editar layout" del diagrama de confirmación abre directo la edición
+  const navegacion = useLocation();
+  const editarAlCargar = useRef((navegacion.state as { editar?: boolean } | null)?.editar === true);
 
   const [formCamino, setFormCamino] = useState<FormularioCamino | null>(null);
   // Valores con que se abrió el formulario de camino: tocarlo cuenta como cambio
@@ -471,6 +474,10 @@ export function LayoutPage() {
         setEquipo(e);
         setLayout(l);
         setParametros(desdeLayout(l, e?.potencia_objetivo_kwp ?? null));
+        if (editarAlCargar.current && l && !l.desactualizado) {
+          setBorrador(l.bloques.map((b, i) => ({ clave: i, origen: b.vertices[3], paneles_ancho: b.paneles_ancho, inversor: b.inversor })));
+        }
+        editarAlCargar.current = false;
       })
       .catch((e) => {
         if (!cancelado) setErrorCarga(mensajeDeError(e, "No se pudo cargar el proyecto"));
@@ -1228,8 +1235,16 @@ export function LayoutPage() {
         }
         adelante={{
           etiqueta: "Confirmar layout \u2192",
-          deshabilitado: true,
-          titulo: "El diagrama de confirmación (RF-05) llega en la siguiente entrega",
+          deshabilitado: !layout || layout.desactualizado || borrador !== null,
+          titulo: !layout
+            ? "Genera el layout antes de confirmarlo"
+            : layout.desactualizado
+              ? "Vuelve a generar el layout antes de confirmarlo"
+              : borrador !== null
+                ? "Guarda o descarta la edición de bloques"
+                : undefined,
+          // Con cambios sin guardar, useCambiosSinGuardar pregunta antes de salir
+          onClick: () => void navegar(`/generar/${proyectoId}/confirmacion`),
         }}
       />
     </div>
