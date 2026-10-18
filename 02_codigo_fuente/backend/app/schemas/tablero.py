@@ -35,7 +35,18 @@ class MaterialConsumidoLeer(BaseModel):
     cantidad: int
 
 
+class ResumenTableroLeer(BaseModel):
+    """Las tarjetas numéricas del tablero: totales del rango completo."""
+
+    total_cotizaciones: int
+    monto_total: Decimal
+    # Suma de L × A × B de cada ítem — los kWp no se pueden calcular
+    # todavía porque la cotización no guarda la potencia del panel.
+    paneles_cotizados: int
+
+
 class TableroLeer(BaseModel):
+    resumen: ResumenTableroLeer
     cotizaciones_por_periodo: list[CotizacionesPorPeriodoLeer]
     cotizaciones_por_estado: list[CotizacionesPorEstadoLeer]
     clientes_frecuentes: list[ClienteFrecuenteLeer]

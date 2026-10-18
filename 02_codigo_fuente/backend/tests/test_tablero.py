@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import crear_access_token
 from app.main import app
-from app.models.cotizacion import Cotizacion, EstadoCotizacion, MaterialCotizado
+from app.models.cotizacion import Cotizacion, EstadoCotizacion, ItemCotizacion, MaterialCotizado
 from app.models.material import Material
 from app.services.tablero import RangoInvalido, ZONA_ECUADOR, _meses_entre, _restar_meses, obtener_tablero
 from tests.fabricas import crear_usuario
@@ -35,6 +35,7 @@ def _crear_cotizacion(
     estado: EstadoCotizacion = EstadoCotizacion.COTIZADA,
     total: str = "100.00",
     created_at: datetime,
+    items: list[tuple[int, int, int]] = (),
 ) -> Cotizacion:
     cotizacion = Cotizacion(
         usuario_id=_usuario_id(db),
@@ -42,6 +43,10 @@ def _crear_cotizacion(
         estado=estado,
         total=Decimal(total),
         created_at=created_at,
+        items=[
+            ItemCotizacion(paneles_largo=largo, paneles_ancho=ancho, bloques=bloques)
+            for largo, ancho, bloques in items
+        ],
     )
     db.add(cotizacion)
     db.flush()
@@ -184,7 +189,38 @@ def test_materiales_mas_consumidos_suma_entre_cotizaciones_y_respeta_el_top(db: 
     assert tablero.materiales_mas_consumidos[0].cantidad == 12
 
 
-def test_los_cuatro_indicadores_comparten_el_mismo_rango(db: Session) -> None:
+def test_resumen_cuenta_cotizaciones_y_suma_el_monto(db: Session) -> None:
+    ahora = datetime.now(ZONA_ECUADOR)
+    _crear_cotizacion(db, total="100.00", created_at=ahora)
+    _crear_cotizacion(db, total="50.50", created_at=ahora)
+
+    tablero = obtener_tablero(db, desde=ahora.date(), hasta=ahora.date())
+
+    assert tablero.resumen.total_cotizaciones == 2
+    assert tablero.resumen.monto_total == Decimal("150.50")
+
+
+def test_resumen_suma_paneles_cotizados_como_largo_por_ancho_por_bloques(db: Session) -> None:
+    ahora = datetime.now(ZONA_ECUADOR)
+    # 4x3 paneles, 2 bloques iguales = 24; más un segundo ítem de 2x2x1 = 4.
+    _crear_cotizacion(db, created_at=ahora, items=[(4, 3, 2), (2, 2, 1)])
+
+    tablero = obtener_tablero(db, desde=ahora.date(), hasta=ahora.date())
+
+    assert tablero.resumen.paneles_cotizados == 28
+
+
+def test_resumen_sin_cotizaciones_en_el_rango_queda_en_cero(db: Session) -> None:
+    ahora = datetime.now(ZONA_ECUADOR)
+
+    tablero = obtener_tablero(db, desde=ahora.date(), hasta=ahora.date())
+
+    assert tablero.resumen.total_cotizaciones == 0
+    assert tablero.resumen.monto_total == Decimal("0")
+    assert tablero.resumen.paneles_cotizados == 0
+
+
+def test_los_cuatro_indicadores_y_el_resumen_comparten_el_mismo_rango(db: Session) -> None:
     """
     Revisión propia: antes el rango solo acotaba "cotizaciones por
     periodo" y los otros tres indicadores siempre miraban toda la
@@ -197,7 +233,11 @@ def test_los_cuatro_indicadores_comparten_el_mismo_rango(db: Session) -> None:
 
     material = _crear_material(db, "VAR1650")
     vieja = _crear_cotizacion(
-        db, cliente_nombre="Cliente viejo", estado=EstadoCotizacion.INSTALADA, created_at=fuera_de_rango
+        db,
+        cliente_nombre="Cliente viejo",
+        estado=EstadoCotizacion.INSTALADA,
+        created_at=fuera_de_rango,
+        items=[(4, 3, 1)],
     )
     db.add(MaterialCotizado(cotizacion_id=vieja.id, material_id=material.id, cantidad=50, precio_unitario=Decimal("1.00")))
     db.flush()
@@ -207,6 +247,8 @@ def test_los_cuatro_indicadores_comparten_el_mismo_rango(db: Session) -> None:
     assert tablero.clientes_frecuentes == []
     assert tablero.materiales_mas_consumidos == []
     assert all(item.cantidad == 0 for item in tablero.cotizaciones_por_estado)
+    assert tablero.resumen.total_cotizaciones == 0
+    assert tablero.resumen.paneles_cotizados == 0
 
 
 # ─── Router: RangoInvalido -> 422 ────────────────────────────────────

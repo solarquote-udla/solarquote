@@ -27,13 +27,14 @@ from decimal import Decimal
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models.cotizacion import Cotizacion, EstadoCotizacion, MaterialCotizado
+from app.models.cotizacion import Cotizacion, EstadoCotizacion, ItemCotizacion, MaterialCotizado
 from app.models.material import Material
 from app.schemas.tablero import (
     ClienteFrecuenteLeer,
     CotizacionesPorEstadoLeer,
     CotizacionesPorPeriodoLeer,
     MaterialConsumidoLeer,
+    ResumenTableroLeer,
     TableroLeer,
 )
 
@@ -148,6 +149,29 @@ def _materiales_mas_consumidos(
     ]
 
 
+def _resumen(db: Session, desde_dt: datetime, hasta_dt: datetime) -> ResumenTableroLeer:
+    total_cotizaciones, monto_total = (
+        db.query(func.count(Cotizacion.id), func.coalesce(func.sum(Cotizacion.total), 0))
+        .filter(Cotizacion.created_at >= desde_dt, Cotizacion.created_at <= hasta_dt)
+        .one()
+    )
+    paneles_cotizados = (
+        db.query(
+            func.coalesce(
+                func.sum(ItemCotizacion.paneles_largo * ItemCotizacion.paneles_ancho * ItemCotizacion.bloques), 0
+            )
+        )
+        .join(Cotizacion, Cotizacion.id == ItemCotizacion.cotizacion_id)
+        .filter(Cotizacion.created_at >= desde_dt, Cotizacion.created_at <= hasta_dt)
+        .scalar()
+    )
+    return ResumenTableroLeer(
+        total_cotizaciones=total_cotizaciones,
+        monto_total=monto_total,
+        paneles_cotizados=int(paneles_cotizados),
+    )
+
+
 def obtener_tablero(
     db: Session, *, desde: date | None = None, hasta: date | None = None, top: int = TOP_POR_DEFECTO
 ) -> TableroLeer:
@@ -157,6 +181,7 @@ def obtener_tablero(
     meses = _meses_entre(desde, hasta)
 
     return TableroLeer(
+        resumen=_resumen(db, desde_dt, hasta_dt),
         cotizaciones_por_periodo=_cotizaciones_por_periodo(db, desde_dt, hasta_dt, meses),
         cotizaciones_por_estado=_cotizaciones_por_estado(db, desde_dt, hasta_dt),
         clientes_frecuentes=_clientes_frecuentes(db, desde_dt, hasta_dt, top),

@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { GraficoBarras } from "@/components/graficos/GraficoBarras";
 import { useAuth } from "@/hooks/useAuth";
@@ -19,7 +20,17 @@ import { hoyISO, primerDiaHaceMeses } from "@/utils/fechas";
 const OPCIONES_PERIODO = [3, 6, 12] as const;
 const PERIODO_POR_DEFECTO = 6;
 
-const formatoMoneda = (valor: number) => `$${valor.toFixed(2)}`;
+// en-US y no es-EC: con es-EC el separador decimal es coma ("$436,77"),
+// distinto del "$436.77" que ya usan Precios y Materiales.
+const formatoIntl = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+const formatoMoneda = (valor: number) => formatoIntl.format(valor);
+const formatoEntero = new Intl.NumberFormat("en-US");
+
+const ACCESOS_DIRECTOS: { ruta: string; etiqueta: string; permisos: Permiso[] }[] = [
+  { ruta: "/generar", etiqueta: "Generar layout solar", permisos: [Permiso.GENERAR_LAYOUT] },
+  { ruta: "/historial", etiqueta: "Historial", permisos: [Permiso.HISTORIAL, Permiso.GENERAR_LAYOUT] },
+  { ruta: "/clientes", etiqueta: "Clientes", permisos: [Permiso.CLIENTES] },
+];
 
 /** "2026-05" → "may 26" */
 function etiquetaPeriodo(periodo: string): string {
@@ -67,13 +78,18 @@ export function TableroIndicadores() {
     return null;
   }
 
-  const totalDelRango = tablero?.cotizaciones_por_periodo.reduce((acc, p) => acc + Number(p.total), 0) ?? 0;
+  const accesos = ACCESOS_DIRECTOS.filter((a) => tienePermiso(...a.permisos));
+  const hayCotizaciones = (tablero?.resumen.total_cotizaciones ?? 0) > 0;
 
   return (
     <section className="mt-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold text-acero-900">Indicadores</h2>
-        <div className="flex gap-1 rounded-lg border border-acero-200 bg-superficie p-1" role="group" aria-label="Periodo del tablero">
+        <div
+          className="flex gap-1 rounded-lg border border-acero-200 bg-superficie p-1"
+          role="group"
+          aria-label="Periodo del tablero"
+        >
           {OPCIONES_PERIODO.map((opcion) => (
             <button
               key={opcion}
@@ -92,60 +108,107 @@ export function TableroIndicadores() {
         </div>
       </div>
 
-      {cargando ? (
+      {accesos.length > 0 && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {accesos.map((a) => (
+            <Link
+              key={a.ruta}
+              to={a.ruta}
+              className="rounded-lg border border-acero-200 bg-superficie px-3 py-1.5 text-sm font-medium text-acero-700 transition-colors hover:border-solar-500 hover:text-solar-700"
+            >
+              {a.etiqueta} →
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {/* "Cargando…" solo en la primera carga; con datos previos, se ven
+          atenuados mientras llega el nuevo periodo, en vez de desaparecer. */}
+      {cargando && tablero === null ? (
         <p className="mt-4 text-sm text-acero-500">Cargando indicadores…</p>
       ) : error ? (
         <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
       ) : tablero ? (
-        <div className="mt-4 grid gap-6 sm:grid-cols-2">
-          <article className="rounded-xl border border-acero-200 bg-superficie p-5">
-            <h3 className="text-sm font-semibold text-acero-900">Cotizaciones por periodo</h3>
-            <p className="text-xs text-acero-500">Total cotizado en el rango: {formatoMoneda(totalDelRango)}</p>
-            <div className="mt-4">
-              <GraficoBarras
-                descripcion="Cotizaciones emitidas por mes"
-                datos={tablero.cotizaciones_por_periodo.map((p) => ({
-                  etiqueta: etiquetaPeriodo(p.periodo),
-                  valor: p.cantidad,
-                }))}
-              />
+        <div className={`mt-4 transition-opacity ${cargando ? "opacity-50" : ""}`}>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="rounded-xl border border-acero-200 bg-superficie p-4">
+              <p className="text-xs text-acero-500">Cotizaciones</p>
+              <p className="mt-1 text-2xl font-bold text-acero-900">
+                {formatoEntero.format(tablero.resumen.total_cotizaciones)}
+              </p>
             </div>
-          </article>
+            <div className="rounded-xl border border-acero-200 bg-superficie p-4">
+              <p className="text-xs text-acero-500">Monto cotizado</p>
+              <p className="mt-1 text-2xl font-bold text-acero-900">
+                {formatoMoneda(Number(tablero.resumen.monto_total))}
+              </p>
+            </div>
+            <div className="rounded-xl border border-acero-200 bg-superficie p-4">
+              <p className="text-xs text-acero-500">Paneles cotizados</p>
+              <p className="mt-1 text-2xl font-bold text-acero-900">
+                {formatoEntero.format(tablero.resumen.paneles_cotizados)}
+              </p>
+            </div>
+          </div>
 
-          <article className="rounded-xl border border-acero-200 bg-superficie p-5">
-            <h3 className="text-sm font-semibold text-acero-900">Distribución por estado</h3>
-            <div className="mt-4">
-              <GraficoBarras
-                descripcion="Cotizaciones por estado"
-                datos={tablero.cotizaciones_por_estado.map((e) => ({
-                  etiqueta: ETIQUETAS_ESTADO_COTIZACION[e.estado],
-                  valor: e.cantidad,
-                }))}
-              />
-            </div>
-          </article>
+          <div className="mt-6 grid gap-6 sm:grid-cols-2">
+            {!hayCotizaciones ? (
+              <div className="rounded-xl border border-acero-200 bg-superficie p-10 text-center sm:col-span-2">
+                <p className="text-sm font-medium text-acero-700">No hay cotizaciones registradas en este rango</p>
+                <p className="mt-1 text-sm text-acero-500">Prueba con un periodo más amplio.</p>
+              </div>
+            ) : (
+              <>
+                <article className="rounded-xl border border-acero-200 bg-superficie p-5">
+                  <h3 className="text-sm font-semibold text-acero-900">Cotizaciones por periodo</h3>
+                  <div className="mt-4">
+                    <GraficoBarras
+                      descripcion="Cotizaciones emitidas por mes"
+                      datos={tablero.cotizaciones_por_periodo.map((p) => ({
+                        etiqueta: etiquetaPeriodo(p.periodo),
+                        valor: p.cantidad,
+                      }))}
+                    />
+                  </div>
+                </article>
 
-          <article className="rounded-xl border border-acero-200 bg-superficie p-5">
-            <h3 className="text-sm font-semibold text-acero-900">Clientes más frecuentes</h3>
-            <div className="mt-4">
-              <GraficoBarras
-                descripcion="Clientes con más cotizaciones"
-                orientacion="horizontal"
-                datos={tablero.clientes_frecuentes.map((c) => ({ etiqueta: c.cliente_nombre, valor: c.cantidad }))}
-              />
-            </div>
-          </article>
+                <article className="rounded-xl border border-acero-200 bg-superficie p-5">
+                  <h3 className="text-sm font-semibold text-acero-900">Distribución por estado</h3>
+                  <div className="mt-4">
+                    <GraficoBarras
+                      descripcion="Cotizaciones por estado"
+                      datos={tablero.cotizaciones_por_estado.map((e) => ({
+                        etiqueta: ETIQUETAS_ESTADO_COTIZACION[e.estado],
+                        valor: e.cantidad,
+                      }))}
+                    />
+                  </div>
+                </article>
+              </>
+            )}
 
-          <article className="rounded-xl border border-acero-200 bg-superficie p-5">
-            <h3 className="text-sm font-semibold text-acero-900">Materiales de mayor consumo</h3>
-            <div className="mt-4">
-              <GraficoBarras
-                descripcion="Materiales más consumidos"
-                orientacion="horizontal"
-                datos={tablero.materiales_mas_consumidos.map((m) => ({ etiqueta: m.nombre, valor: m.cantidad }))}
-              />
-            </div>
-          </article>
+            <article className="rounded-xl border border-acero-200 bg-superficie p-5">
+              <h3 className="text-sm font-semibold text-acero-900">Clientes más frecuentes</h3>
+              <div className="mt-4">
+                <GraficoBarras
+                  descripcion="Clientes con más cotizaciones"
+                  orientacion="horizontal"
+                  datos={tablero.clientes_frecuentes.map((c) => ({ etiqueta: c.cliente_nombre, valor: c.cantidad }))}
+                />
+              </div>
+            </article>
+
+            <article className="rounded-xl border border-acero-200 bg-superficie p-5">
+              <h3 className="text-sm font-semibold text-acero-900">Materiales de mayor consumo</h3>
+              <div className="mt-4">
+                <GraficoBarras
+                  descripcion="Materiales más consumidos"
+                  orientacion="horizontal"
+                  datos={tablero.materiales_mas_consumidos.map((m) => ({ etiqueta: m.nombre, valor: m.cantidad }))}
+                />
+              </div>
+            </article>
+          </div>
         </div>
       ) : null}
     </section>
