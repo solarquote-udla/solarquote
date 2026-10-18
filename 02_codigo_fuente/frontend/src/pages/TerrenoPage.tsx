@@ -529,7 +529,7 @@ export function TerrenoPage() {
               <div className="grid grid-cols-2 gap-3">
                 <label className={ETIQUETA}>
                   Proforma
-                  <input className={`mt-1 ${CAMPO}`} value="" placeholder="Se asigna al cotizar" disabled />
+                  <input className={`mt-1 ${CAMPO}`} value={proyecto?.numero_proforma ?? ""} placeholder="Se asigna al confirmar el layout" disabled />
                 </label>
                 <label className={ETIQUETA}>
                   Fecha

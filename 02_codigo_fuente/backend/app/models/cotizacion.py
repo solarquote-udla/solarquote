@@ -99,6 +99,14 @@ class Cotizacion(Base):
     iva_monto: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     total: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
 
+    # ─── Tamaño de la planta cotizada ───────────────────────────────────
+    # Solo cuando la cotización sale de un layout (RF-05): ahí se conoce
+    # el panel. El tablero (RF-13) suma los kWp cotizados. Nullable: una
+    # cotización al vuelo, con L/A/B escritos a mano, no sabe qué panel
+    # se va a usar.
+    potencia_kwp: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    total_paneles: Mapped[int | None] = mapped_column(nullable=True)
+
     estado: Mapped[EstadoCotizacion] = mapped_column(
         SAEnum(EstadoCotizacion, name="estado_cotizacion", values_callable=lambda e: [i.value for i in e]),
         default=EstadoCotizacion.COTIZADA,

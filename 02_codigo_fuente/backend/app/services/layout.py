@@ -433,7 +433,9 @@ def _inversores_del_layout(layout: Layout, equipo: ConfiguracionEquipo | None) -
     paneles = [0] * len(equipo.inversores)
     for b in layout.bloques:
         # Por si acaso: un número fuera de rango no debe romper la lectura
-        i = min(b.inversor, ultimo)
+        # ni sumarse a otro inversor (en Python, lista[-1] es el último).
+        # La base ya rechaza negativos (ck_bloques_layout_inversor_no_negativo).
+        i = min(max(b.inversor, 0), ultimo)
         bloques[i] += 1
         paneles[i] += b.paneles_largo * b.paneles_ancho
 
