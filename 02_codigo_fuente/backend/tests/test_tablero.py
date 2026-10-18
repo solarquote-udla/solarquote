@@ -4,8 +4,12 @@ from datetime import date, datetime
 from decimal import Decimal
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.core.database import get_db
+from app.core.security import crear_access_token
+from app.main import app
 from app.models.cotizacion import Cotizacion, EstadoCotizacion, MaterialCotizado
 from app.models.material import Material
 from app.services.tablero import RangoInvalido, ZONA_ECUADOR, _meses_entre, _restar_meses, obtener_tablero
@@ -17,6 +21,11 @@ def _usuario_id(db: Session) -> int:
     if not hasattr(db, "_usuario_tablero_id"):
         db._usuario_tablero_id = crear_usuario(db).id
     return db._usuario_tablero_id
+
+
+def _cabecera(usuario) -> dict[str, str]:
+    token = crear_access_token(usuario_id=usuario.id, version=usuario.version_token)
+    return {"Authorization": f"Bearer {token}"}
 
 
 def _crear_cotizacion(
@@ -198,3 +207,32 @@ def test_los_cuatro_indicadores_comparten_el_mismo_rango(db: Session) -> None:
     assert tablero.clientes_frecuentes == []
     assert tablero.materiales_mas_consumidos == []
     assert all(item.cantidad == 0 for item in tablero.cotizaciones_por_estado)
+
+
+# ─── Router: RangoInvalido -> 422 ────────────────────────────────────
+
+
+@pytest.fixture
+def api(db: Session):
+    app.dependency_overrides[get_db] = lambda: db
+    try:
+        yield TestClient(app)
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+
+def test_desde_posterior_a_hasta_responde_422(api, db: Session) -> None:
+    sesion = _cabecera(crear_usuario(db))
+
+    r = api.get("/api/tablero", params={"desde": "2026-10-01", "hasta": "2026-01-01"}, headers=sesion)
+
+    assert r.status_code == 422
+    assert "desde" in r.json()["detail"]
+
+
+def test_rango_de_mas_de_24_meses_responde_422(api, db: Session) -> None:
+    sesion = _cabecera(crear_usuario(db))
+
+    r = api.get("/api/tablero", params={"desde": "2000-01-01", "hasta": "2026-10-01"}, headers=sesion)
+
+    assert r.status_code == 422

@@ -513,3 +513,49 @@ export interface Layout {
   created_at: string;
   updated_at: string;
 }
+
+/** Espejo de `EstadoCotizacion` en backend/app/models/cotizacion.py (RF-16) */
+export const EstadoCotizacion = {
+  COTIZADA: "cotizada",
+  DESPACHADA: "despachada",
+  RECIBIDA: "recibida",
+  INSTALADA: "instalada",
+} as const;
+export type EstadoCotizacion = (typeof EstadoCotizacion)[keyof typeof EstadoCotizacion];
+
+export const ETIQUETAS_ESTADO_COTIZACION: Record<EstadoCotizacion, string> = {
+  [EstadoCotizacion.COTIZADA]: "Cotizada",
+  [EstadoCotizacion.DESPACHADA]: "Despachada",
+  [EstadoCotizacion.RECIBIDA]: "Recibida",
+  [EstadoCotizacion.INSTALADA]: "Instalada",
+};
+
+export interface CotizacionesPorPeriodo {
+  periodo: string; // "AAAA-MM", en hora de Ecuador
+  cantidad: number;
+  total: string;
+}
+
+export interface CotizacionesPorEstado {
+  estado: EstadoCotizacion;
+  cantidad: number;
+}
+
+export interface ClienteFrecuente {
+  cliente_nombre: string;
+  cantidad: number;
+}
+
+export interface MaterialConsumido {
+  material_id: number;
+  codigo: string;
+  nombre: string;
+  cantidad: number;
+}
+
+export interface Tablero {
+  cotizaciones_por_periodo: CotizacionesPorPeriodo[];
+  cotizaciones_por_estado: CotizacionesPorEstado[];
+  clientes_frecuentes: ClienteFrecuente[];
+  materiales_mas_consumidos: MaterialConsumido[];
+}
