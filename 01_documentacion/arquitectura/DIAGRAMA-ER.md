@@ -4,7 +4,7 @@
 `alembic upgrade head`), no una propuesta.
 
 Reemplaza el diagrama ASCII informal que había al final de
-[MODELOS-COMPARTIDOS.md](MODELOS-COMPARTIDOS.md): este cubre las 16 tablas
+[MODELOS-COMPARTIDOS.md](MODELOS-COMPARTIDOS.md): este cubre las 17 tablas
 del sistema completo (Módulo 1 de Joseph + Cotización/Materiales/Inversores/
 Clientes de Esteban), no solo los modelos compartidos.
 
@@ -145,7 +145,7 @@ erDiagram
         int paneles_ancho
         float proporcion
         boolean en_proporcion
-        int inversor "orden de InversorEquipo; NO es FK real"
+        int inversor "orden de InversorEquipo; NO es FK real; CHECK >= 0"
     }
 
     INVERSORES {
@@ -198,6 +198,8 @@ erDiagram
         decimal iva_porcentaje "nullable"
         decimal iva_monto "nullable"
         decimal total "nullable"
+        decimal potencia_kwp "nullable; solo si viene de un layout (RF-05)"
+        int total_paneles "nullable; idem"
         string estado "cotizada→despachada→recibida→instalada"
         datetime created_at
         datetime updated_at
@@ -244,6 +246,14 @@ erDiagram
 
 ---
 
+> **Nota de origen:** `COTIZACIONES.potencia_kwp`, `COTIZACIONES.total_paneles`
+> y el `CHECK` `inversor >= 0` de `BLOQUES_LAYOUT` vienen del PR #42
+> (RF-05, confirmación del layout), de Joseph — en revisión al momento de
+> escribir esto, no todavía en `develop`. Las primeras dos permiten que el
+> tablero (RF-13) sume la potencia y el conteo de paneles de las
+> cotizaciones que salen de un layout; quedan en `null` en las cotizadas
+> al vuelo, sin layout de por medio.
+
 ## Notas sobre relaciones que no son llaves foráneas
 
 El diagrama de arriba solo dibuja relaciones con llave foránea real en la
@@ -274,6 +284,11 @@ de Joseph (Módulo 1): si el Gerente reemplaza la lista de inversores de un
 proyecto, los bloques ya ubicados no deben quedar huérfanos — deben seguir
 apuntando al "Inversor 2" de la nueva lista, sea cual sea su fila real. Una
 FK real a `inversores_equipo.id` rompería esa garantía.
+
+Sí lleva una restricción, agregada en el PR #42 por una revisión del PR
+#38 (Esteban): `CHECK (inversor >= 0)`. No evita apuntar a un `orden` que
+no existe (eso lo valida la aplicación), pero evita que un bug guarde un
+número negativo, que no corresponde a ningún inversor posible.
 
 ---
 
