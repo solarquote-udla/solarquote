@@ -142,6 +142,8 @@ puede asociar después.
 
 ## Diagrama
 
+Resumen rápido de este documento (solo los modelos compartidos):
+
 ```
 Cliente 1 ──── N Proyecto
    │                │
@@ -154,3 +156,7 @@ Cliente 1 ──── N Proyecto
                               │
                               └── snapshot: cliente_nombre, email, teléfono
 ```
+
+El diagrama entidad-relación completo del sistema (las 16 tablas, con
+tipos de columna y llaves) está en
+[DIAGRAMA-ER.md](DIAGRAMA-ER.md).
