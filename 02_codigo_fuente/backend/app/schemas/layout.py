@@ -6,6 +6,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.schemas.equipo import MAX_INVERSORES
 from app.services.calculo_layout import (
     PANELES_LARGO_DEFECTO,
     PASILLO_DEFECTO_M,
@@ -64,6 +65,15 @@ class BloqueEditar(BaseModel):
 
     origen: list[float] = Field(min_length=2, max_length=2, description="Esquina suroeste [x, y], en metros")
     paneles_ancho: int = Field(ge=1, le=500, description="A: paneles a lo largo de la fila")
+    inversor: int | None = Field(
+        default=None,
+        ge=0,
+        lt=MAX_INVERSORES,
+        description=(
+            "Número del inversor (0 = Inversor 1). Si falta en algún bloque, o no existe ese "
+            "inversor, todos los bloques se reparten de nuevo."
+        ),
+    )
 
 
 class LayoutEditar(BaseModel):
@@ -80,6 +90,7 @@ class BloqueLeer(BaseModel):
     proporcion: float
     en_proporcion: bool
     tipo: str
+    inversor: int = Field(description="Número del inversor al que va conectado (0 = Inversor 1)")
 
 
 class TipoBloqueLeer(BaseModel):
@@ -101,15 +112,29 @@ class CapacidadLeer(BaseModel):
     remanente_kwp: float
 
 
-class ElectricaLeer(BaseModel):
+class InversorLayoutLeer(BaseModel):
+    """
+    Un inversor de la planta con los bloques que tiene asignados y sus
+    strings. Se calcula al leer, con el equipo actual: cambiar los datos
+    de un inversor no obliga a volver a generar el layout.
+    """
+
+    numero: int = Field(description="1 = Inversor 1")
+    marca: str
+    modelo: str
+    potencia_kw: float
+    bloques: int
+    paneles: int
+    potencia_kwp: float
+    relacion_dc_ac: float | None = Field(description="kWp de paneles por kW del inversor")
+
     paneles_por_string_min: int | None
     paneles_por_string_max: int | None
     paneles_por_string: int | None
-    strings_totales: int | None
+    strings: int | None
     paneles_sin_string: int | None
-    inversores: int
     strings_por_mppt: int | None
-    compatible: bool | None
+    compatible: bool | None = Field(description="Null si faltan datos para evaluarlo")
     motivo: str | None
 
 
@@ -131,7 +156,8 @@ class LayoutLeer(BaseModel):
     area_ocupada_m2: float
 
     capacidad: CapacidadLeer | None
-    electrica: ElectricaLeer
+    inversores: list[InversorLayoutLeer]
+    inversores_sugeridos: int = Field(description="Regla de HEXtructure: ~400 paneles por inversor")
     advertencias: list[str]
 
     # Para que el plano pueda editar bloques con la misma geometría que el backend

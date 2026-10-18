@@ -380,11 +380,17 @@ export interface Inversor {
   strings_por_mppt: number | null;
 }
 
+/** Espejo de `MAX_INVERSORES` (backend/app/schemas/equipo.py) */
+export const MAX_INVERSORES = 50;
+
 /** Espejo de `ConfiguracionEquipoGuardar` */
 export interface ConfiguracionEquipoGuardar {
   panel: Panel;
   angulo_montaje: number;
-  inversor: Inversor;
+  /** En orden: el primero es el Inversor 1 */
+  inversores: Inversor[];
+  /** Potencia que pide el cliente; con ella se sugiere cuántos inversores usar */
+  potencia_objetivo_kwp: number | null;
 }
 
 /** Espejo de `SeparacionFilas`. Metros, para un panel en vertical. */
@@ -405,11 +411,22 @@ export interface LimitesString {
   motivo: string | null;
 }
 
+/** Espejo de `SugerenciaLeer`: la "Sugerencia automática" del Paso 2 */
+export interface SugerenciaInversores {
+  paneles: number;
+  potencia_kwp: number;
+  inversores: number;
+  paneles_por_inversor: number;
+  kwp_por_inversor: number;
+}
+
 /** Espejo de `CalculosEquipo` */
 export interface CalculosEquipo {
   area_panel_m2: number;
   separacion: SeparacionFilas | null;
-  strings: LimitesString | null;
+  /** Uno por inversor, en el mismo orden; null si le faltan los voltajes */
+  strings: (LimitesString | null)[];
+  sugerencia: SugerenciaInversores | null;
   advertencias: string[];
 }
 
@@ -448,6 +465,8 @@ export interface BloqueLayout {
   proporcion: number;
   en_proporcion: boolean;
   tipo: string;
+  /** Inversor al que va conectado: 0 = Inversor 1 */
+  inversor: number;
 }
 
 /** Espejo de `TipoBloqueLeer`: notación "Bloque A × N" */
@@ -471,14 +490,25 @@ export interface CapacidadLayout {
   remanente_kwp: number;
 }
 
-/** Espejo de `ElectricaLeer`. Nulos cuando faltan datos del inversor. */
-export interface ElectricaLayout {
+/**
+ * Espejo de `InversorLayoutLeer`: un inversor con sus bloques y strings.
+ * Los campos eléctricos son nulos cuando faltan datos del inversor.
+ */
+export interface InversorLayout {
+  /** 1 = Inversor 1 */
+  numero: number;
+  marca: string;
+  modelo: string;
+  potencia_kw: number;
+  bloques: number;
+  paneles: number;
+  potencia_kwp: number;
+  relacion_dc_ac: number | null;
   paneles_por_string_min: number | null;
   paneles_por_string_max: number | null;
   paneles_por_string: number | null;
-  strings_totales: number | null;
+  strings: number | null;
   paneles_sin_string: number | null;
-  inversores: number;
   strings_por_mppt: number | null;
   compatible: boolean | null;
   motivo: string | null;
@@ -500,7 +530,9 @@ export interface Layout {
   area_util_m2: number;
   area_ocupada_m2: number;
   capacidad: CapacidadLayout | null;
-  electrica: ElectricaLayout;
+  inversores: InversorLayout[];
+  /** Regla de HEXtructure: ~400 paneles por inversor */
+  inversores_sugeridos: number;
   advertencias: string[];
   /** Grados del norte usados al generar; la edición arma los bloques con este ángulo */
   angulo_norte: number;
