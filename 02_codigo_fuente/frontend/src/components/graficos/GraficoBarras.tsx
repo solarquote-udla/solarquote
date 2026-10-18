@@ -10,6 +10,12 @@
  * Accesible: el <svg> lleva role="img" y aria-label con la descripción
  * completa del gráfico; cada barra tiene su propio <title> (tooltip al
  * pasar el mouse, y lo que lee un lector de pantalla por esa barra).
+ *
+ * El texto no tiene un tamaño de letra que no cambie: al no medir el
+ * contenedor, todo lo que hay adentro del <svg> (texto incluido) escala
+ * con el viewBox. ANCHO_VISTA se eligió cercano al ancho real de una
+ * tarjeta del tablero para que esa escala quede cerca de 1:1; en un
+ * contenedor bien angosto el texto igual se achica un poco.
  */
 
 import { useId } from "react";
@@ -30,8 +36,14 @@ interface GraficoBarrasProps {
   alto?: number;
 }
 
-const ANCHO_VISTA = 600;
+const ANCHO_VISTA = 420;
 const ALTO_FILA_HORIZONTAL = 32;
+const LARGO_MAXIMO_ETIQUETA = 15;
+
+/** Recorta con "…"; el nombre completo igual queda en el <title> de la barra. */
+function recortar(texto: string, limite = LARGO_MAXIMO_ETIQUETA): string {
+  return texto.length > limite ? `${texto.slice(0, limite - 1)}…` : texto;
+}
 
 export function GraficoBarras({
   datos,
@@ -51,8 +63,8 @@ export function GraficoBarras({
   if (orientacion === "horizontal") {
     const altoFila = alto ?? ALTO_FILA_HORIZONTAL;
     const altoTotal = datos.length * altoFila;
-    const anchoEtiqueta = 150;
-    const anchoDisponible = ANCHO_VISTA - anchoEtiqueta - 60;
+    const anchoEtiqueta = 105;
+    const anchoDisponible = ANCHO_VISTA - anchoEtiqueta - 42;
 
     return (
       <svg
@@ -74,7 +86,7 @@ export function GraficoBarras({
                 dominantBaseline="central"
                 className="fill-acero-600 text-[11px]"
               >
-                {d.etiqueta}
+                {recortar(d.etiqueta)}
               </text>
               <rect
                 x={anchoEtiqueta}

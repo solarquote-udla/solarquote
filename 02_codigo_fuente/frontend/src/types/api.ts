@@ -553,7 +553,14 @@ export interface MaterialConsumido {
   cantidad: number;
 }
 
+export interface ResumenTablero {
+  total_cotizaciones: number;
+  monto_total: string;
+  paneles_cotizados: number;
+}
+
 export interface Tablero {
+  resumen: ResumenTablero;
   cotizaciones_por_periodo: CotizacionesPorPeriodo[];
   cotizaciones_por_estado: CotizacionesPorEstado[];
   clientes_frecuentes: ClienteFrecuente[];
