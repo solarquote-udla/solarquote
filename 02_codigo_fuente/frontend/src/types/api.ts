@@ -546,7 +546,7 @@ export interface Layout {
   updated_at: string;
 }
 
-// ─── Cotizaciones (RF-10) ───────────────────────────────
+// ─── Cotizaciones (RF-10 y RF-13) ───────────────────────
 
 /** Espejo de `EstadoCotizacion` en backend/app/models/cotizacion.py */
 export const EstadoCotizacion = {
@@ -631,4 +631,41 @@ export interface CotizacionDetalle {
 
   items: ItemCotizacion[];
   materiales: MaterialCotizado[];
+}
+
+export interface CotizacionesPorPeriodo {
+  periodo: string; // "AAAA-MM", en hora de Ecuador
+  cantidad: number;
+  total: string;
+}
+
+export interface CotizacionesPorEstado {
+  estado: EstadoCotizacion;
+  cantidad: number;
+}
+
+export interface ClienteFrecuente {
+  cliente_nombre: string;
+  cantidad: number;
+}
+
+export interface MaterialConsumido {
+  material_id: number;
+  codigo: string;
+  nombre: string;
+  cantidad: number;
+}
+
+export interface ResumenTablero {
+  total_cotizaciones: number;
+  monto_total: string;
+  paneles_cotizados: number;
+}
+
+export interface Tablero {
+  resumen: ResumenTablero;
+  cotizaciones_por_periodo: CotizacionesPorPeriodo[];
+  cotizaciones_por_estado: CotizacionesPorEstado[];
+  clientes_frecuentes: ClienteFrecuente[];
+  materiales_mas_consumidos: MaterialConsumido[];
 }

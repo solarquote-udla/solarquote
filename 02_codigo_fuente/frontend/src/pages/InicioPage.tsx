@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { TableroIndicadores } from "@/components/TableroIndicadores";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/services/api";
 
@@ -50,6 +51,8 @@ export function InicioPage() {
           </span>
         </div>
       </div>
+
+      <TableroIndicadores />
 
       <div className="mt-6 rounded-xl border border-dashed border-acero-300 bg-superficie p-6">
         <h2 className="text-sm font-semibold text-acero-700">Próximos módulos</h2>
