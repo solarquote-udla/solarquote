@@ -50,11 +50,16 @@ vi.mock("@/services/proyectos", async () => {
   return { obtenerProyecto: vi.fn(async () => PROYECTO), actualizarProyecto: vi.fn() };
 });
 vi.mock("@/services/equipo", () => ({
-  obtenerEquipo: vi.fn(async () => ({ proyecto_id: 5 })),
+  obtenerEquipo: vi.fn(async () => ({ proyecto_id: 5, inversores: [{ marca: "H", modelo: "M", potencia_kw: 160 }], potencia_objetivo_kwp: null })),
   guardarEquipo: vi.fn(),
   listarPanelesReferencia: vi.fn(async () => []),
 }));
-vi.mock("@/services/layout", () => ({ obtenerLayout: vi.fn(async () => null), generarLayout: vi.fn(), guardarBloques: vi.fn() }));
+vi.mock("@/services/layout", () => ({
+  obtenerLayout: vi.fn(async () => null),
+  generarLayout: vi.fn(),
+  guardarBloques: vi.fn(),
+  reagruparLayout: vi.fn(),
+}));
 vi.mock("@/services/terreno", async () => {
   const { TERRENO: T } = await import("./utilidades");
   return {
