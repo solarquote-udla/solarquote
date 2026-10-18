@@ -18,6 +18,7 @@ from app.services.calculo_equipo import (
     inversores_sugeridos,
     limites_string,
     separacion_entre_filas,
+    sugerencia_inversores,
 )
 
 
@@ -113,6 +114,28 @@ class TestInversoresSugeridos:
         assert inversores_sugeridos(paneles) == esperado
 
 
+class TestSugerenciaInversores:
+    def test_ejemplo_del_prototipo(self):
+        """
+        316 kWp con paneles de 550 Wp: ceil(316000 / 550) = 575 paneles
+        (316,25 kWp). ceil(575 / 400) = 2 inversores de ceil(575 / 2) =
+        288 paneles, 158,4 kWp cada uno. El prototipo muestra lo mismo.
+        """
+        s = sugerencia_inversores(316, 550)
+        assert (s.paneles, s.inversores, s.paneles_por_inversor) == (575, 2, 288)
+        assert s.potencia_kwp == pytest.approx(316.25)
+        assert s.kwp_por_inversor == pytest.approx(158.4)
+
+    def test_potencia_exacta_no_suma_un_panel_por_redondeo(self):
+        # 0,55 kWp × 400 = 220 kWp: justo 400 paneles, un inversor
+        s = sugerencia_inversores(220, 550)
+        assert (s.paneles, s.inversores) == (400, 1)
+
+    def test_planta_chica_usa_un_inversor(self):
+        s = sugerencia_inversores(5, 550)
+        assert (s.paneles, s.inversores, s.paneles_por_inversor) == (10, 1, 10)
+
+
 class TestValidacionSchemas:
     PANEL = dict(
         marca="Jinko Solar",
@@ -126,7 +149,36 @@ class TestValidacionSchemas:
     INVERSOR = dict(marca="Huawei", modelo="SUN2000", potencia_kw=100)
 
     def test_configuracion_valida(self):
-        ConfiguracionEquipoGuardar(panel=self.PANEL, angulo_montaje=15, inversor=self.INVERSOR)
+        ConfiguracionEquipoGuardar(panel=self.PANEL, angulo_montaje=15, inversores=[self.INVERSOR])
+
+    def test_varios_inversores_y_potencia_objetivo(self):
+        c = ConfiguracionEquipoGuardar(
+            panel=self.PANEL, angulo_montaje=15, inversores=[self.INVERSOR] * 3, potencia_objetivo_kwp=316
+        )
+        assert len(c.inversores) == 3
+
+    def test_al_menos_un_inversor(self):
+        with pytest.raises(ValidationError):
+            ConfiguracionEquipoGuardar(panel=self.PANEL, angulo_montaje=15, inversores=[])
+
+    def test_tope_de_inversores(self):
+        with pytest.raises(ValidationError):
+            ConfiguracionEquipoGuardar(panel=self.PANEL, angulo_montaje=15, inversores=[self.INVERSOR] * 51)
+
+    @pytest.mark.parametrize("objetivo", [0, -5])
+    def test_potencia_objetivo_positiva(self, objetivo):
+        with pytest.raises(ValidationError):
+            ConfiguracionEquipoGuardar(
+                panel=self.PANEL, angulo_montaje=15, inversores=[self.INVERSOR], potencia_objetivo_kwp=objetivo
+            )
+
+    def test_cada_inversor_se_valida(self):
+        with pytest.raises(ValidationError, match="mayor que el mínimo"):
+            ConfiguracionEquipoGuardar(
+                panel=self.PANEL,
+                angulo_montaje=15,
+                inversores=[self.INVERSOR, {**self.INVERSOR, "vmax_v": 200, "vmin_v": 500}],
+            )
 
     def test_voc_debe_superar_vmp(self):
         with pytest.raises(ValidationError, match="Voc debe ser mayor que el Vmp"):
@@ -139,7 +191,7 @@ class TestValidacionSchemas:
     @pytest.mark.parametrize("angulo", [-1, 91])
     def test_angulo_fuera_de_rango(self, angulo):
         with pytest.raises(ValidationError):
-            ConfiguracionEquipoGuardar(panel=self.PANEL, angulo_montaje=angulo, inversor=self.INVERSOR)
+            ConfiguracionEquipoGuardar(panel=self.PANEL, angulo_montaje=angulo, inversores=[self.INVERSOR])
 
     def test_voltajes_del_inversor_van_juntos(self):
         with pytest.raises(ValidationError, match="ambos voltajes"):
