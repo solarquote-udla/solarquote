@@ -9,10 +9,8 @@ en el proceso de RF-02:
   2. Distancia mínima entre filas según el ángulo de montaje
   3. Límites de paneles por string a partir de panel e inversor
 
-La sugerencia de cantidad de inversores (~400 paneles por inversor)
-también está en RF-02, pero necesita el número total de paneles, que
-recién existe cuando RF-03 genera el layout. La regla queda aquí para
-que RF-03 la use, pero no se expone todavía.
+  4. Sugerencia de cuántos inversores usar (~400 paneles por inversor),
+     a partir de la potencia objetivo del sistema
 """
 
 import math
@@ -183,9 +181,40 @@ def limites_string(
 def inversores_sugeridos(total_paneles: int) -> int:
     """
     Regla de HEXtructure: aproximadamente un inversor cada 400 paneles.
-
-    La usará RF-03, que es donde se conoce el total de paneles.
     """
     if total_paneles <= 0:
         return 0
     return math.ceil(total_paneles / PANELES_POR_INVERSOR)
+
+
+@dataclass(frozen=True)
+class Sugerencia:
+    """Cuántos inversores usar para la potencia objetivo, repartidos por igual."""
+
+    paneles: int
+    potencia_kwp: float
+    inversores: int
+    paneles_por_inversor: int
+    kwp_por_inversor: float
+
+
+def sugerencia_inversores(potencia_objetivo_kwp: float, potencia_panel_wp: float) -> Sugerencia:
+    """
+    Paneles que hacen falta para la potencia objetivo y cuántos
+    inversores corresponden con la regla de los 400 paneles.
+
+    Es la "Sugerencia automática" del Paso 2 del prototipo: 316 kWp con
+    paneles de 550 Wp son 575 paneles y 2 inversores de ~288 paneles. El
+    número final de paneles lo fija el layout (Paso 3), según lo que
+    entre en el terreno.
+    """
+    paneles = math.ceil(potencia_objetivo_kwp * 1000 / potencia_panel_wp - _EPSILON)
+    inversores = max(inversores_sugeridos(paneles), 1)
+    por_inversor = math.ceil(paneles / inversores)
+    return Sugerencia(
+        paneles=paneles,
+        potencia_kwp=paneles * potencia_panel_wp / 1000,
+        inversores=inversores,
+        paneles_por_inversor=por_inversor,
+        kwp_por_inversor=por_inversor * potencia_panel_wp / 1000,
+    )

@@ -11,17 +11,19 @@
  *     componente no decide nada: informa el desplazamiento en metros y la
  *     página actualiza el borrador y valida.
  *
- * Colores:
- *   azul   bloque en proporción
- *   ámbar  bloque que se aparta de ancho = 3 × largo (RF-03 lo exige)
- *   rojo   bloque que no se puede guardar (fuera del terreno, sobre un
- *          camino o encima de otro)
+ * Colores (como el prototipo):
+ *   relleno        el color del inversor al que va conectado el bloque
+ *   borde ámbar    bloque que se aparta de ancho = 3 × largo (RF-03 lo
+ *   punteado       exige)
+ *   rojo           bloque que no se puede guardar (fuera del terreno,
+ *                  sobre un camino o encima de otro)
  */
 
 import { useRef, type PointerEvent } from "react";
 
 import type { Punto } from "@/types/api";
 import { encuadre, marcas, pasoCuadricula } from "@/utils/geometria";
+import { colorInversor } from "@/utils/inversores";
 
 export interface BloqueDibujo {
   clave: number;
@@ -30,6 +32,8 @@ export interface BloqueDibujo {
   paneles_largo: number;
   paneles_ancho: number;
   en_proporcion: boolean;
+  /** Inversor al que va conectado: 0 = Inversor 1 */
+  inversor: number;
   /** Motivo por el que no se puede guardar; undefined si es válido */
   problema?: string;
 }
@@ -42,6 +46,8 @@ interface Props {
   orientacionNorte: number | null;
   /** Atenúa los bloques cuando el layout ya no corresponde a los datos */
   desactualizado?: boolean;
+  /** Cuántos inversores hay, para la leyenda */
+  inversores?: number;
 
   // ─── Edición ─────────────────────────────────────────
   editable?: boolean;
@@ -70,8 +76,12 @@ function ladoMenor(vertices: Punto[]): number {
 
 function claseBloque(b: BloqueDibujo): string {
   if (b.problema) return "fill-red-500/70 stroke-red-800";
-  return b.en_proporcion ? "fill-sky-600/80 stroke-sky-900" : "fill-amber-400/90 stroke-amber-600";
+  const color = colorInversor(b.inversor);
+  return `${color.relleno} ${color.borde}`;
 }
+
+/** En la leyenda caben pocos: con muchos inversores se resume. */
+const MAX_LEYENDA = 6;
 
 export function VistaLayout({
   terreno,
@@ -79,6 +89,7 @@ export function VistaLayout({
   bloques,
   orientacionNorte,
   desactualizado,
+  inversores = 1,
   editable = false,
   seleccionado = null,
   onSeleccionar,
@@ -166,11 +177,17 @@ export function VistaLayout({
                 onPointerDown={(e) => alPresionarBloque(e, b.clave)}
               >
                 <title>
-                  {`Bloque ${b.tipo} · ${b.paneles_largo} × ${b.paneles_ancho} = ${b.paneles_largo * b.paneles_ancho} paneles`}
+                  {`Bloque ${b.tipo} · ${b.paneles_largo} × ${b.paneles_ancho} = ${b.paneles_largo * b.paneles_ancho} paneles · Inversor ${b.inversor + 1}`}
                   {b.problema ? ` · ${b.problema}` : b.en_proporcion ? "" : " · fuera de proporción"}
                 </title>
               </polygon>
             ))}
+            {/* Fuera de proporción: borde ámbar punteado encima del color del inversor */}
+            {bloques
+              .filter((b) => !b.en_proporcion && !b.problema)
+              .map((b) => (
+                <polygon key={`p${b.clave}`} points={puntos(b.vertices)} fill="none" className="pointer-events-none stroke-amber-400" strokeWidth={2.5} strokeDasharray="5 3" vectorEffect="non-scaling-stroke" />
+              ))}
             {/* Contorno resaltado del seleccionado, encima de todo */}
             {bloques
               .filter((b) => b.clave === seleccionado)
@@ -185,9 +202,8 @@ export function VistaLayout({
           {bloques.map((b) => {
             if (ladoMenor(b.vertices) < fuente) return null;
             const [x, y] = centro(b.vertices);
-            const color = b.problema ? "fill-white" : b.en_proporcion ? "fill-white" : "fill-acero-50";
             return (
-              <text key={`t${b.clave}`} x={x} y={-y} className={color}>
+              <text key={`t${b.clave}`} x={x} y={-y} className="fill-white">
                 {b.tipo}
               </text>
             );
@@ -203,12 +219,15 @@ export function VistaLayout({
         <span className="text-[10px] font-semibold text-acero-600">N{orientacionNorte == null ? "?" : ""}</span>
       </div>
 
-      <div className="pointer-events-none absolute bottom-3 left-3 flex gap-3 rounded-md bg-superficie/90 px-3 py-1.5 text-xs text-acero-600 shadow-sm">
+      <div className="pointer-events-none absolute bottom-3 left-3 flex max-w-[calc(100%-1.5rem)] flex-wrap gap-x-3 gap-y-1 rounded-md bg-superficie/90 px-3 py-1.5 text-xs text-acero-600 shadow-sm">
+        {Array.from({ length: Math.min(inversores, MAX_LEYENDA) }, (_, i) => (
+          <span key={i} className="flex items-center gap-1.5">
+            <span className={`inline-block h-3 w-3 rounded-sm ${colorInversor(i).muestra}`} /> Inversor {i + 1}
+          </span>
+        ))}
+        {inversores > MAX_LEYENDA && <span>+{inversores - MAX_LEYENDA} inversores</span>}
         <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-3 rounded-sm bg-sky-600" /> En proporción
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-3 rounded-sm bg-amber-400" /> Fuera de proporción
+          <span className="inline-block h-3 w-3 rounded-sm border-2 border-dashed border-amber-400" /> Fuera de proporción
         </span>
         {editable && (
           <span className="flex items-center gap-1.5">
