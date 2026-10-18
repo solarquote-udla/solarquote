@@ -7,20 +7,24 @@
  */
 
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 
 import { EstadoCotizacionBadge } from "@/components/EstadoCotizacionBadge";
 import { mensajeDeError } from "@/services/api";
 import { obtenerCotizacion } from "@/services/cotizaciones";
 import type { CotizacionDetalle } from "@/types/api";
+import { formatoMoneda } from "@/utils/dinero";
 import { fechaHora } from "@/utils/fechas";
 
-function subtotalMaterial(cantidad: number, precioUnitario: string): string {
-  return (cantidad * Number(precioUnitario)).toFixed(2);
+/** Ruta por la que se llegó al detalle (con los filtros del historial activos) */
+interface EstadoNavegacion {
+  volverA?: string;
 }
 
 export function CotizacionDetallePage() {
   const { cotizacionId } = useParams();
+  const location = useLocation();
+  const volverA = (location.state as EstadoNavegacion | null)?.volverA ?? "/historial?vista=cotizaciones";
   const [cotizacion, setCotizacion] = useState<CotizacionDetalle | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +49,7 @@ export function CotizacionDetallePage() {
   return (
     <div className="mx-auto max-w-4xl">
       <nav className="text-sm text-acero-500">
-        <Link to="/historial?vista=cotizaciones" className="hover:text-solar-700 hover:underline">
+        <Link to={volverA} className="hover:text-solar-700 hover:underline">
           Historial
         </Link>
         <span className="mx-2">/</span>
@@ -147,9 +151,9 @@ export function CotizacionDetallePage() {
                       {m.nombre} <span className="text-acero-400">({m.unidad})</span>
                     </td>
                     <td className="px-5 py-2 text-right text-acero-700">{m.cantidad}</td>
-                    <td className="px-5 py-2 text-right text-acero-700">${m.precio_unitario}</td>
+                    <td className="px-5 py-2 text-right text-acero-700">{formatoMoneda(m.precio_unitario)}</td>
                     <td className="px-5 py-2 text-right font-medium text-acero-800">
-                      ${subtotalMaterial(m.cantidad, m.precio_unitario)}
+                      {formatoMoneda(m.cantidad * Number(m.precio_unitario))}
                     </td>
                   </tr>
                 ))}
@@ -161,19 +165,19 @@ export function CotizacionDetallePage() {
             <dl className="w-full max-w-xs space-y-1 text-sm sm:w-72">
               <div className="flex justify-between">
                 <dt className="text-acero-500">Subtotal</dt>
-                <dd className="text-acero-800">${cotizacion.subtotal ?? "—"}</dd>
+                <dd className="text-acero-800">{formatoMoneda(cotizacion.subtotal)}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-acero-500">Addendum ({cotizacion.addendum_porcentaje}%)</dt>
-                <dd className="text-acero-800">${cotizacion.addendum_monto ?? "—"}</dd>
+                <dd className="text-acero-800">{formatoMoneda(cotizacion.addendum_monto)}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-acero-500">IVA ({cotizacion.iva_porcentaje ?? "—"}%)</dt>
-                <dd className="text-acero-800">${cotizacion.iva_monto ?? "—"}</dd>
+                <dd className="text-acero-800">{formatoMoneda(cotizacion.iva_monto)}</dd>
               </div>
               <div className="flex justify-between border-t border-acero-200 pt-1 text-base font-semibold">
                 <dt className="text-acero-900">Total</dt>
-                <dd className="text-acero-900">${cotizacion.total ?? "—"}</dd>
+                <dd className="text-acero-900">{formatoMoneda(cotizacion.total)}</dd>
               </div>
             </dl>
           </section>

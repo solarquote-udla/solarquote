@@ -17,6 +17,7 @@ def _crear_cotizacion(
     db: Session,
     *,
     cliente_nombre: str = "Cliente de prueba",
+    numero_proforma: str | None = None,
     estado: EstadoCotizacion = EstadoCotizacion.COTIZADA,
     total: Decimal = Decimal("100.00"),
     creada: datetime | None = None,
@@ -25,6 +26,7 @@ def _crear_cotizacion(
     cotizacion = Cotizacion(
         usuario_id=usuario.id,
         cliente_nombre=cliente_nombre,
+        numero_proforma=numero_proforma,
         estado=estado,
         subtotal=total,
         addendum_monto=Decimal("0"),
@@ -69,6 +71,38 @@ def test_buscar_cubre_clientes_cotizados_al_vuelo_sin_cliente_id(db: Session) ->
 
     assert total == 1
     assert cotizaciones[0].id == cotizacion.id
+
+
+def test_buscar_tambien_encuentra_por_numero_de_proforma(db: Session) -> None:
+    """Revisión de Joseph (PR #39): RF-10 pide filtrar también por proforma."""
+    cotizacion = _crear_cotizacion(db, cliente_nombre="Constructora Andina", numero_proforma="CT-130")
+    _crear_cotizacion(db, cliente_nombre="Hormigones del Valle", numero_proforma="CT-131")
+
+    cotizaciones, total = listar_cotizaciones(db, buscar="ct-130")
+
+    assert total == 1
+    assert cotizaciones[0].id == cotizacion.id
+
+
+def test_buscar_sin_proforma_no_rompe_con_el_or(db: Session) -> None:
+    """numero_proforma es nullable: el OR no debe convertir el filtro en 'todo'."""
+    _crear_cotizacion(db, cliente_nombre="Constructora Andina", numero_proforma=None)
+    _crear_cotizacion(db, cliente_nombre="Hormigones del Valle", numero_proforma=None)
+
+    cotizaciones, total = listar_cotizaciones(db, buscar="andina")
+
+    assert total == 1
+    assert cotizaciones[0].cliente_nombre == "Constructora Andina"
+
+
+def test_buscar_escapa_el_comodin_guion_bajo(db: Session) -> None:
+    """Revisión de Joseph (PR #39): sin escapar, '_' hace de comodín de ILIKE y trae todo."""
+    _crear_cotizacion(db, cliente_nombre="Constructora Andina")
+    _crear_cotizacion(db, cliente_nombre="Hormigones del Valle")
+
+    cotizaciones, total = listar_cotizaciones(db, buscar="_")
+
+    assert total == 0
 
 
 def test_filtra_por_estado(db: Session) -> None:

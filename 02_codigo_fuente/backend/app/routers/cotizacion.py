@@ -127,7 +127,7 @@ def crear(
 
 @router.get("", response_model=CotizacionesPaginaLeer, dependencies=[Depends(puede_ver_historial)])
 def listar(
-    buscar: str | None = Query(default=None, description="Texto libre contra el nombre del cliente"),
+    buscar: str | None = Query(default=None, description="Texto libre contra el cliente o el número de proforma"),
     estado: EstadoCotizacion | None = Query(default=None),
     desde: date | None = Query(default=None, description="Emitidas desde esta fecha, inclusive"),
     hasta: date | None = Query(default=None, description="Emitidas hasta esta fecha, inclusive"),

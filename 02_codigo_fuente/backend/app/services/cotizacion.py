@@ -10,9 +10,11 @@ ese momento — es un snapshot, no se recalcula después.
 
 from datetime import date, datetime, time, timedelta, timezone
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import settings
+from app.core.texto import escapar_comodines_ilike
 from app.models.cliente import Cliente
 from app.models.cotizacion import Cotizacion, EstadoCotizacion, ItemCotizacion, MaterialCotizado
 from app.models.material import Material
@@ -158,12 +160,20 @@ def listar_cotizaciones(
 
     `buscar` es texto libre contra el nombre del cliente en el snapshot
     (no contra el catálogo `Cliente`): así cubre también las cotizaciones
-    hechas al vuelo, sin `cliente_id`. `desde`/`hasta` filtran por la
-    fecha de emisión (`created_at`), inclusive en los dos extremos.
+    hechas al vuelo, sin `cliente_id`. También busca en `numero_proforma`,
+    ya que RF-10 pide poder encontrar una cotización por su proforma.
+    `desde`/`hasta` filtran por la fecha de emisión (`created_at`),
+    inclusive en los dos extremos.
     """
     query = db.query(Cotizacion)
     if buscar:
-        query = query.filter(Cotizacion.cliente_nombre.ilike(f"%{buscar}%"))
+        patron = f"%{escapar_comodines_ilike(buscar)}%"
+        query = query.filter(
+            or_(
+                Cotizacion.cliente_nombre.ilike(patron, escape="\\"),
+                Cotizacion.numero_proforma.ilike(patron, escape="\\"),
+            )
+        )
     if estado is not None:
         query = query.filter(Cotizacion.estado == estado)
     if desde is not None:

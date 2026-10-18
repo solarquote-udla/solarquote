@@ -29,6 +29,7 @@ import {
   type CotizacionResumen,
   type Proyecto,
 } from "@/types/api";
+import { formatoMoneda } from "@/utils/dinero";
 import { fechaHora } from "@/utils/fechas";
 
 type Vista = "en-curso" | "cotizaciones";
@@ -209,25 +210,44 @@ function ProyectosEnCurso() {
 
 const POR_PAGINA = 20;
 
+function estadoDesdeUrl(valor: string | null): EstadoCotizacion | "" {
+  return valor && (Object.values(EstadoCotizacion) as string[]).includes(valor) ? (valor as EstadoCotizacion) : "";
+}
+
 function CotizacionesHistorial() {
+  const [parametros, setParametros] = useSearchParams();
+
   const [resultados, setResultados] = useState<CotizacionResumen[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPaginas, setTotalPaginas] = useState(1);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [buscar, setBuscar] = useState("");
-  const [buscarDebounced, setBuscarDebounced] = useState("");
-  const [estado, setEstado] = useState<EstadoCotizacion | "">("");
-  const [desde, setDesde] = useState("");
-  const [hasta, setHasta] = useState("");
-  const [pagina, setPagina] = useState(1);
+  // El valor inicial sale de la URL: así no se pierden los filtros al
+  // volver del detalle con el botón atrás, ni al recargar la página.
+  const [buscar, setBuscar] = useState(() => parametros.get("buscar") ?? "");
+  const [buscarDebounced, setBuscarDebounced] = useState(buscar);
+  const [estado, setEstado] = useState<EstadoCotizacion | "">(() => estadoDesdeUrl(parametros.get("estado")));
+  const [desde, setDesde] = useState(() => parametros.get("desde") ?? "");
+  const [hasta, setHasta] = useState(() => parametros.get("hasta") ?? "");
+  const [pagina, setPagina] = useState(() => Math.max(1, Number(parametros.get("pagina")) || 1));
 
   // Solo el texto libre espera a que el usuario deje de escribir.
   useEffect(() => {
     const temporizador = setTimeout(() => setBuscarDebounced(buscar), 300);
     return () => clearTimeout(temporizador);
   }, [buscar]);
+
+  // Refleja los filtros vigentes en la URL (?vista=cotizaciones&...).
+  useEffect(() => {
+    const nuevos: Record<string, string> = { vista: "cotizaciones" };
+    if (buscarDebounced) nuevos.buscar = buscarDebounced;
+    if (estado) nuevos.estado = estado;
+    if (desde) nuevos.desde = desde;
+    if (hasta) nuevos.hasta = hasta;
+    if (pagina > 1) nuevos.pagina = String(pagina);
+    setParametros(nuevos, { replace: true });
+  }, [buscarDebounced, estado, desde, hasta, pagina, setParametros]);
 
   // Estado, rango de fechas y paginación consultan de inmediato.
   useEffect(() => {
@@ -281,11 +301,11 @@ function CotizacionesHistorial() {
 
       <div className="mt-4 flex flex-wrap items-end gap-3">
         <label className="text-sm">
-          <span className="mb-1 block text-acero-600">Cliente</span>
+          <span className="mb-1 block text-acero-600">Cliente o proforma</span>
           <input
             type="search"
             className="w-56 rounded-lg border border-acero-300 bg-acero-50 px-3 py-2 text-sm text-acero-900 placeholder:text-acero-400 focus:border-solar-500 focus:outline-none focus:ring-1 focus:ring-solar-500"
-            placeholder="Buscar por cliente"
+            placeholder="Cliente o proforma"
             value={buscar}
             onChange={(e) => cambiarBuscar(e.target.value)}
           />
@@ -357,6 +377,7 @@ function CotizacionesHistorial() {
           <table className={["w-full text-sm", cargando ? "opacity-60" : ""].join(" ")}>
             <thead className="bg-acero-50 text-left text-xs uppercase tracking-wide text-acero-500">
               <tr>
+                <th className="px-4 py-3 font-medium">Proforma</th>
                 <th className="px-4 py-3 font-medium">Cliente</th>
                 <th className="px-4 py-3 font-medium">Proyecto</th>
                 <th className="px-4 py-3 font-medium">Estado</th>
@@ -368,6 +389,7 @@ function CotizacionesHistorial() {
             <tbody className="divide-y divide-acero-200">
               {resultados.map((c) => (
                 <tr key={c.id} className="hover:bg-acero-100/40">
+                  <td className="px-4 py-3 font-mono text-xs text-acero-500">{c.numero_proforma ?? "—"}</td>
                   <td className="px-4 py-3">
                     <p className="font-medium text-acero-800">{c.cliente_nombre}</p>
                     {c.cliente_empresa && <p className="text-xs text-acero-500">{c.cliente_empresa}</p>}
@@ -377,11 +399,15 @@ function CotizacionesHistorial() {
                     <EstadoCotizacionBadge estado={c.estado} />
                   </td>
                   <td className="px-4 py-3 text-right font-medium text-acero-800">
-                    {c.total !== null ? `$${c.total}` : "—"}
+                    {formatoMoneda(c.total)}
                   </td>
                   <td className="px-4 py-3 text-xs text-acero-500">{fechaHora(c.created_at)}</td>
                   <td className="px-4 py-3 text-right">
-                    <Link to={`/cotizaciones/${c.id}`} className="text-sm font-medium text-solar-700 hover:underline">
+                    <Link
+                      to={`/cotizaciones/${c.id}`}
+                      state={{ volverA: `/historial?${parametros.toString()}` }}
+                      className="text-sm font-medium text-solar-700 hover:underline"
+                    >
                       Ver detalle
                     </Link>
                   </td>
