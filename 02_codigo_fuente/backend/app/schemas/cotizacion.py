@@ -7,7 +7,14 @@ stateless, así que el backend valida la entrada y resuelve la salida
 con los mismos nombres de campo, sin traducir nada de por medio.
 
 `CotizacionCrear`/`CotizacionLeer` son del endpoint orquestador
-(`POST /api/cotizacion`): arma el cálculo anterior y lo persiste.
+(`POST /api/cotizaciones`): arma el cálculo anterior y lo persiste.
+
+`CotizacionResumenLeer`/`CotizacionDetalleLeer`/`CotizacionesPaginaLeer`
+son del historial (RF-10): leen lo que quedó persistido, no el resultado
+de calc-service. Por eso `CotizacionDetalleLeer` no tiene la cantidad de
+cada material POR ÍTEM (`ResultadoCalculoCotizacion.items[].cantidades`):
+esa nunca se guardó, solo el total por material de toda la cotización
+(ver `MaterialCotizado` en models/cotizacion.py).
 """
 
 from datetime import datetime
@@ -113,3 +120,79 @@ class CotizacionLeer(BaseModel):
     # la Cotización: esto es la misma información, con el detalle por
     # ítem y por material que no amerita columnas propias.
     calculo: ResultadoCalculoCotizacion
+
+
+# ─── Historial (RF-10) ───────────────────────────────────────────────
+
+
+class CotizacionResumenLeer(BaseModel):
+    """Una fila del listado: lo necesario para identificarla y filtrar."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    numero_proforma: str | None
+    estado: EstadoCotizacion
+    cliente_nombre: str
+    cliente_empresa: str | None
+    proyecto_id: int | None
+    proyecto_nombre: str | None
+    total: Decimal | None
+    created_at: datetime
+
+
+class ItemCotizacionLeer(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    paneles_largo: int
+    paneles_ancho: int
+    bloques: int
+
+
+class MaterialCotizadoLeer(BaseModel):
+    """Cantidad y precio del material TAL COMO SE EMITIÓ, no el catálogo actual."""
+
+    material_id: int
+    codigo: str
+    nombre: str
+    unidad: str
+    cantidad: int
+    precio_unitario: Decimal
+
+
+class CotizacionDetalleLeer(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    numero_proforma: str | None
+    estado: EstadoCotizacion
+
+    cliente_id: int | None
+    cliente_nombre: str
+    cliente_empresa: str | None
+    cliente_email: str | None
+    cliente_telefono: str | None
+
+    proyecto_id: int | None
+    proyecto_nombre: str | None
+
+    addendum_porcentaje: Decimal
+    subtotal: Decimal | None
+    addendum_monto: Decimal | None
+    iva_porcentaje: Decimal | None
+    iva_monto: Decimal | None
+    total: Decimal | None
+
+    created_at: datetime
+    updated_at: datetime
+
+    items: list[ItemCotizacionLeer]
+    materiales: list[MaterialCotizadoLeer]
+
+
+class CotizacionesPaginaLeer(BaseModel):
+    resultados: list[CotizacionResumenLeer]
+    total: int
+    pagina: int
+    por_pagina: int
+    total_paginas: int
