@@ -90,10 +90,12 @@ describe("TableroIndicadores", () => {
     expect(screen.getByText("Distribución por estado")).toBeTruthy();
     expect(screen.getByText("Clientes más frecuentes")).toBeTruthy();
     expect(screen.getByText("Materiales de mayor consumo")).toBeTruthy();
-    // Tarjetas del resumen (RF-13): cotizaciones, monto y paneles.
+    // Tarjetas del resumen (RF-13): cotizaciones, monto, paneles y tiempo ahorrado.
     expect(screen.getByText("3")).toBeTruthy();
     expect(screen.getByText("$300.00")).toBeTruthy();
     expect(screen.getByText("48")).toBeTruthy();
+    // 3 cotizaciones × 35 min (45 manual − 10 con el sistema, acordado con Joseph) = 105 min.
+    expect(screen.getByText("1 h 45 min")).toBeTruthy();
     // materiales_mas_consumidos vino vacío del servicio simulado.
     expect(screen.getByText("Sin datos para este rango.")).toBeTruthy();
   });

@@ -26,6 +26,20 @@ const formatoIntl = new Intl.NumberFormat("en-US", { style: "currency", currency
 const formatoMoneda = (valor: number) => formatoIntl.format(valor);
 const formatoEntero = new Intl.NumberFormat("en-US");
 
+// Supuesto acordado con Joseph: 45 min una cotización manual, 10 min con
+// el asistente de principio a fin (terreno + equipo + layout + cotizar).
+const MINUTOS_COTIZACION_MANUAL = 45;
+const MINUTOS_COTIZACION_SISTEMA = 10;
+const MINUTOS_AHORRADOS_POR_COTIZACION = MINUTOS_COTIZACION_MANUAL - MINUTOS_COTIZACION_SISTEMA;
+
+/** 90 → "1 h 30 min"; 35 → "35 min" */
+function formatoTiempoAhorrado(minutos: number): string {
+  if (minutos < 60) return `${minutos} min`;
+  const horas = Math.floor(minutos / 60);
+  const resto = minutos % 60;
+  return resto === 0 ? `${horas} h` : `${horas} h ${resto} min`;
+}
+
 const ACCESOS_DIRECTOS: { ruta: string; etiqueta: string; permisos: Permiso[] }[] = [
   { ruta: "/generar", etiqueta: "Generar layout solar", permisos: [Permiso.GENERAR_LAYOUT] },
   { ruta: "/historial", etiqueta: "Historial", permisos: [Permiso.HISTORIAL, Permiso.GENERAR_LAYOUT] },
@@ -130,7 +144,7 @@ export function TableroIndicadores() {
         <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
       ) : tablero ? (
         <div className={`mt-4 transition-opacity ${cargando ? "opacity-50" : ""}`}>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <div className="rounded-xl border border-acero-200 bg-superficie p-4">
               <p className="text-xs text-acero-500">Cotizaciones</p>
               <p className="mt-1 text-2xl font-bold text-acero-900">
@@ -147,6 +161,12 @@ export function TableroIndicadores() {
               <p className="text-xs text-acero-500">Paneles cotizados</p>
               <p className="mt-1 text-2xl font-bold text-acero-900">
                 {formatoEntero.format(tablero.resumen.paneles_cotizados)}
+              </p>
+            </div>
+            <div className="rounded-xl border border-acero-200 bg-superficie p-4">
+              <p className="text-xs text-acero-500">Tiempo ahorrado</p>
+              <p className="mt-1 text-2xl font-bold text-acero-900">
+                {formatoTiempoAhorrado(tablero.resumen.total_cotizaciones * MINUTOS_AHORRADOS_POR_COTIZACION)}
               </p>
             </div>
           </div>
