@@ -63,7 +63,10 @@ criterio quede explícito.
 """
 
 import math
+from bisect import bisect_left
+from collections.abc import Sequence
 from dataclasses import dataclass, field
+from itertools import accumulate
 
 from shapely.affinity import rotate
 from shapely import STRtree
@@ -71,11 +74,7 @@ from shapely.geometry import Point, Polygon, box
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union
 
-from app.services.calculo_equipo import (
-    inversores_sugeridos,
-    limites_string,
-    separacion_entre_filas,
-)
+from app.services.calculo_equipo import limites_string, separacion_entre_filas
 
 # Proporción estructural ancho / largo validada por simulación antisísmica.
 RELACION_OBJETIVO = 3.0
@@ -177,13 +176,14 @@ class Capacidad:
 
 
 @dataclass(frozen=True)
-class Electrica:
+class ElectricaInversor:
+    """Strings de un inversor con los paneles de los bloques que tiene asignados."""
+
     paneles_por_string_min: int | None
     paneles_por_string_max: int | None
     paneles_por_string: int | None
-    strings_totales: int | None
+    strings: int | None
     paneles_sin_string: int | None
-    inversores: int
     strings_por_mppt: int | None
     compatible: bool | None
     motivo: str | None
@@ -203,7 +203,6 @@ class ResultadoLayout:
     area_util_m2: float
     area_ocupada_m2: float
     capacidad: Capacidad | None
-    electrica: Electrica
     advertencias: list[str] = field(default_factory=list)
     # Necesarios para editar bloques después (SQ-64): con la orientación
     # y el ancho de un panel, un bloque se reconstruye a partir de su
@@ -403,75 +402,128 @@ def _recortar_a_capacidad(
     return resultado
 
 
-def configuracion_electrica(total_paneles: int, panel_voc: float | None,
-                            panel_vmp: float | None,
-                            inversor: InversorLayout) -> Electrica:
+def electrica_inversor(
+    paneles: int,
+    panel_voc: float | None,
+    panel_vmp: float | None,
+    inversor: InversorLayout,
+) -> ElectricaInversor:
     """
-    Strings y distribución por MPPT para el total de paneles del layout.
+    Strings y distribución por MPPT de un inversor, con los paneles de
+    los bloques que tiene asignados.
 
     Se usa el string más largo permitido: menos strings, menos cableado
     y menos entradas de MPPT ocupadas. Los paneles que no completan un
     string se informan para que el instalador decida (acortar strings o
     quitar paneles).
     """
-    inversores = inversores_sugeridos(total_paneles)
-    sin_datos = Electrica(
+    vacio = dict(
         paneles_por_string_min=None,
         paneles_por_string_max=None,
         paneles_por_string=None,
-        strings_totales=None,
+        strings=None,
         paneles_sin_string=None,
-        inversores=inversores,
         strings_por_mppt=None,
-        compatible=None,
-        motivo="Faltan Vmax y Vmin del inversor para calcular los strings.",
     )
+    if paneles <= 0:
+        return ElectricaInversor(**vacio, compatible=None, motivo="No tiene bloques asignados.")
     if not (inversor.vmax_v and inversor.vmin_v and panel_voc and panel_vmp):
-        return sin_datos
+        return ElectricaInversor(
+            **vacio,
+            compatible=None,
+            motivo="Faltan Vmax y Vmin del inversor para calcular los strings.",
+        )
 
     limites = limites_string(inversor.vmax_v, inversor.vmin_v, panel_voc, panel_vmp)
     if not limites.compatible:
-        return Electrica(
-            paneles_por_string_min=limites.paneles_min,
-            paneles_por_string_max=limites.paneles_max,
-            paneles_por_string=None,
-            strings_totales=None,
-            paneles_sin_string=None,
-            inversores=inversores,
-            strings_por_mppt=None,
+        return ElectricaInversor(
+            **{**vacio, "paneles_por_string_min": limites.paneles_min, "paneles_por_string_max": limites.paneles_max},
             compatible=False,
             motivo=limites.motivo,
         )
 
     por_string = limites.paneles_max
-    strings = total_paneles // por_string
-    sobrantes = total_paneles % por_string
+    strings = paneles // por_string
+    sobrantes = paneles % por_string
 
     por_mppt = None
     compatible = True
     motivo = None
-    if inversor.mppts and inversores:
-        por_mppt = math.ceil(strings / (inversores * inversor.mppts)) if strings else 0
+    if inversor.mppts:
+        por_mppt = math.ceil(strings / inversor.mppts) if strings else 0
         if inversor.strings_por_mppt and por_mppt > inversor.strings_por_mppt:
             compatible = False
-            necesarios = math.ceil(strings / (inversor.mppts * inversor.strings_por_mppt))
+            admite = inversor.mppts * inversor.strings_por_mppt * por_string
             motivo = (
-                f"Con {inversores} inversor(es) cada MPPT recibiría {por_mppt} strings y "
-                f"admite {inversor.strings_por_mppt}. Se necesitan al menos {necesarios} "
-                f"inversores de este modelo."
+                f"Cada MPPT recibiría {por_mppt} strings y admite {inversor.strings_por_mppt}: "
+                f"este inversor admite hasta {admite} paneles y tiene {paneles}. Agrega otro "
+                f"inversor o pasa bloques a uno con menos carga."
             )
 
-    return Electrica(
+    return ElectricaInversor(
         paneles_por_string_min=limites.paneles_min,
         paneles_por_string_max=limites.paneles_max,
         paneles_por_string=por_string,
-        strings_totales=strings,
+        strings=strings,
         paneles_sin_string=sobrantes,
-        inversores=inversores,
         strings_por_mppt=por_mppt,
         compatible=compatible,
         motivo=motivo,
     )
+
+
+# ─── Asignación de bloques a inversores ─────────────────────────────
+
+
+def asignar_inversores(
+    bloques: Sequence[tuple[list[list[float]], int]],
+    potencias_kw: Sequence[float],
+    angulo_norte: float = 0.0,
+) -> list[int]:
+    """
+    A qué inversor va cada bloque: el número del inversor (0 = el primero).
+
+    `bloques` son pares (vértices, paneles). Los bloques se recorren de
+    oeste a este por franja y, dentro de cada franja, de sur a norte (el
+    mismo orden en que el algoritmo los ubica), y se cortan en tramos
+    seguidos. Así cada inversor recibe un sector compacto de la planta,
+    que es lo que acorta el cableado.
+
+    Cada inversor recibe paneles en proporción a su potencia: con dos
+    iguales, mitad y mitad. Un bloque no se parte, así que el reparto
+    exacto se aproxima: el bloque va al inversor en cuyo tramo cae su
+    punto medio.
+
+    Si hay más inversores que bloques, alguno queda sin bloques; la
+    pantalla lo avisa.
+    """
+    n = len(bloques)
+    if n == 0:
+        return []
+    if len(potencias_kw) <= 1:
+        return [0] * n
+
+    theta = math.radians(angulo_norte)
+    cos_t, sin_t = math.cos(theta), math.sin(theta)
+
+    def posicion_local(i: int) -> tuple[float, float]:
+        # Esquina suroeste llevada al marco con el norte hacia +Y
+        x, y = bloques[i][0][3]
+        return (round(x * cos_t - y * sin_t, 1), y * cos_t + x * sin_t)
+
+    orden = sorted(range(n), key=posicion_local)
+
+    total = sum(paneles for _, paneles in bloques)
+    suma = sum(potencias_kw)
+    cortes = list(accumulate(total * p / suma for p in potencias_kw[:-1]))
+
+    asignacion = [0] * n
+    acumulado = 0
+    for i in orden:
+        paneles = bloques[i][1]
+        asignacion[i] = bisect_left(cortes, acumulado + paneles / 2)
+        acumulado += paneles
+    return asignacion
 
 
 # ─── Agrupación por tipo ────────────────────────────────────────────
@@ -551,15 +603,11 @@ def generar_layout(
     *,
     orientacion_norte: float | None = None,
     latitud: float | None = None,
-    inversor: InversorLayout | None = None,
-    panel_voc: float | None = None,
-    panel_vmp: float | None = None,
 ) -> ResultadoLayout:
     if parametros.paneles_largo < 2 or parametros.paneles_largo % 2:
         raise LayoutImposible("L debe ser un número par mayor o igual a 2.")
 
     advertencias: list[str] = []
-    inversor = inversor or InversorLayout()
 
     lado_mayor = max(panel.largo_mm, panel.ancho_mm) / 1000
     lado_menor = min(panel.largo_mm, panel.ancho_mm) / 1000
@@ -691,8 +739,6 @@ def generar_layout(
             "prueba con otro L."
         )
 
-    electrica = configuracion_electrica(total, panel_voc, panel_vmp, inversor)
-
     return ResultadoLayout(
         bloques=bloques,
         tipos=tipos,
@@ -706,7 +752,6 @@ def generar_layout(
         area_util_m2=round(area_util, 2),
         area_ocupada_m2=round(sum(Polygon(b.vertices).area for b in bloques), 2),
         capacidad=capacidad,
-        electrica=electrica,
         advertencias=advertencias,
         angulo_norte=angulo,
         lado_menor_m=lado_menor,

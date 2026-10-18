@@ -1,9 +1,10 @@
 """
 Schemas de la configuración de equipo — RF-02.
 
-En la API, panel e inversor van anidados para que el contrato se lea
-solo; en la tabla van planos porque la relación es uno a uno. El
-servicio traduce entre ambas formas.
+En la API, el panel va anidado para que el contrato se lea solo; en la
+tabla va plano porque es uno por proyecto. Los inversores son una lista:
+el primero es el "Inversor 1" del plano. El servicio traduce entre
+ambas formas.
 
 Reglas del documento de titulación:
   - Ángulo de montaje entre 0 y 90 grados
@@ -63,10 +64,25 @@ class Inversor(BaseModel):
         return self
 
 
+#: Tope práctico: una planta de 5 MWp con paneles de 550 Wp usa ~23
+#: inversores de 400 paneles. Evita listas absurdas por error.
+MAX_INVERSORES = 50
+
+
 class ConfiguracionEquipoGuardar(BaseModel):
     panel: Panel
     angulo_montaje: float = Field(ge=0, le=90, description="Inclinación en grados")
-    inversor: Inversor
+    inversores: list[Inversor] = Field(
+        min_length=1,
+        max_length=MAX_INVERSORES,
+        description="En orden: el primero es el Inversor 1",
+    )
+    potencia_objetivo_kwp: float | None = Field(
+        default=None,
+        gt=0,
+        le=1_000_000,
+        description="Potencia que pide el cliente. Opcional: con ella se sugiere cuántos inversores usar.",
+    )
 
 
 # ─── Resultados calculados ──────────────────────────────────────────
@@ -94,6 +110,16 @@ class LimitesStringLeer(BaseModel):
     motivo: str | None
 
 
+class SugerenciaLeer(BaseModel):
+    """La "Sugerencia automática" del prototipo, a partir de la potencia objetivo."""
+
+    paneles: int
+    potencia_kwp: float
+    inversores: int
+    paneles_por_inversor: int
+    kwp_por_inversor: float
+
+
 class CalculosEquipo(BaseModel):
     """
     Derivados de la configuración. No se guardan: se recalculan en cada
@@ -102,7 +128,10 @@ class CalculosEquipo(BaseModel):
 
     area_panel_m2: float
     separacion: SeparacionFilas | None
-    strings: LimitesStringLeer | None
+    strings: list[LimitesStringLeer | None] = Field(
+        description="Límites de string de cada inversor, en el mismo orden; null si le faltan los voltajes",
+    )
+    sugerencia: SugerenciaLeer | None = Field(description="Null si no hay potencia objetivo")
     advertencias: list[str]
 
 
@@ -110,7 +139,8 @@ class ConfiguracionEquipoLeer(BaseModel):
     proyecto_id: int
     panel: Panel
     angulo_montaje: float
-    inversor: Inversor
+    inversores: list[Inversor]
+    potencia_objetivo_kwp: float | None
     calculos: CalculosEquipo
     created_at: datetime
     updated_at: datetime
