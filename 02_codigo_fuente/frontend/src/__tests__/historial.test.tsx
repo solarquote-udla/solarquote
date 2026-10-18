@@ -85,17 +85,28 @@ describe("HistorialPage", () => {
     expect(screen.getByText("$436.77")).toBeTruthy();
   });
 
-  it("buscar por cliente pasa el texto al servicio", async () => {
-    montar(<HistorialPage />, "/historial", ["/historial"]);
+  it("buscar por cliente o proforma pasa el texto al servicio y queda en la URL", async () => {
+    const { router } = montar(<HistorialPage />, "/historial", ["/historial"]);
     await act(async () => fireEvent.click(screen.getByText("Cotizaciones")));
     await screen.findByText("Constructora Andina");
 
-    fireEvent.change(screen.getByPlaceholderText("Buscar por cliente"), { target: { value: "andina" } });
+    fireEvent.change(screen.getByPlaceholderText("Cliente o proforma"), { target: { value: "andina" } });
 
     await waitFor(() => {
       const llamadas = vi.mocked(cotizaciones.listarCotizaciones).mock.calls;
       expect(llamadas.at(-1)?.[0]).toMatchObject({ buscar: "andina", pagina: 1 });
     });
+    // No se pierde al volver del detalle (botón atrás) ni al recargar.
+    expect(router.state.location.search).toContain("buscar=andina");
+  });
+
+  it("muestra la columna Proforma, con guion si la cotización no tiene número", async () => {
+    montar(<HistorialPage />, "/historial", ["/historial"]);
+    await act(async () => fireEvent.click(screen.getByText("Cotizaciones")));
+
+    const fila = (await screen.findByText("Constructora Andina")).closest("tr") as HTMLElement;
+    const primeraCelda = fila.querySelector("td");
+    expect(primeraCelda?.textContent).toBe("—");
   });
 
   it("cada fila enlaza al detalle de su cotización", async () => {
