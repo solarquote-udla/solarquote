@@ -15,6 +15,10 @@
  * eliminar sobre el plano. Se trabaja sobre un borrador local que se
  * valida en vivo con las mismas reglas del backend; al guardar, el
  * backend recalcula tipos, potencia y eléctrica.
+ *
+ * Inversores: cada bloque se pinta con el color del inversor al que va
+ * conectado. El backend los reparte al generar; "Reagrupar" los vuelve a
+ * repartir y, en modo edición, un bloque se puede pasar a otro inversor.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
@@ -28,7 +32,7 @@ import { useCambiosSinGuardar } from "@/hooks/useCambiosSinGuardar";
 import { useAccionUnica } from "@/hooks/useAccionUnica";
 import { mensajeDeError } from "@/services/api";
 import { obtenerEquipo } from "@/services/equipo";
-import { generarLayout, guardarBloques, obtenerLayout } from "@/services/layout";
+import { generarLayout, guardarBloques, obtenerLayout, reagruparLayout } from "@/services/layout";
 import { obtenerProyecto } from "@/services/proyectos";
 import { agregarCamino, eliminarCamino, obtenerTerreno } from "@/services/terreno";
 import {
@@ -49,6 +53,10 @@ import {
   type GeometriaLayout,
 } from "@/utils/edicionLayout";
 import { formatearArea, limitesDe } from "@/utils/geometria";
+import { colorInversor } from "@/utils/inversores";
+
+/** Un bloque del borrador: geometría editable más el inversor al que va. */
+type BloqueBorrador = BloqueEdicion & { inversor: number };
 
 /** El arrastre se ajusta al centímetro: más fino no se puede replantear en obra. */
 const AJUSTE_ARRASTRE_M = 0.01;
@@ -71,6 +79,12 @@ function contarCambios(original: BloqueEdicion[], borrador: BloqueEdicion[]): nu
   const agregados = [...nuevos].filter((k) => !previos.has(k)).length;
   const quitados = [...previos].filter((k) => !nuevos.has(k)).length;
   return Math.max(agregados, quitados);
+}
+
+/** Bloques que cambiaron de inversor (los movidos se comparan por su clave local). */
+function contarCambiosDeInversor(original: BloqueBorrador[], borrador: BloqueBorrador[]): number {
+  const antes = new Map(original.map((b) => [b.clave, b.inversor]));
+  return borrador.filter((b) => antes.has(b.clave) && antes.get(b.clave) !== b.inversor).length;
 }
 
 /**
@@ -163,8 +177,12 @@ function posicionCentrada(terreno: Punto[], direccion: Direccion): string {
   return String(Math.round(extensionEje(terreno, direccion) / 2));
 }
 
-function desdeLayout(l: Layout | null): Parametros {
-  if (!l) return PARAMETROS_DEFECTO;
+/**
+ * Parámetros del formulario. Sin layout, la capacidad deseada parte de la
+ * potencia objetivo del Paso 2 (prototipo: se define una sola vez).
+ */
+function desdeLayout(l: Layout | null, objetivoKwp: number | null = null): Parametros {
+  if (!l) return { ...PARAMETROS_DEFECTO, kwp: objetivoKwp == null ? "" : String(objetivoKwp) };
   return {
     L: String(l.parametros.paneles_largo),
     pasillo: String(l.parametros.pasillo_m),
@@ -251,9 +269,10 @@ export function LayoutPage() {
 
   // ─── Edición manual (SQ-64) ──────────────────────────
   // null = no se está editando
-  const [borrador, setBorrador] = useState<BloqueEdicion[] | null>(null);
+  const [borrador, setBorrador] = useState<BloqueBorrador[] | null>(null);
   const [seleccionado, setSeleccionado] = useState<number | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [reagrupando, setReagrupando] = useState(false);
   const origenAlArrastrar = useRef<Punto | null>(null);
   const navegar = useNavigate();
 
@@ -265,8 +284,14 @@ export function LayoutPage() {
   const [procesandoCamino, setProcesandoCamino] = useState(false);
   const unaVez = useAccionUnica();
 
-  const original = useMemo<BloqueEdicion[]>(
-    () => (layout?.bloques ?? []).map((b, i) => ({ clave: i, origen: b.vertices[3], paneles_ancho: b.paneles_ancho })),
+  const original = useMemo<BloqueBorrador[]>(
+    () =>
+      (layout?.bloques ?? []).map((b, i) => ({
+        clave: i,
+        origen: b.vertices[3],
+        paneles_ancho: b.paneles_ancho,
+        inversor: b.inversor,
+      })),
     [layout],
   );
 
@@ -286,7 +311,13 @@ export function LayoutPage() {
     [borrador, geometria, terreno],
   );
 
-  const cambios = useMemo(() => (borrador ? contarCambios(original, borrador) : 0), [borrador, original]);
+  const cambios = useMemo(
+    () => (borrador ? contarCambios(original, borrador) + contarCambiosDeInversor(original, borrador) : 0),
+    [borrador, original],
+  );
+
+  /** Inversores del equipo: los del layout se calculan con el equipo actual, son los mismos. */
+  const cantidadInversores = layout?.inversores.length || equipo?.inversores.length || 1;
 
   /** Bloques a dibujar: los guardados, o el borrador si se está editando. */
   const dibujo = useMemo<BloqueDibujo[]>(() => {
@@ -306,6 +337,7 @@ export function LayoutPage() {
       paneles_largo: layout.parametros.paneles_largo,
       paneles_ancho: b.paneles_ancho,
       en_proporcion: Math.abs((porPanel * b.paneles_ancho) / 3 - 1) <= tolerancia + 1e-6,
+      inversor: b.inversor,
       problema: problemas.get(b.clave),
     }));
   }, [layout, borrador, geometria, problemas]);
@@ -329,6 +361,10 @@ export function LayoutPage() {
     setBorrador((bs) => bs?.filter((b) => b.clave !== seleccionado) ?? null);
     setSeleccionado(null);
   }, [seleccionado]);
+
+  function cambiarInversor(inversor: number) {
+    setBorrador((bs) => bs?.map((b) => (b.clave === seleccionado ? { ...b, inversor } : b)) ?? null);
+  }
 
   function cambiarA(delta: number) {
     setBorrador((bs) =>
@@ -384,7 +420,7 @@ export function LayoutPage() {
     try {
       const nuevo = await guardarBloques(
         proyectoId,
-        borrador.map((b) => ({ origen: redondearMm(b.origen), paneles_ancho: b.paneles_ancho })),
+        borrador.map((b) => ({ origen: redondearMm(b.origen), paneles_ancho: b.paneles_ancho, inversor: b.inversor })),
       );
       setLayout(nuevo);
       setBorrador(null);
@@ -394,6 +430,27 @@ export function LayoutPage() {
       setError(mensajeDeError(e, "No se pudo guardar la edición"));
     } finally {
       setGuardando(false);
+    }
+  }
+
+  /** "Reagrupar" del prototipo: reparte de nuevo los bloques entre los inversores. */
+  async function reagrupar() {
+    if (!layout) return;
+    const aMano = layout.ediciones_manuales;
+    setError(null);
+    setAviso(null);
+    setReagrupando(true);
+    try {
+      const nuevo = await reagruparLayout(proyectoId);
+      setLayout(nuevo);
+      setAviso(
+        `Bloques repartidos entre ${nuevo.inversores.length} inversores.` +
+          (aMano > 0 ? " Las ediciones de posición y tamaño se conservan." : ""),
+      );
+    } catch (e) {
+      setError(mensajeDeError(e, "No se pudieron reagrupar los bloques"));
+    } finally {
+      setReagrupando(false);
     }
   }
 
@@ -413,7 +470,7 @@ export function LayoutPage() {
         setTerreno(t);
         setEquipo(e);
         setLayout(l);
-        setParametros(desdeLayout(l));
+        setParametros(desdeLayout(l, e?.potencia_objetivo_kwp ?? null));
       })
       .catch((e) => {
         if (!cancelado) setErrorCarga(mensajeDeError(e, "No se pudo cargar el proyecto"));
@@ -535,7 +592,7 @@ export function LayoutPage() {
     try {
       const nuevo = await generarLayout(proyectoId, resultado.datos);
       setLayout(nuevo);
-      setParametros(desdeLayout(nuevo));
+      setParametros(desdeLayout(nuevo, equipo?.potencia_objetivo_kwp ?? null));
     } catch (e) {
       setError(mensajeDeError(e, "No se pudo generar el layout"));
     } finally {
@@ -550,7 +607,9 @@ export function LayoutPage() {
    * guardar, un camino a medio cargar, parámetros cambiados sin volver a
    * generar y los datos del proyecto en edición.
    */
-  const parametrosCambiados = JSON.stringify(aPeticion(parametros)) !== JSON.stringify(aPeticion(desdeLayout(layout)));
+  const parametrosCambiados =
+    JSON.stringify(aPeticion(parametros)) !==
+    JSON.stringify(aPeticion(desdeLayout(layout, equipo?.potencia_objetivo_kwp ?? null)));
   const caminoACargar = formCamino !== null && JSON.stringify(formCamino) !== JSON.stringify(formCaminoInicial);
   const sinGuardar = borrador !== null || caminoACargar || parametrosCambiados || encabezadoSucio;
   useCambiosSinGuardar(sinGuardar);
@@ -716,6 +775,7 @@ export function LayoutPage() {
                   <p className="font-semibold">Modo edición</p>
                   <p className="text-xs">
                     Arrastra un bloque para moverlo. Flechas: 10 cm (con Shift, 1 m). Supr: eliminar.
+                    {cantidadInversores > 1 && " Para pasar un bloque a otro inversor, selecciónalo y elige el inversor."}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -754,6 +814,22 @@ export function LayoutPage() {
                       +
                     </button>
                   </span>
+                  {cantidadInversores > 1 && (
+                    <label className="flex items-center gap-1.5 text-xs text-acero-500">
+                      Inversor:
+                      <select
+                        className="rounded border border-acero-300 bg-superficie px-2 py-1 text-sm text-acero-800"
+                        value={bloqueSeleccionado.inversor}
+                        onChange={(e) => cambiarInversor(Number(e.target.value))}
+                      >
+                        {Array.from({ length: cantidadInversores }, (_, i) => (
+                          <option key={i} value={i}>
+                            Inversor {i + 1}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                   <button type="button" onClick={eliminarSeleccionado} className="text-sm text-red-700 hover:underline">
                     Eliminar bloque
                   </button>
@@ -772,6 +848,7 @@ export function LayoutPage() {
               bloques={dibujo}
               orientacionNorte={terreno.orientacion_norte}
               desactualizado={layout?.desactualizado}
+              inversores={cantidadInversores}
               editable={borrador !== null}
               seleccionado={seleccionado}
               onSeleccionar={setSeleccionado}
@@ -810,6 +887,58 @@ export function LayoutPage() {
               </div>
             ))}
           </div>
+
+          {/* ─── Bloques por inversor (prototipo: "BLOQUES · REAGRUPAR") ─── */}
+          {layout && (
+            <div className="rounded-xl border border-acero-200 bg-superficie p-5">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xs font-semibold tracking-wider text-acero-400">BLOQUES POR INVERSOR</h2>
+                <button
+                  type="button"
+                  onClick={() => void unaVez("reagrupar", reagrupar)}
+                  disabled={reagrupando || borrador !== null || layout.desactualizado || layout.inversores.length < 2}
+                  title={
+                    layout.inversores.length < 2
+                      ? "Con un solo inversor todos los bloques van a él"
+                      : "Reparte de nuevo los bloques en proporción a la potencia de cada inversor"
+                  }
+                  className="text-xs font-semibold text-solar-700 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {reagrupando ? "Reagrupando…" : "Reagrupar"}
+                </button>
+              </div>
+              <ul className="mt-3 space-y-2">
+                {layout.inversores.map((inv, i) => (
+                  <li key={inv.numero} className="flex items-center justify-between gap-3 rounded-lg border border-acero-200 px-3 py-2">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className={`h-3 w-3 shrink-0 rounded-sm ${colorInversor(i).muestra}`} aria-hidden />
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium text-acero-800">
+                          Inversor {inv.numero} · {inv.marca} {inv.modelo}
+                        </span>
+                        <span className="block text-xs text-acero-500">
+                          {inv.bloques} bloque{inv.bloques === 1 ? "" : "s"} · {numero(inv.paneles, 0)} paneles ·{" "}
+                          {numero(inv.potencia_kwp, 1)} kWp
+                        </span>
+                      </span>
+                    </span>
+                    <span className={`shrink-0 text-xs font-semibold ${colorInversor(i).texto}`}>
+                      {numero(inv.potencia_kw, 1)} kW
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {layout.inversores.length > 0 && layout.inversores.length !== layout.inversores_sugeridos && (
+                <p className="mt-3 text-xs text-amber-800">
+                  Con {numero(layout.total_paneles, 0)} paneles se sugieren {layout.inversores_sugeridos} inversor
+                  {layout.inversores_sugeridos === 1 ? "" : "es"} (~400 paneles c/u) y hay {layout.inversores.length}.{" "}
+                  <Link to={rutaPaso(proyecto.id, 2)} className="font-semibold underline">
+                    Ajustar en el Paso 2
+                  </Link>
+                </p>
+              )}
+            </div>
+          )}
 
           {/* ─── Caminos de acceso ───────────────────────── */}
           {terreno && (
@@ -1034,37 +1163,45 @@ export function LayoutPage() {
               </Tarjeta>
 
               <Tarjeta titulo="Configuración eléctrica">
-                {layout.electrica.strings_totales == null ? (
-                  <>
-                    <dl className="mt-3 space-y-2">
-                      <Fila nombre="Inversores sugeridos" valor={layout.electrica.inversores} />
-                    </dl>
-                    <p className={["mt-2 text-sm", layout.electrica.compatible === false ? "text-red-700" : "text-acero-500"].join(" ")}>
-                      {layout.electrica.motivo}
-                    </p>
-                  </>
+                {layout.inversores.length === 0 ? (
+                  <p className="mt-2 text-sm text-acero-500">Configura los inversores en el Paso 2.</p>
                 ) : (
-                  <>
-                    <dl className="mt-3 space-y-2">
-                      <Fila nombre="Paneles por string" valor={`${layout.electrica.paneles_por_string} (rango ${layout.electrica.paneles_por_string_min}–${layout.electrica.paneles_por_string_max})`} />
-                      <Fila nombre="Strings totales" valor={layout.electrica.strings_totales} />
-                      {!!layout.electrica.paneles_sin_string && (
-                        <Fila nombre="Paneles sin string completo" valor={layout.electrica.paneles_sin_string} />
-                      )}
-                      <Fila nombre="Inversores (~400 paneles c/u)" valor={layout.electrica.inversores} />
-                      {layout.electrica.strings_por_mppt != null && (
-                        <Fila nombre="Strings por MPPT" valor={layout.electrica.strings_por_mppt} />
-                      )}
-                    </dl>
-                    {layout.electrica.compatible ? (
-                      <span className="mt-3 inline-block rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
-                        Configuración válida
-                      </span>
-                    ) : (
-                      <p className="mt-3 text-sm text-red-700">{layout.electrica.motivo}</p>
-                    )}
-                  </>
+                  <ul className="mt-3 space-y-4">
+                    {layout.inversores.map((inv, i) => (
+                      <li key={inv.numero}>
+                        <p className="flex items-center gap-2 text-sm font-medium text-acero-800">
+                          <span className={`h-2.5 w-2.5 rounded-full ${colorInversor(i).muestra}`} aria-hidden />
+                          Inversor {inv.numero}
+                        </p>
+                        <dl className="mt-1.5 space-y-1.5">
+                          {inv.strings != null && (
+                            <Fila
+                              nombre="Strings"
+                              valor={`${inv.strings} de ${inv.paneles_por_string} paneles (rango ${inv.paneles_por_string_min}–${inv.paneles_por_string_max})`}
+                            />
+                          )}
+                          {!!inv.paneles_sin_string && <Fila nombre="Paneles sin string completo" valor={inv.paneles_sin_string} />}
+                          {inv.strings_por_mppt != null && <Fila nombre="Strings por MPPT" valor={inv.strings_por_mppt} />}
+                          {inv.relacion_dc_ac != null && inv.paneles > 0 && (
+                            <Fila nombre="Relación DC/AC" valor={`${numero(inv.relacion_dc_ac)} (kWp / kW)`} />
+                          )}
+                        </dl>
+                        {inv.compatible ? (
+                          <span className="mt-2 inline-block rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
+                            Configuración válida
+                          </span>
+                        ) : (
+                          <p className={["mt-1.5 text-xs", inv.compatible === false ? "text-red-700" : "text-acero-500"].join(" ")}>
+                            {inv.motivo}
+                          </p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
                 )}
+                <dl className="mt-4 space-y-2 border-t border-acero-200 pt-3">
+                  <Fila nombre="Inversores sugeridos (~400 paneles c/u)" valor={layout.inversores_sugeridos} />
+                </dl>
               </Tarjeta>
 
               {layout.advertencias.length > 0 && (
