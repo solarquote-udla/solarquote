@@ -6,16 +6,23 @@ manda, qué se guarda y qué reglas aplica la API principal. La lectura del
 archivo en sí se prueba en ia-service.
 """
 
+import threading
+import time
 from datetime import datetime, timedelta, timezone
 
 import httpx
 import pytest
+from sqlalchemy import delete
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.permisos import Permiso
+from app.core.security import hash_password
 from app.models.boceto import BloqueBoceto, Boceto
 from app.models.cliente import Cliente, TipoIdentificacion
 from app.models.cotizacion import Cotizacion
+from app.models.perfil import Perfil
+from app.models.usuario import Usuario
 from app.models.proyecto import EstadoProyecto, Proyecto
 from app.services import boceto as servicio
 from app.services.confirmacion import items_del_boceto
@@ -334,3 +341,95 @@ def test_precio_faltante_no_cotiza(api, db, h, pid, ia):
     assert cotizar(api, h, pid, acepta_fuera_de_proporcion=True).status_code == 422
     assert db.query(Cotizacion).count() == 0
 
+
+
+# ─── Revisión del PR #44 (Esteban) ──────────────────────────────────
+
+
+def test_etiqueta_larga_se_recorta_y_no_descarta_la_lectura(api, h, pid, ia):
+    larga = "Bloque tipo A de la segunda etapa norte"  # 39 caracteres
+    ia["respuesta"] = httpx.Response(200, json={**LECTURA, "bloques": [{**LECTURA["bloques"][0], "etiqueta": larga}]})
+    r = subir(api, h, pid)
+    assert r.status_code == 201, r.text
+    assert r.json()["bloques"][0]["etiqueta"] == larga[:20].rstrip()
+
+
+def test_si_se_cotiza_mientras_se_lee_el_boceto_no_se_guarda(api, db, h, pid, monkeypatch):
+    """La lectura tarda: se vuelve a verificar el estado con la fila bloqueada."""
+
+    def lectura_lenta(nombre, contenido):
+        db.get(Proyecto, pid).estado = EstadoProyecto.COTIZADO  # otra pestaña cotizó mientras tanto
+        db.flush()
+        return LECTURA
+
+    monkeypatch.setattr(servicio, "interpretar_boceto", lectura_lenta)
+    assert subir(api, h, pid).status_code == 409
+    assert db.query(Boceto).count() == 0
+
+
+def test_dos_cargas_simultaneas_se_ordenan_y_gana_la_ultima(_engine, monkeypatch):
+    """
+    Sin el bloqueo, las dos cargas insertan un boceto para el mismo
+    proyecto y una choca contra la unicidad: un 500. Con FOR UPDATE, la
+    segunda espera a la primera y la reemplaza.
+    """
+    monkeypatch.setattr(servicio, "interpretar_boceto", lambda nombre, contenido: LECTURA)
+
+    with Session(_engine) as preparar:
+        perfil = Perfil(nombre="Gerente bocetos", clave="gerente_bocetos_carrera", acceso_total=True)
+        preparar.add(perfil)
+        preparar.flush()
+        usuario = Usuario(nombre="U", email="bocetos-carrera@example.com", password_hash=hash_password("Clave1234"), perfil_id=perfil.id)
+        cliente = Cliente(nombre="Carrera", tipo_identificacion=TipoIdentificacion.RUC, identificacion="1710034065001")
+        preparar.add_all([usuario, cliente])
+        preparar.flush()
+        proyecto = Proyecto(nombre="Carrera", cliente_id=cliente.id, usuario_id=usuario.id)
+        preparar.add(proyecto)
+        preparar.commit()
+        ids = {"perfil": perfil.id, "usuario": usuario.id, "cliente": cliente.id, "proyecto": proyecto.id}
+
+    resultado: dict[str, object] = {}
+    primera = Session(_engine)
+    segunda = Session(_engine)
+    try:
+        # La primera carga ya tiene la fila bloqueada y está guardando
+        servicio._bloquear_proyecto(primera, ids["proyecto"])
+
+        def segunda_carga():
+            try:
+                p = segunda.get(Proyecto, ids["proyecto"])
+                u = segunda.get(Usuario, ids["usuario"])
+                resultado["boceto"] = servicio.cargar_boceto(segunda, p, u, "segunda.pdf", PDF).nombre_archivo
+            except Exception as exc:  # noqa: BLE001 — se reporta en la aserción
+                resultado["error"] = repr(exc)
+                segunda.rollback()
+
+        hilo = threading.Thread(target=segunda_carga)
+        hilo.start()
+        time.sleep(0.5)
+        assert hilo.is_alive(), "la segunda carga debía esperar el bloqueo"
+
+        primera.add(
+            Boceto(
+                proyecto_id=ids["proyecto"], usuario_id=ids["usuario"], nombre_archivo="primera.pdf", formato="pdf",
+                tamano_bytes=len(PDF), contenido=PDF, metodo="ia", advertencias=[],
+            )
+        )
+        primera.commit()
+        hilo.join(timeout=10)
+
+        assert resultado == {"boceto": "segunda.pdf"}
+        with Session(_engine) as revisar:
+            assert [b.nombre_archivo for b in revisar.query(Boceto).filter(Boceto.proyecto_id == ids["proyecto"])] == ["segunda.pdf"]
+    finally:
+        primera.rollback()
+        primera.close()
+        if "hilo" in locals():
+            hilo.join(timeout=10)
+        segunda.close()
+        with Session(_engine) as limpiar:
+            limpiar.execute(delete(Proyecto).where(Proyecto.id == ids["proyecto"]))
+            limpiar.execute(delete(Cliente).where(Cliente.id == ids["cliente"]))
+            limpiar.execute(delete(Usuario).where(Usuario.id == ids["usuario"]))
+            limpiar.execute(delete(Perfil).where(Perfil.id == ids["perfil"]))
+            limpiar.commit()

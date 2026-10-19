@@ -19,7 +19,7 @@ import httpx
 from pydantic import ValidationError
 
 from app.core.config import settings
-from app.schemas.boceto import BloqueDetectado, ResultadoInterpretacion
+from app.schemas.boceto import MAXIMO_ETIQUETA, BloqueDetectado, ResultadoInterpretacion
 
 VERSION_API = "2023-06-01"
 MAX_TOKENS = 4096
@@ -65,7 +65,11 @@ HERRAMIENTA = {
                 "items": {
                     "type": "object",
                     "properties": {
-                        "etiqueta": {"type": "string", "description": "Nombre del tipo en el boceto, si lo tiene"},
+                        "etiqueta": {
+                            "type": "string",
+                            "maxLength": MAXIMO_ETIQUETA,
+                            "description": "Nombre corto del tipo en el boceto, si lo tiene (por ejemplo A o B2)",
+                        },
                         "paneles_largo": {"type": "integer", "minimum": 1},
                         "paneles_ancho": {"type": "integer", "minimum": 1},
                         "repeticiones": {"type": "integer", "minimum": 1},

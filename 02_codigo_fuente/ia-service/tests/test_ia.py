@@ -143,3 +143,19 @@ def test_endpoint_pdf_correcto(llamadas):
     )
     assert r.status_code == 200
     assert r.json()["bloques"][0]["confianza"] == 0.92
+
+
+def test_etiqueta_larga_se_recorta(monkeypatch, con_clave):
+    """Revisión del PR #44: un rótulo largo no descarta toda la lectura."""
+    larga = {**SALIDA["bloques"][0], "etiqueta": "Bloque   tipo A de la segunda etapa norte, junto al cerramiento"}
+    cuerpo = {"content": [{"type": "tool_use", "name": "registrar_bloques", "input": {"bloques": [larga], "advertencias": []}}]}
+    monkeypatch.setattr(ia.httpx, "post", lambda *a, **k: respuesta(200, cuerpo))
+    r = interpretar_con_ia(PDF, "pdf")
+    assert r.bloques[0].etiqueta == "Bloque tipo A de la"
+    assert len(r.bloques[0].etiqueta) <= 20
+
+
+def test_la_herramienta_pide_etiquetas_cortas(llamadas):
+    interpretar_con_ia(PDF, "pdf")
+    esquema = llamadas[0]["json"]["tools"][0]["input_schema"]
+    assert esquema["properties"]["bloques"]["items"]["properties"]["etiqueta"]["maxLength"] == 20
