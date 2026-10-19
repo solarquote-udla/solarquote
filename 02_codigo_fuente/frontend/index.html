@@ -9,6 +9,16 @@
       content="Sistema de gestión y cotización de estructuras fotovoltaicas — HEXtructure S.A.S."
     />
     <title>SolarQuote</title>
+    <script>
+      // Antes de que React monte: evita el parpadeo oscuro→claro al
+      // recargar si el usuario ya había elegido el modo claro.
+      // Ver context/TemaProvider.tsx.
+      try {
+        if (localStorage.getItem("solarquote_tema") === "claro") {
+          document.documentElement.setAttribute("data-tema", "claro");
+        }
+      } catch {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
