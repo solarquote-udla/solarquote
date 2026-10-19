@@ -1,12 +1,13 @@
 """Pruebas del historial de cotizaciones (RF-10)."""
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
 from app.models.cotizacion import Cotizacion, EstadoCotizacion, ItemCotizacion, MaterialCotizado
 from app.models.material import Material
+from app.core.fechas import ZONA_ECUADOR
 from app.services.cotizacion import listar_cotizaciones, obtener_cotizacion
 from tests.fabricas import crear_usuario
 
@@ -120,7 +121,13 @@ def test_filtra_por_rango_de_fechas_inclusive(db: Session) -> None:
     hoy = _crear_cotizacion(db, creada=HOY)
     _crear_cotizacion(db, creada=HOY - timedelta(days=10))
 
-    cotizaciones, total = listar_cotizaciones(db, desde=(HOY - timedelta(days=3)).date(), hasta=date.today())
+    # Fechas de Ecuador, igual que el filtro: con date.today() (hora del
+    # servidor, UTC en el CI) la prueba fallaba entre las 19:00 y las 24:00
+    cotizaciones, total = listar_cotizaciones(
+        db,
+        desde=(HOY - timedelta(days=3)).astimezone(ZONA_ECUADOR).date(),
+        hasta=HOY.astimezone(ZONA_ECUADOR).date(),
+    )
 
     assert total == 2
     assert {c.id for c in cotizaciones} == {hace_tres_dias.id, hoy.id}
