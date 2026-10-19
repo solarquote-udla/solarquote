@@ -40,9 +40,11 @@ class ResumenTableroLeer(BaseModel):
 
     total_cotizaciones: int
     monto_total: Decimal
-    # Suma de L × A × B de cada ítem — los kWp no se pueden calcular
-    # todavía porque la cotización no guarda la potencia del panel.
+    # Suma de L × A × B de cada ítem.
     paneles_cotizados: int
+    # Suma de Cotizacion.potencia_kwp. Solo las cotizaciones que salen de
+    # un layout (RF-05) la tienen; las cotizadas al vuelo no cuentan.
+    potencia_total_kwp: Decimal
 
 
 class TableroLeer(BaseModel):

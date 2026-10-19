@@ -148,8 +148,12 @@ def _materiales_mas_consumidos(
 
 
 def _resumen(db: Session, desde_dt: datetime, hasta_dt: datetime) -> ResumenTableroLeer:
-    total_cotizaciones, monto_total = (
-        db.query(func.count(Cotizacion.id), func.coalesce(func.sum(Cotizacion.total), 0))
+    total_cotizaciones, monto_total, potencia_total_kwp = (
+        db.query(
+            func.count(Cotizacion.id),
+            func.coalesce(func.sum(Cotizacion.total), 0),
+            func.coalesce(func.sum(Cotizacion.potencia_kwp), 0),
+        )
         .filter(Cotizacion.created_at >= desde_dt, Cotizacion.created_at <= hasta_dt)
         .one()
     )
@@ -167,6 +171,7 @@ def _resumen(db: Session, desde_dt: datetime, hasta_dt: datetime) -> ResumenTabl
         total_cotizaciones=total_cotizaciones,
         monto_total=monto_total,
         paneles_cotizados=int(paneles_cotizados),
+        potencia_total_kwp=potencia_total_kwp,
     )
 
 
