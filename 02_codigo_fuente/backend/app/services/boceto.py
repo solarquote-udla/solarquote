@@ -16,7 +16,8 @@ configuró el equipo (RF-02) y, si no, con el panel de referencia de
 2278 × 1134 mm, el más usado por los clientes de HEXtructure.
 """
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, field_validator
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.data.paneles_referencia import PANELES_REFERENCIA
@@ -39,13 +40,26 @@ class BocetoNoEditable(ValueError):
     """El proyecto ya se cotizó: su boceto queda como respaldo de la proforma."""
 
 
+# Largo de bloques_boceto.etiqueta; ia-service ya recorta a esto
+MAXIMO_ETIQUETA = 20
+
+
 class _BloqueRecibido(BaseModel):
-    etiqueta: str | None = Field(default=None, max_length=20)
+    etiqueta: str | None = None
     paneles_largo: int = Field(ge=1)
     paneles_ancho: int = Field(ge=1)
     repeticiones: int = Field(ge=1)
     orientacion: str = Field(pattern="^(vertical|horizontal)$")
     confianza: float | None = Field(default=None, ge=0, le=1)
+
+    @field_validator("etiqueta", mode="before")
+    @classmethod
+    def _etiqueta_corta(cls, valor: object) -> str | None:
+        # Revisión del PR #44: una etiqueta larga no debe descartar una lectura correcta
+        if valor is None:
+            return None
+        texto = " ".join(str(valor).split())
+        return texto[:MAXIMO_ETIQUETA].rstrip() or None
 
 
 class _ResultadoRecibido(BaseModel):
@@ -57,6 +71,25 @@ class _ResultadoRecibido(BaseModel):
 
 def obtener_boceto(db: Session, proyecto_id: int) -> Boceto | None:
     return db.query(Boceto).filter(Boceto.proyecto_id == proyecto_id).one_or_none()
+
+
+def _bloquear_proyecto(db: Session, proyecto_id: int) -> Proyecto:
+    """
+    Bloquea la fila del proyecto hasta el commit (revisión del PR #44).
+
+    Dos cargas o ediciones simultáneas del mismo boceto (doble clic, dos
+    pestañas, un reintento) se ejecutan una después de la otra en lugar
+    de chocar contra la unicidad de `bocetos.proyecto_id`. Es el mismo
+    bloqueo que toma la cotización, así que tampoco se puede cambiar el
+    boceto mientras se está cotizando.
+    """
+    return (
+        db.query(Proyecto)
+        .filter(Proyecto.id == proyecto_id)
+        .with_for_update()
+        .populate_existing()
+        .one()
+    )
 
 
 def _verificar_editable(proyecto: Proyecto) -> None:
@@ -83,6 +116,13 @@ def cargar_boceto(
     except ValidationError as exc:
         raise IaServiceError("El servicio de bocetos devolvió un resultado inválido.") from exc
 
+    # El bloqueo se toma recién aquí: la lectura puede tardar un par de
+    # minutos y no debe frenar mientras tanto al resto del proyecto. Por
+    # eso se vuelve a verificar: pudo cotizarse mientras se leía.
+    proyecto = _bloquear_proyecto(db, proyecto.id)
+    _verificar_editable(proyecto)
+
+    # Si otra carga terminó mientras tanto, esta la reemplaza: gana la última
     anterior = obtener_boceto(db, proyecto.id)
     if anterior is not None:
         db.delete(anterior)
@@ -113,7 +153,12 @@ def cargar_boceto(
     )
     db.add(boceto)
     avanzar_a_en_diseno(proyecto)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        # No debería pasar con el bloqueo; si pasa, que sea un 409 y no un 500
+        db.rollback()
+        raise BocetoNoEditable("Se estaba guardando otro boceto de este proyecto. Intenta de nuevo.") from exc
     db.refresh(boceto)
     return boceto
 
@@ -124,6 +169,7 @@ def editar_bloques(db: Session, proyecto: Proyecto, datos: BocetoBloquesEditar) 
     no cambió conserva la confianza de la IA; uno corregido la pierde,
     porque ya no es lo que la IA leyó.
     """
+    proyecto = _bloquear_proyecto(db, proyecto.id)
     _verificar_editable(proyecto)
     boceto = obtener_boceto(db, proyecto.id)
     if boceto is None:
@@ -153,6 +199,8 @@ def editar_bloques(db: Session, proyecto: Proyecto, datos: BocetoBloquesEditar) 
         boceto.ediciones_manuales += 1
         db.commit()
         db.refresh(boceto)
+    else:
+        db.commit()  # sin cambios: solo libera el bloqueo
     return boceto
 
 
