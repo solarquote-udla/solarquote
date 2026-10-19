@@ -248,11 +248,10 @@ erDiagram
 
 > **Nota de origen:** `COTIZACIONES.potencia_kwp`, `COTIZACIONES.total_paneles`
 > y el `CHECK` `inversor >= 0` de `BLOQUES_LAYOUT` vienen del PR #42
-> (RF-05, confirmación del layout), de Joseph — en revisión al momento de
-> escribir esto, no todavía en `develop`. Las primeras dos permiten que el
-> tablero (RF-13) sume la potencia y el conteo de paneles de las
-> cotizaciones que salen de un layout; quedan en `null` en las cotizadas
-> al vuelo, sin layout de por medio.
+> (RF-05, confirmación del layout), de Joseph — ya mergeado a `develop`.
+> Las primeras dos permiten que el tablero (RF-13) sume la potencia y el
+> conteo de paneles de las cotizaciones que salen de un layout; quedan en
+> `null` en las cotizadas al vuelo, sin layout de por medio.
 
 ## Notas sobre relaciones que no son llaves foráneas
 
