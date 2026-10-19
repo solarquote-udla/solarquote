@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from sqlalchemy import exists, select
 from sqlalchemy.orm import Session, joinedload
 
+from app.models.boceto import Boceto
 from app.models.cliente import Cliente
 from app.models.cotizacion import Cotizacion
 from app.models.proyecto import EstadoProyecto, Proyecto
@@ -83,11 +84,13 @@ class Avance:
     layout: set[int]
     # Cotización emitida de cada proyecto: (id, número de proforma)
     cotizacion: dict[int, tuple[int, str | None]] = field(default_factory=dict)
+    # Proyectos con boceto del cliente (RF-04): se retoman en su confirmación
+    boceto: set[int] = field(default_factory=set)
 
 
 def avance_de(db: Session, proyecto_ids: list[int]) -> Avance:
     """
-    Cuáles de estos proyectos ya tienen terreno, equipo y layout.
+    Cuáles de estos proyectos ya tienen terreno, equipo, layout o boceto.
 
     El estado del proyecto no alcanza para esto: pasa a "en diseño" en
     cuanto se guarda el terreno o el equipo, sin distinguir cuál. El
@@ -122,13 +125,15 @@ def avance_de(db: Session, proyecto_ids: list[int]) -> Avance:
             existe(Layout),
             ultima_cotizacion(Cotizacion.id),
             ultima_cotizacion(Cotizacion.numero_proforma),
+            existe(Boceto),
         ).where(Proyecto.id.in_(proyecto_ids))
     ).all()
     return Avance(
-        terreno={pid for pid, t, _, _, _, _ in filas if t},
-        equipo={pid for pid, _, e, _, _, _ in filas if e},
-        layout={pid for pid, _, _, l, _, _ in filas if l},
-        cotizacion={pid: (cid, numero) for pid, _, _, _, cid, numero in filas if cid is not None},
+        terreno={pid for pid, t, _, _, _, _, _ in filas if t},
+        equipo={pid for pid, _, e, _, _, _, _ in filas if e},
+        layout={pid for pid, _, _, l, _, _, _ in filas if l},
+        cotizacion={pid: (cid, numero) for pid, _, _, _, cid, numero, _ in filas if cid is not None},
+        boceto={pid for pid, *_, b in filas if b},
     )
 
 

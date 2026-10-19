@@ -261,6 +261,8 @@ export interface Proyecto {
   tiene_equipo: boolean;
   /** Layout generado (RF-03) */
   tiene_layout: boolean;
+  /** Boceto del cliente cargado (RF-04): se retoma en su confirmación */
+  tiene_boceto: boolean;
   /** Cotización emitida al confirmar el layout (RF-05); null si aún no se cotizó */
   cotizacion_id: number | null;
   numero_proforma: string | null;
@@ -686,4 +688,50 @@ export interface Tablero {
   cotizaciones_por_estado: CotizacionesPorEstado[];
   clientes_frecuentes: ClienteFrecuente[];
   materiales_mas_consumidos: MaterialConsumido[];
+}
+
+// ─── Boceto del cliente (Módulo 2 — RF-04 y RF-05) ──────
+
+export type FormatoBoceto = "pdf" | "png" | "jpg" | "dxf";
+export type OrientacionBloque = "vertical" | "horizontal";
+
+/** Espejo de `BloqueBocetoEditar`: un tipo de bloque como lo deja el Gerente */
+export interface BloqueBocetoEditar {
+  etiqueta: string | null;
+  /** L: paneles en el largo; par */
+  paneles_largo: number;
+  /** A: paneles a lo largo de la fila */
+  paneles_ancho: number;
+  /** B: bloques iguales */
+  repeticiones: number;
+  orientacion: OrientacionBloque;
+}
+
+/** Espejo de `BloqueBocetoLeer` */
+export interface BloqueBoceto extends BloqueBocetoEditar {
+  /** Confianza de la IA entre 0 y 1; null si vino de un DXF o se corrigió a mano */
+  confianza: number | null;
+  paneles: number;
+  proporcion: number;
+  en_proporcion: boolean;
+}
+
+/** Espejo de `BocetoLeer` */
+export interface Boceto {
+  proyecto_id: number;
+  nombre_archivo: string;
+  formato: FormatoBoceto;
+  tamano_bytes: number;
+  /** "dxf": lectura directa de la geometría; "ia": Claude */
+  metodo: "dxf" | "ia";
+  advertencias: string[];
+  bloques: BloqueBoceto[];
+  total_paneles: number;
+  /** Solo si el proyecto tiene panel configurado */
+  potencia_kwp: number | null;
+  panel: { largo_mm: number; ancho_mm: number; potencia_wp: number | null; origen: "equipo" | "referencia" };
+  tolerancia_proporcion: number;
+  ediciones_manuales: number;
+  created_at: string;
+  updated_at: string;
 }

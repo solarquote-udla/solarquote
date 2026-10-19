@@ -95,6 +95,10 @@ class ProyectoLeer(BaseModel):
         default=False,
         description="Si ya se generó el layout (RF-03).",
     )
+    tiene_boceto: bool = Field(
+        default=False,
+        description="Si se cargó un boceto del cliente (RF-04): se retoma en su confirmación.",
+    )
     cotizacion_id: int | None = Field(
         default=None,
         description="Cotización emitida desde el layout (RF-05), si ya se cotizó.",

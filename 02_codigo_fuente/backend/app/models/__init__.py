@@ -15,6 +15,7 @@ from app.models.material import Material, PrecioMaterial
 from app.models.inversor import Inversor
 from app.models.equipo import ConfiguracionEquipo, InversorEquipo
 from app.models.layout import BloqueLayout, Layout
+from app.models.boceto import BloqueBoceto, Boceto
 from app.models.terreno import Camino, Terreno, TipoCamino
 from app.models.perfil import Perfil, PerfilPermiso
 from app.models.usuario import Usuario
@@ -37,6 +38,9 @@ __all__ = [
     "InversorEquipo",
     "Layout",
     "BloqueLayout",
+    # Módulo 2 — Bocetos
+    "Boceto",
+    "BloqueBoceto",
     # Cotización
     "Cotizacion",
     "ItemCotizacion",

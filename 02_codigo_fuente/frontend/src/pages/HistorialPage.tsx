@@ -30,6 +30,7 @@ import {
   type Proyecto,
 } from "@/types/api";
 import { formatoMoneda } from "@/utils/dinero";
+import { rutaConfirmacionBoceto } from "@/utils/bocetos";
 import { fechaHora } from "@/utils/fechas";
 
 type Vista = "en-curso" | "cotizaciones";
@@ -127,6 +128,8 @@ function ProyectosEnCurso() {
     (p) => !texto || p.nombre.toLowerCase().includes(texto) || p.cliente.nombre.toLowerCase().includes(texto),
   );
   const puedeEditar = tienePermiso(Permiso.GENERAR_LAYOUT);
+  // Los proyectos que llegaron como boceto del cliente se retoman en su confirmación (RF-04)
+  const puedeBoceto = tienePermiso(Permiso.CARGAR_BOCETO);
 
   return (
     <div>
@@ -191,10 +194,21 @@ function ProyectosEnCurso() {
                     </td>
                     <td className="px-4 py-3 text-xs text-acero-500">{fechaHora(p.updated_at)}</td>
                     <td className="px-4 py-3 text-right">
-                      {puedeEditar && (
-                        <Link to={rutaPaso(p.id, paso)} className="text-sm font-medium text-solar-700 hover:underline">
-                          {etiquetaRetomar(p, paso)}
-                        </Link>
+                      {p.tiene_boceto ? (
+                        puedeBoceto && (
+                          <Link
+                            to={rutaConfirmacionBoceto(p.id)}
+                            className="text-sm font-medium text-solar-700 hover:underline"
+                          >
+                            Abrir confirmación del boceto
+                          </Link>
+                        )
+                      ) : (
+                        puedeEditar && (
+                          <Link to={rutaPaso(p.id, paso)} className="text-sm font-medium text-solar-700 hover:underline">
+                            {etiquetaRetomar(p, paso)}
+                          </Link>
+                        )
                       )}
                     </td>
                   </tr>
