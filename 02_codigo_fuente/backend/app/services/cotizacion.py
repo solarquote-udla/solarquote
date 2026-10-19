@@ -8,12 +8,13 @@ sus ítems (L, A, B) y el desglose (subtotal, IVA, total, y la cantidad
 ese momento — es un snapshot, no se recalcula después.
 """
 
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, time
 
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import settings
+from app.core.fechas import ZONA_ECUADOR
 from app.core.texto import escapar_comodines_ilike
 from app.models.cliente import Cliente
 from app.models.cotizacion import Cotizacion, EstadoCotizacion, ItemCotizacion, MaterialCotizado
@@ -27,14 +28,12 @@ from app.services.material import (
     obtener_precios_vigentes,
     obtener_precios_vigentes_opcionales,
 )
+from app.services.proforma import siguiente_numero_proforma
 from app.services.proyecto import ClienteNoDisponible, avanzar_a_cotizado
 
 # Cantidad fija de logística por cotización (SQ-76): no escala con L/A/B.
 CODIGO_LOGISTICA = "LOG"
 CANTIDAD_LOGISTICA = 1
-
-# Ecuador no usa horario de verano: UTC-5 todo el año.
-ZONA_ECUADOR = timezone(timedelta(hours=-5))
 
 
 class ProyectoNoDisponible(ValueError):
@@ -45,7 +44,15 @@ def crear_cotizacion(
     db: Session,
     datos: CotizacionCrear,
     usuario: Usuario,
+    *,
+    potencia_kwp: float | None = None,
+    total_paneles: int | None = None,
 ) -> tuple[Cotizacion, ResultadoCalculoCotizacion]:
+    """
+    Calcula y emite la cotización. `potencia_kwp` y `total_paneles` solo
+    se conocen cuando sale de un layout (RF-05); el número de proforma se
+    asigna aquí, al emitirla.
+    """
     cliente: Cliente | None = None
     if datos.cliente_id is not None:
         cliente = db.get(Cliente, datos.cliente_id)
@@ -100,6 +107,9 @@ def crear_cotizacion(
         cliente_telefono = datos.cliente_telefono
 
     cotizacion = Cotizacion(
+        numero_proforma=siguiente_numero_proforma(db),
+        potencia_kwp=potencia_kwp,
+        total_paneles=total_paneles,
         usuario_id=usuario.id,
         cliente_id=datos.cliente_id,
         proyecto_id=datos.proyecto_id,

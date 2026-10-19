@@ -21,12 +21,13 @@ del catálogo que a uno cotizado al vuelo, igual que el filtro `buscar`
 del historial en RF-10.
 """
 
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, time
 from decimal import Decimal
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core.fechas import ZONA_ECUADOR
 from app.models.cotizacion import Cotizacion, EstadoCotizacion, ItemCotizacion, MaterialCotizado
 from app.models.material import Material
 from app.schemas.tablero import (
@@ -37,9 +38,6 @@ from app.schemas.tablero import (
     ResumenTableroLeer,
     TableroLeer,
 )
-
-# Ecuador no usa horario de verano: UTC-5 todo el año.
-ZONA_ECUADOR = timezone(timedelta(hours=-5))
 
 MESES_POR_DEFECTO = 6
 MESES_MAXIMO = 24  # cuántos meses puede abarcar como máximo desde/hasta

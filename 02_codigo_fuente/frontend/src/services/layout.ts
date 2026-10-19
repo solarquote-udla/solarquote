@@ -5,7 +5,7 @@
 import axios from "axios";
 
 import { api } from "@/services/api";
-import type { Layout, LayoutGenerar } from "@/types/api";
+import type { ConfirmarLayout, CotizacionEmitida, Layout, LayoutGenerar } from "@/types/api";
 
 const ruta = (proyectoId: number) => `/api/proyectos/${proyectoId}/layout`;
 
@@ -54,5 +54,16 @@ export async function guardarBloques(
  */
 export async function reagruparLayout(proyectoId: number): Promise<Layout> {
   const { data } = await api.post<Layout>(`${ruta(proyectoId)}/reagrupar`);
+  return data;
+}
+
+/**
+ * "Confirmar y generar cotización" (RF-05): confirma el diseño y emite la
+ * cotización con los bloques del layout. 409 si ya se cotizó, si el
+ * layout quedó desactualizado o si hay bloques fuera de proporción sin
+ * aceptar; 422 si falta un precio.
+ */
+export async function confirmarYCotizar(proyectoId: number, datos: ConfirmarLayout): Promise<CotizacionEmitida> {
+  const { data } = await api.post<CotizacionEmitida>(`${ruta(proyectoId)}/cotizacion`, datos);
   return data;
 }

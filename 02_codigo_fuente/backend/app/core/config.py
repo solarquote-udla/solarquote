@@ -81,6 +81,13 @@ class Settings(BaseSettings):
     # manda en cada request a /api/cotizacion/calcular.
     IVA_PORCENTAJE: Decimal = Field(default=Decimal("15"), ge=0, le=100)
 
+    # Numeración de proformas: PREFIJO-NNN-AAAA (prototipo: CT-130-2026),
+    # correlativa por año. PRIMER_NUMERO permite continuar la numeración
+    # que HEXtructure ya lleva a mano: si este año van por la 129, se
+    # configura 130 y el sistema sigue desde ahí.
+    PROFORMA_PREFIJO: str = Field(default="CT", min_length=1, max_length=6, pattern=r"^[A-Z]+$")
+    PROFORMA_PRIMER_NUMERO: int = Field(default=1, ge=1)
+
     @property
     def cors_origins_list(self) -> list[str]:
         """Convierte el string de orígenes en una lista."""
