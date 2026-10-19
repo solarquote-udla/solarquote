@@ -378,7 +378,8 @@ no un módulo nuevo.
   "resumen": {
     "total_cotizaciones": 34,
     "monto_total": "58230.40",
-    "paneles_cotizados": 1248
+    "paneles_cotizados": 1248,
+    "potencia_total_kwp": "612.50"
   },
   "cotizaciones_por_periodo": [
     { "periodo": "2026-09", "cantidad": 10, "total": "15200.00" }
@@ -396,8 +397,12 @@ no un módulo nuevo.
 ```
 
 `resumen.paneles_cotizados` es la suma de `L × A × B` de cada ítem de cada
-cotización del rango. **No** son kWp: la cotización todavía no guarda la
-potencia del panel (eso llega con el PR C de Joseph — ver nota abajo).
+cotización del rango.
+
+`resumen.potencia_total_kwp` es la suma de `Cotizacion.potencia_kwp` de las
+cotizaciones del rango. Solo las que salen de un layout (RF-05) la tienen;
+las cotizadas al vuelo no cuentan, así que puede ser `0` aunque
+`paneles_cotizados` no lo sea.
 
 `periodo` va en formato `"AAAA-MM"`, agrupado en hora de Ecuador.
 
@@ -411,9 +416,6 @@ potencia del panel (eso llega con el PR C de Joseph — ver nota abajo).
 
 ## Pendiente, no parte de esta entrega
 
-- **Tarjeta de kWp en el tablero:** cuando el PR C de Joseph agregue la
-  potencia del panel a la cotización, `ResumenTableroLeer` sumará un campo
-  `potencia_total_kwp` junto a `paneles_cotizados`. No implementado todavía.
 - **Proforma en Word/Excel (RF-07):** la pantalla de "desglose" del
   prototipo y la descarga del archivo generado. Sprint 4, no iniciado — no
   hay endpoint `/api/cotizaciones/{id}/proforma` aún.
