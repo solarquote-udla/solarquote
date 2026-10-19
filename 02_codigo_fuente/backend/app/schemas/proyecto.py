@@ -95,5 +95,10 @@ class ProyectoLeer(BaseModel):
         default=False,
         description="Si ya se generó el layout (RF-03).",
     )
+    cotizacion_id: int | None = Field(
+        default=None,
+        description="Cotización emitida desde el layout (RF-05), si ya se cotizó.",
+    )
+    numero_proforma: str | None = Field(default=None, description="Proforma de esa cotización")
     created_at: datetime
     updated_at: datetime
