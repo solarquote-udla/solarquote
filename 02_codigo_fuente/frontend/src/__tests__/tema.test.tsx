@@ -78,6 +78,31 @@ describe("useTema", () => {
     expect(localStorage.getItem(CLAVE_TEMA)).toBe("oscuro");
     expect(document.documentElement.getAttribute("data-tema")).toBe("oscuro");
   });
+
+  it("sigue el cambio de tema hecho en otra pestaña (evento 'storage')", () => {
+    render(
+      <TemaProvider>
+        <Sonda />
+      </TemaProvider>,
+    );
+
+    fireEvent(window, new StorageEvent("storage", { key: CLAVE_TEMA, newValue: "claro" }));
+
+    expect(screen.getByText("tema: claro")).toBeTruthy();
+    expect(document.documentElement.getAttribute("data-tema")).toBe("claro");
+  });
+
+  it("ignora eventos 'storage' de otras claves", () => {
+    render(
+      <TemaProvider>
+        <Sonda />
+      </TemaProvider>,
+    );
+
+    fireEvent(window, new StorageEvent("storage", { key: "otra_clave", newValue: "lo que sea" }));
+
+    expect(screen.getByText("tema: oscuro")).toBeTruthy();
+  });
 });
 
 // ─── El botón del encabezado ──────────────────────────────────────────
