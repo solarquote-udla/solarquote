@@ -34,6 +34,7 @@ def _crear_cotizacion(
     cliente_nombre: str = "Cliente de prueba",
     estado: EstadoCotizacion = EstadoCotizacion.COTIZADA,
     total: str = "100.00",
+    potencia_kwp: str | None = None,
     created_at: datetime,
     items: list[tuple[int, int, int]] = (),
 ) -> Cotizacion:
@@ -42,6 +43,7 @@ def _crear_cotizacion(
         cliente_nombre=cliente_nombre,
         estado=estado,
         total=Decimal(total),
+        potencia_kwp=Decimal(potencia_kwp) if potencia_kwp is not None else None,
         created_at=created_at,
         items=[
             ItemCotizacion(paneles_largo=largo, paneles_ancho=ancho, bloques=bloques)
@@ -210,6 +212,18 @@ def test_resumen_suma_paneles_cotizados_como_largo_por_ancho_por_bloques(db: Ses
     assert tablero.resumen.paneles_cotizados == 28
 
 
+def test_resumen_suma_la_potencia_kwp_de_las_cotizaciones_que_la_tienen(db: Session) -> None:
+    ahora = datetime.now(ZONA_ECUADOR)
+    # Una cotización al vuelo, sin layout detrás, no tiene potencia_kwp.
+    _crear_cotizacion(db, created_at=ahora, potencia_kwp="12.60")
+    _crear_cotizacion(db, created_at=ahora, potencia_kwp="5.40")
+    _crear_cotizacion(db, created_at=ahora)
+
+    tablero = obtener_tablero(db, desde=ahora.date(), hasta=ahora.date())
+
+    assert tablero.resumen.potencia_total_kwp == Decimal("18.00")
+
+
 def test_resumen_sin_cotizaciones_en_el_rango_queda_en_cero(db: Session) -> None:
     ahora = datetime.now(ZONA_ECUADOR)
 
@@ -218,6 +232,7 @@ def test_resumen_sin_cotizaciones_en_el_rango_queda_en_cero(db: Session) -> None
     assert tablero.resumen.total_cotizaciones == 0
     assert tablero.resumen.monto_total == Decimal("0")
     assert tablero.resumen.paneles_cotizados == 0
+    assert tablero.resumen.potencia_total_kwp == Decimal("0")
 
 
 def test_los_cuatro_indicadores_y_el_resumen_comparten_el_mismo_rango(db: Session) -> None:
@@ -238,6 +253,7 @@ def test_los_cuatro_indicadores_y_el_resumen_comparten_el_mismo_rango(db: Sessio
         estado=EstadoCotizacion.INSTALADA,
         created_at=fuera_de_rango,
         items=[(4, 3, 1)],
+        potencia_kwp="9.00",
     )
     db.add(MaterialCotizado(cotizacion_id=vieja.id, material_id=material.id, cantidad=50, precio_unitario=Decimal("1.00")))
     db.flush()
@@ -249,6 +265,7 @@ def test_los_cuatro_indicadores_y_el_resumen_comparten_el_mismo_rango(db: Sessio
     assert all(item.cantidad == 0 for item in tablero.cotizaciones_por_estado)
     assert tablero.resumen.total_cotizaciones == 0
     assert tablero.resumen.paneles_cotizados == 0
+    assert tablero.resumen.potencia_total_kwp == Decimal("0")
 
 
 # ─── Router: RangoInvalido -> 422 ────────────────────────────────────
