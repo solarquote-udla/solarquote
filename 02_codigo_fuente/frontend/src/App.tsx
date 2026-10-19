@@ -23,7 +23,9 @@ import { AppLayout } from "@/components/AppLayout";
 import { RutaProtegida } from "@/components/RutaProtegida";
 import { AuthProvider } from "@/context/AuthProvider";
 import { CambiarPasswordPage } from "@/pages/CambiarPasswordPage";
+import { CargarBocetoPage } from "@/pages/CargarBocetoPage";
 import { ClientesPage } from "@/pages/ClientesPage";
+import { ConfirmacionBocetoPage } from "@/pages/ConfirmacionBocetoPage";
 import { ConfirmacionPage } from "@/pages/ConfirmacionPage";
 import { CotizacionDetallePage } from "@/pages/CotizacionDetallePage";
 import { EnConstruccionPage } from "@/pages/EnConstruccionPage";
@@ -110,7 +112,12 @@ const router = createBrowserRouter(
           )}
           {conPermiso(
             Permiso.CARGAR_BOCETO,
-            <Route path="bocetos" element={pendiente("Cargar boceto", "Módulo 2", "RF-04 y RF-05")} />,
+            <>
+              {/* Sin id crea el proyecto; con id carga otro boceto al mismo proyecto */}
+              <Route path="bocetos" element={<CargarBocetoPage />} />
+              <Route path="bocetos/:proyectoId" element={<CargarBocetoPage key="existente" />} />
+              <Route path="bocetos/:proyectoId/confirmacion" element={<ConfirmacionBocetoPage />} />
+            </>,
           )}
           {conPermiso(
             [Permiso.HISTORIAL, Permiso.GENERAR_LAYOUT],

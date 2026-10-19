@@ -7,6 +7,7 @@ Guía para dejar SolarQuote corriendo en línea.
 | Frontend | Vercel | `02_codigo_fuente/frontend` | Desplegado |
 | Backend principal | Railway | `02_codigo_fuente/backend` | Desplegado |
 | Microservicio de cálculo | Railway | `02_codigo_fuente/calc-service` | Pendiente (ver Parte 2) |
+| Microservicio de bocetos (IA) | Railway | `02_codigo_fuente/ia-service` | Pendiente (ver Parte 2B) |
 | Base de datos | Neon | — | Desplegado |
 
 > **Orden importante:** primero el backend, después el frontend. El frontend
@@ -179,6 +180,58 @@ generes dominio — así queda inaccesible desde fuera.
 
 ---
 
+## Parte 2B — ia-service en Railway (RF-04)
+
+Lee los bocetos del cliente. Los DXF se procesan directo de la geometría,
+sin IA; los PDF e imágenes se envían a la API de Claude (Anthropic).
+Sin clave de Anthropic el servicio arranca igual: los DXF funcionan y los
+PDF e imágenes responden 503 con un mensaje claro.
+
+### 2B.1 Tercer servicio, mismo proyecto
+
+**New** → **GitHub Repo** → `solarquote`. Renómbralo a `solarquote-ia`.
+
+| Campo | Valor |
+|---|---|
+| Root Directory | `02_codigo_fuente/ia-service` |
+| Branch | `develop` |
+
+### 2B.2 Variables de ia-service
+
+| Variable | Valor |
+|---|---|
+| `ENVIRONMENT` | `production` |
+| `DEBUG` | `False` |
+| `IA_SERVICE_SECRET` | Secreto aleatorio largo (`python -c "import secrets; print(secrets.token_urlsafe(32))"`) |
+| `ANTHROPIC_API_KEY` | La clave de la API de Anthropic. Solo aquí: nunca en el repositorio ni en un chat |
+| `ANTHROPIC_MODEL` | Opcional. Por defecto el del `.env.example` |
+
+### 2B.3 Conectar backend → ia-service
+
+En el servicio **backend**:
+
+```
+IA_SERVICE_URL=http://solarquote-ia.railway.internal:8080
+IA_SERVICE_SECRET=<el mismo valor que en ia-service>
+```
+
+No generes dominio público para ia-service: solo lo llama el backend por
+la red interna. Así nadie de fuera puede gastar el crédito de la API.
+
+### 2B.4 Verificar
+
+Desde el backend, `GET /health` de ia-service debe responder
+`"ia_configurada": true` cuando la clave está puesta (nunca muestra la
+clave). En la aplicación, carga un DXF y luego un PDF en **Cargar boceto**.
+
+### 2B.5 Costo
+
+Cada PDF o imagen es una llamada a la API de Claude, que se cobra por uso.
+Define un límite de gasto mensual en la consola de Anthropic antes de
+cargar la clave en Railway. Los DXF no consumen crédito.
+
+---
+
 ## Parte 3 — Frontend en Vercel
 
 ### 3.1 Importar
@@ -280,7 +333,7 @@ con la URL.
 Queda configurado automáticamente:
 
 ```
-merge a la rama configurada → Railway redespliega backend y calc-service
+merge a la rama configurada → Railway redespliega backend, calc-service e ia-service
                             → Vercel redespliega frontend
 ```
 
@@ -291,8 +344,8 @@ Cada PR hacia `develop` genera además una previsualización en Vercel con URL
 propia, que pasa el CORS gracias a `CORS_ORIGIN_REGEX` (ver 3.5 y sus
 límites).
 
-Antes del merge, cada PR debe pasar los checks `backend`, `calc-service` y
-`frontend` del workflow `.github/workflows/ci.yml`. Son obligatorios en los
+Antes del merge, cada PR debe pasar los checks `backend`, `calc-service`,
+`ia-service` y `frontend` del workflow `.github/workflows/ci.yml`. Son obligatorios en los
 rulesets de `develop` y `main`, junto con tener la rama al día con la base.
 
 `develop` está protegida: todo cambio entra por pull request con una
@@ -317,7 +370,7 @@ puede disparar builds en la cuenta.
 ## Problemas comunes
 
 **El build de Railway falla con `No such file or directory`**
-El Root Directory no está configurado. Debe ser `02_codigo_fuente/backend` o `02_codigo_fuente/calc-service`.
+El Root Directory no está configurado. Debe ser `02_codigo_fuente/backend`, `02_codigo_fuente/calc-service` o `02_codigo_fuente/ia-service`.
 
 **`Application failed to respond`**
 Falta `--host 0.0.0.0` en el comando de arranque. Sin eso, uvicorn solo

@@ -10,7 +10,7 @@ import { createMemoryRouter, Link, Outlet, RouterProvider } from "react-router-d
 
 export const PROYECTO = {
   id: 5, nombre: "San Pablo", cliente: { id: 9, nombre: "Cliente" }, ubicacion: null, latitud: 0.19, longitud: null,
-  estado: "en_diseno", notas: null, tiene_terreno: true, tiene_equipo: true, tiene_layout: false,
+  estado: "en_diseno", notas: null, tiene_terreno: true, tiene_equipo: true, tiene_layout: false, tiene_boceto: false,
   cotizacion_id: null, numero_proforma: null,
   created_at: "2026-10-14T10:00:00Z", updated_at: "2026-10-14T10:00:00Z",
 };
@@ -28,6 +28,8 @@ const DESTINOS = [
   { path: "/generar/:proyectoId/equipo", element: <p>PASO 2</p> },
   { path: "/generar/:proyectoId/layout", element: <p>PASO 3</p> },
   { path: "/generar/:proyectoId/confirmacion", element: <p>CONFIRMACION</p> },
+  { path: "/bocetos/:proyectoId", element: <p>CARGAR BOCETO</p> },
+  { path: "/bocetos/:proyectoId/confirmacion", element: <p>CONFIRMACION BOCETO</p> },
   { path: "/cotizaciones/:cotizacionId", element: <p>DETALLE COTIZACION</p> },
   { path: "/historial", element: <p>HISTORIAL</p> },
   { path: "/seguridad/usuarios", element: <p>LISTA USUARIOS</p> },
