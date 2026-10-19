@@ -16,6 +16,7 @@ import { useTema } from "@/hooks/useTema";
 export function AppLayout() {
   const { usuario, cerrarSesion, tienePermiso } = useAuth();
   const { tema, alternarTema } = useTema();
+  const alternarTemaEtiqueta = tema === "oscuro" ? "Cambiar a modo claro" : "Cambiar a modo oscuro";
 
   const grupos = menuVisible(tienePermiso);
 
@@ -93,8 +94,8 @@ export function AppLayout() {
           <button
             type="button"
             onClick={alternarTema}
-            aria-label={tema === "oscuro" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
-            title={tema === "oscuro" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+            aria-label={alternarTemaEtiqueta}
+            title={alternarTemaEtiqueta}
             className="flex h-9 w-9 items-center justify-center rounded-lg text-acero-600 transition hover:bg-acero-100"
           >
             {tema === "oscuro" ? "☀️" : "🌙"}

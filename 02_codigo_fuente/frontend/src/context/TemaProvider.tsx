@@ -18,6 +18,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 
 import { TemaContext, type Tema } from "@/context/TemaContext";
 
+// Si se cambia, actualizar también el script inline de index.html.
 const CLAVE_TEMA = "solarquote_tema";
 
 function temaGuardado(): Tema {
@@ -40,6 +41,17 @@ export function TemaProvider({ children }: { children: ReactNode }) {
       // Sin storage, el tema no persiste entre recargas, pero la sesión actual sigue funcionando
     }
   }, [tema]);
+
+  // Si se cambia el tema en otra pestaña del mismo origen, seguirla acá también.
+  useEffect(() => {
+    function alTema(evento: StorageEvent) {
+      if (evento.key === CLAVE_TEMA) {
+        setTema(evento.newValue === "claro" ? "claro" : "oscuro");
+      }
+    }
+    window.addEventListener("storage", alTema);
+    return () => window.removeEventListener("storage", alTema);
+  }, []);
 
   const alternarTema = useCallback(() => {
     setTema((actual) => (actual === "oscuro" ? "claro" : "oscuro"));
