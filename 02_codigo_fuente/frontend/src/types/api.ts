@@ -677,6 +677,7 @@ export interface ResumenTablero {
   total_cotizaciones: number;
   monto_total: string;
   paneles_cotizados: number;
+  potencia_total_kwp: string;
 }
 
 export interface Tablero {
