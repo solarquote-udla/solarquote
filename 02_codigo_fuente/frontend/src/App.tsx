@@ -24,6 +24,7 @@ import { RutaProtegida } from "@/components/RutaProtegida";
 import { AuthProvider } from "@/context/AuthProvider";
 import { CambiarPasswordPage } from "@/pages/CambiarPasswordPage";
 import { ClientesPage } from "@/pages/ClientesPage";
+import { ConfirmacionPage } from "@/pages/ConfirmacionPage";
 import { CotizacionDetallePage } from "@/pages/CotizacionDetallePage";
 import { EnConstruccionPage } from "@/pages/EnConstruccionPage";
 import { EquipoPage } from "@/pages/EquipoPage";
@@ -100,6 +101,7 @@ const router = createBrowserRouter(
               <Route path="generar/:proyectoId/terreno" element={<TerrenoPage />} />
               <Route path="generar/:proyectoId/equipo" element={<EquipoPage />} />
               <Route path="generar/:proyectoId/layout" element={<LayoutPage />} />
+              <Route path="generar/:proyectoId/confirmacion" element={<ConfirmacionPage />} />
               <Route path="proyectos" element={<Navigate to="/historial" replace />} />
               <Route path="proyectos/:proyectoId/terreno" element={<RedirigirPaso paso="terreno" />} />
               <Route path="proyectos/:proyectoId/equipo" element={<RedirigirPaso paso="equipo" />} />

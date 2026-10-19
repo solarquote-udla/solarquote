@@ -3,6 +3,7 @@ Schemas del layout solar — RF-03.
 """
 
 from datetime import datetime
+from decimal import Decimal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -174,3 +175,24 @@ class LayoutLeer(BaseModel):
 
     created_at: datetime
     updated_at: datetime
+
+
+# ─── Confirmación y cotización (RF-05) ──────────────────────────────
+
+
+class ConfirmarLayout(BaseModel):
+    """Confirmación explícita del diseño antes de calcular materiales."""
+
+    acepta_fuera_de_proporcion: bool = Field(
+        default=False,
+        description="El Gerente acepta bajo su responsabilidad los bloques fuera de proporción",
+    )
+    addendum_porcentaje: Decimal = Field(default=Decimal("0"), ge=0, le=100)
+
+
+class CotizacionEmitidaLeer(BaseModel):
+    """Lo necesario para abrir la cotización recién emitida."""
+
+    id: int
+    numero_proforma: str | None
+    total: Decimal | None

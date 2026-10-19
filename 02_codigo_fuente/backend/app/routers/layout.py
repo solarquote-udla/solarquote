@@ -5,6 +5,7 @@ Endpoints del layout solar — RF-03.
   POST /api/proyectos/{id}/layout           → generar (reemplaza el anterior)
   PUT  /api/proyectos/{id}/layout/bloques   → guardar la edición manual (SQ-64)
   POST /api/proyectos/{id}/layout/reagrupar → repartir los bloques entre los inversores
+  POST /api/proyectos/{id}/layout/cotizacion → confirmar el diseño y emitir la cotización (RF-05)
 
 POST y no PUT: el cliente no envía el layout, envía parámetros y el
 servidor lo calcula. Dos POST con los mismos parámetros dan el mismo
@@ -19,16 +20,29 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.dependencies import requiere_permiso
 from app.core.permisos import Permiso
-from app.schemas.layout import LayoutEditar, LayoutGenerar, LayoutLeer
+from app.models.usuario import Usuario
+from app.schemas.layout import (
+    ConfirmarLayout,
+    CotizacionEmitidaLeer,
+    LayoutEditar,
+    LayoutGenerar,
+    LayoutLeer,
+)
 from app.services import layout as servicio
+from app.services.calc_service import CalcServiceError
+from app.services.confirmacion import NoSePuedeCotizar, cotizar_layout
+from app.services.material import PrecioVigenteFaltante
+from app.services.proyecto import ClienteNoDisponible
 from app.services.calculo_layout import EdicionInvalida, LayoutImposible
 from app.services.equipo import obtener_configuracion
 from app.services.proyecto import obtener_proyecto
 
+puede_generar = requiere_permiso(Permiso.GENERAR_LAYOUT)
+
 router = APIRouter(
     prefix="/api/proyectos/{proyecto_id}/layout",
     tags=["Módulo 1 — Layout"],
-    dependencies=[Depends(requiere_permiso(Permiso.GENERAR_LAYOUT))],
+    dependencies=[Depends(puede_generar)],
 )
 
 
@@ -121,3 +135,37 @@ def reagrupar(proyecto_id: int, db: Session = Depends(get_db)) -> LayoutLeer:
     except servicio.LayoutNoEditable as error:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
     return servicio.a_respuesta(layout, layout.huella, obtener_configuracion(db, proyecto_id))
+
+
+@router.post("/cotizacion", response_model=CotizacionEmitidaLeer, status_code=status.HTTP_201_CREATED)
+def confirmar_y_cotizar(
+    proyecto_id: int,
+    datos: ConfirmarLayout,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(puede_generar),
+) -> CotizacionEmitidaLeer:
+    """
+    "Confirmar y generar cotización" del diagrama de confirmación: el
+    Gerente confirma el diseño y se emiten los materiales (RF-05 → RF-06).
+
+    409 si el proyecto ya se cotizó, si no hay layout, si quedó
+    desactualizado o si hay bloques fuera de proporción sin aceptar;
+    422 si falta un precio o el cliente está dado de baja; 502 si
+    calc-service no responde.
+    """
+    _proyecto_o_404(db, proyecto_id)
+    try:
+        cotizacion = cotizar_layout(
+            db,
+            proyecto_id,
+            usuario,
+            acepta_fuera_de_proporcion=datos.acepta_fuera_de_proporcion,
+            addendum_porcentaje=datos.addendum_porcentaje,
+        )
+    except NoSePuedeCotizar as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+    except (ClienteNoDisponible, PrecioVigenteFaltante) as error:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
+    except CalcServiceError as error:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(error)) from error
+    return CotizacionEmitidaLeer(id=cotizacion.id, numero_proforma=cotizacion.numero_proforma, total=cotizacion.total)
