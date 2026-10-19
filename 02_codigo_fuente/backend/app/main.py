@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.routers import (
     auth,
+    bocetos,
     cliente,
     cotizacion,
     equipo,
@@ -72,6 +73,9 @@ app.include_router(terreno.router)
 app.include_router(equipo.router)
 app.include_router(layout.router)
 
+# Módulo 2 — Bocetos del cliente (RF-04 y RF-05)
+app.include_router(bocetos.router)
+
 # Módulo 3 — Cotización
 app.include_router(cotizacion.router)
 
@@ -79,7 +83,6 @@ app.include_router(cotizacion.router)
 app.include_router(tablero.router)
 
 # A medida que avancemos, cada módulo registra su router aquí:
-# app.include_router(boceto.router,     prefix="/api/boceto",    tags=["Módulo 2 — Boceto"])
 # app.include_router(admin.router,      prefix="/api/admin",     tags=["Módulo 4 — Administración"])
 # app.include_router(validacion.router, prefix="/api/validacion",tags=["Módulo 5 — Validación"])
 

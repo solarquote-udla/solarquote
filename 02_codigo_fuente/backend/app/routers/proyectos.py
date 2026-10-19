@@ -45,6 +45,7 @@ def _respuesta(proyecto: Proyecto, avance: servicio.Avance | None = None) -> Pro
         tiene_terreno=avance is not None and proyecto.id in avance.terreno,
         tiene_equipo=avance is not None and proyecto.id in avance.equipo,
         tiene_layout=avance is not None and proyecto.id in avance.layout,
+        tiene_boceto=avance is not None and proyecto.id in avance.boceto,
         cotizacion_id=avance.cotizacion[proyecto.id][0] if avance and proyecto.id in avance.cotizacion else None,
         numero_proforma=avance.cotizacion[proyecto.id][1] if avance and proyecto.id in avance.cotizacion else None,
         created_at=proyecto.created_at,

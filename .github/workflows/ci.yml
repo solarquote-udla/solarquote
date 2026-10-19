@@ -1,10 +1,10 @@
 # Integración continua de SolarQuote.
 #
 # Corre en cada PR hacia develop o main y en cada push a esas ramas.
-# Los tres jobs son independientes: si uno falla, los otros igual reportan.
+# Los cuatro jobs son independientes: si uno falla, los otros igual reportan.
 #
 # Una vez que aparezcan en un PR, los nombres de los jobs ("backend",
-# "calc-service", "frontend") se marcan como checks obligatorios en los
+# "calc-service", "ia-service", "frontend") se marcan como checks obligatorios en los
 # rulesets proteger-develop y proteger-main.
 
 name: CI
@@ -112,6 +112,34 @@ jobs:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: 02_codigo_fuente/calc-service/requirements.txt
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Pruebas unitarias
+        run: pytest
+
+  ia-service:
+    name: ia-service
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: 02_codigo_fuente/ia-service
+
+    # Sin clave de Anthropic: las pruebas simulan la API y nunca la llaman
+    env:
+      IA_SERVICE_SECRET: ci-secreto-ficticio-no-usar-fuera-del-ci
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: 02_codigo_fuente/ia-service/requirements.txt
 
       - name: Instalar dependencias
         run: pip install -r requirements.txt
