@@ -14,6 +14,10 @@ Reglas (ficha RF-05 y prototipo):
     cotiza.
   - Un proyecto se cotiza una vez. Volver a cotizarlo con otro número
     de proforma queda para cuando exista la revisión de proformas.
+
+El boceto del cliente (RF-04) pasa por la misma confirmación con
+`cotizar_boceto`: en lugar de los bloques ubicados del layout, se cotizan
+los tipos L, A, B que el Gerente revisó.
 """
 
 from collections import Counter
@@ -21,11 +25,14 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
+from app.models.boceto import Boceto
 from app.models.cotizacion import Cotizacion
 from app.models.layout import Layout
 from app.models.proyecto import EstadoProyecto, Proyecto
 from app.models.usuario import Usuario
 from app.schemas.cotizacion import CotizacionCrear, ItemCalculoEntrada
+from app.services.boceto import a_respuesta as boceto_a_respuesta
+from app.services.boceto import obtener_boceto
 from app.services.cotizacion import crear_cotizacion
 from app.services.layout import huella_actual, obtener_layout
 
@@ -46,6 +53,26 @@ def items_del_layout(layout: Layout) -> list[ItemCalculoEntrada]:
     ]
 
 
+def _bloquear_sin_cotizar(db: Session, proyecto_id: int) -> Proyecto:
+    """
+    Bloquea la fila del proyecto hasta el commit y verifica que todavía
+    no tenga cotización. Lo comparten el layout y el boceto: un proyecto
+    se cotiza una sola vez, venga de donde venga el diseño.
+    """
+    proyecto = db.query(Proyecto).filter(Proyecto.id == proyecto_id).with_for_update().one()
+
+    if proyecto.estado == EstadoProyecto.COTIZADO:
+        anterior = (
+            db.query(Cotizacion)
+            .filter(Cotizacion.proyecto_id == proyecto.id)
+            .order_by(Cotizacion.created_at.desc(), Cotizacion.id.desc())
+            .first()
+        )
+        numero = f" ({anterior.numero_proforma})" if anterior and anterior.numero_proforma else ""
+        raise NoSePuedeCotizar(f"El proyecto ya tiene su cotización{numero}.")
+    return proyecto
+
+
 def cotizar_layout(
     db: Session,
     proyecto_id: int,
@@ -61,17 +88,7 @@ def cotizar_layout(
     simultáneas (doble clic, dos pestañas) no pueden emitir dos
     cotizaciones. `crear_cotizacion` hace el commit y libera el bloqueo.
     """
-    proyecto = db.query(Proyecto).filter(Proyecto.id == proyecto_id).with_for_update().one()
-
-    if proyecto.estado == EstadoProyecto.COTIZADO:
-        anterior = (
-            db.query(Cotizacion)
-            .filter(Cotizacion.proyecto_id == proyecto.id)
-            .order_by(Cotizacion.created_at.desc(), Cotizacion.id.desc())
-            .first()
-        )
-        numero = f" ({anterior.numero_proforma})" if anterior and anterior.numero_proforma else ""
-        raise NoSePuedeCotizar(f"El proyecto ya tiene su cotización{numero}.")
+    proyecto = _bloquear_sin_cotizar(db, proyecto_id)
 
     layout = obtener_layout(db, proyecto.id)
     if layout is None or not layout.bloques:
@@ -102,5 +119,72 @@ def cotizar_layout(
         usuario,
         potencia_kwp=round(layout.potencia_kwp, 2),
         total_paneles=layout.total_paneles,
+    )
+    return cotizacion
+
+
+def items_del_boceto(boceto: Boceto) -> list[ItemCalculoEntrada]:
+    """
+    Tipos del boceto como ítems L, A, B. Dos tipos con el mismo L y A y
+    distinta orientación llevan los mismos materiales: se suman.
+    """
+    conteo: Counter = Counter()
+    for b in boceto.bloques:
+        conteo[(b.paneles_largo, b.paneles_ancho)] += b.repeticiones
+    return [
+        ItemCalculoEntrada(paneles_largo=l, paneles_ancho=a, bloques=b)
+        for (l, a), b in sorted(conteo.items(), key=lambda item: (-item[1], -item[0][1], -item[0][0]))
+    ]
+
+
+def cotizar_boceto(
+    db: Session,
+    proyecto_id: int,
+    usuario: Usuario,
+    *,
+    acepta_fuera_de_proporcion: bool,
+    addendum_porcentaje: Decimal = Decimal("0"),
+) -> Cotizacion:
+    """
+    Confirma los bloques del boceto (RF-05) y emite su cotización (RF-06).
+    Mismas reglas que el layout: una cotización por proyecto y los
+    bloques fuera de proporción se aceptan de forma explícita.
+    """
+    proyecto = _bloquear_sin_cotizar(db, proyecto_id)
+
+    boceto = obtener_boceto(db, proyecto.id)
+    if boceto is None:
+        raise NoSePuedeCotizar("Carga el boceto del proyecto antes de confirmarlo.")
+    if not boceto.bloques:
+        raise NoSePuedeCotizar("El boceto no tiene bloques. Agrégalos en la confirmación antes de cotizar.")
+
+    impares = sorted({b.paneles_largo for b in boceto.bloques if b.paneles_largo % 2})
+    if impares:
+        raise NoSePuedeCotizar(
+            f"Hay bloques con L impar ({', '.join(map(str, impares))}): la estructura apoya los paneles "
+            f"de a dos. Corrígelos antes de cotizar."
+        )
+
+    leido = boceto_a_respuesta(db, boceto)
+    fuera = sum(b.repeticiones for b in leido.bloques if not b.en_proporcion)
+    if fuera and not acepta_fuera_de_proporcion:
+        raise NoSePuedeCotizar(
+            f"{fuera} bloque(s) están fuera de la proporción antisísmica. Ajústalos o "
+            f"confírmalos bajo tu responsabilidad."
+        )
+
+    datos = CotizacionCrear(
+        cliente_id=proyecto.cliente_id,
+        proyecto_id=proyecto.id,
+        proyecto_nombre=proyecto.nombre,
+        addendum_porcentaje=addendum_porcentaje,
+        items=items_del_boceto(boceto),
+    )
+    cotizacion, _ = crear_cotizacion(
+        db,
+        datos,
+        usuario,
+        potencia_kwp=leido.potencia_kwp,
+        total_paneles=leido.total_paneles,
     )
     return cotizacion

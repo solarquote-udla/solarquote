@@ -76,6 +76,11 @@ class Settings(BaseSettings):
     # .env). Sin default a propósito, igual que SECRET_KEY.
     CALC_SERVICE_SECRET: str
 
+    # Secreto compartido con ia-service (RF-04), mismo valor en los dos
+    # servicios. Opcional: sin él, cargar un boceto responde 503 y el
+    # resto de la API funciona igual.
+    IA_SERVICE_SECRET: str | None = None
+
     # ─── Cotización (RF-06) ─────────────────────────────
     # calc-service no asume ninguna tasa: la resuelve este valor y se la
     # manda en cada request a /api/cotizacion/calcular.
