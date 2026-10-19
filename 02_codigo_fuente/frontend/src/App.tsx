@@ -22,6 +22,7 @@ import {
 import { AppLayout } from "@/components/AppLayout";
 import { RutaProtegida } from "@/components/RutaProtegida";
 import { AuthProvider } from "@/context/AuthProvider";
+import { TemaProvider } from "@/context/TemaProvider";
 import { CambiarPasswordPage } from "@/pages/CambiarPasswordPage";
 import { CargarBocetoPage } from "@/pages/CargarBocetoPage";
 import { ClientesPage } from "@/pages/ClientesPage";
@@ -65,12 +66,14 @@ function pendiente(titulo: string, modulo: string, requerimientos: string) {
   );
 }
 
-/** La sesión envuelve a todas las rutas. */
+/** El tema y la sesión envuelven a todas las rutas. */
 function Raiz() {
   return (
-    <AuthProvider>
-      <Outlet />
-    </AuthProvider>
+    <TemaProvider>
+      <AuthProvider>
+        <Outlet />
+      </AuthProvider>
+    </TemaProvider>
   );
 }
 

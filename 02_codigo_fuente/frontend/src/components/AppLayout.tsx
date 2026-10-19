@@ -11,9 +11,11 @@ import { Link, NavLink, Outlet } from "react-router-dom";
 import { menuVisible } from "@/components/menu";
 import { useAuth } from "@/hooks/useAuth";
 import { hayCambiosPendientes } from "@/hooks/useCambiosSinGuardar";
+import { useTema } from "@/hooks/useTema";
 
 export function AppLayout() {
   const { usuario, cerrarSesion, tienePermiso } = useAuth();
+  const { tema, alternarTema } = useTema();
 
   const grupos = menuVisible(tienePermiso);
 
@@ -87,6 +89,16 @@ export function AppLayout() {
           <div className="flex h-9 w-9 items-center justify-center rounded-full bg-solar-100 text-sm font-semibold text-solar-700">
             {iniciales}
           </div>
+
+          <button
+            type="button"
+            onClick={alternarTema}
+            aria-label={tema === "oscuro" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+            title={tema === "oscuro" ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-acero-600 transition hover:bg-acero-100"
+          >
+            {tema === "oscuro" ? "☀️" : "🌙"}
+          </button>
 
           <Link
             to="/cambiar-password"
