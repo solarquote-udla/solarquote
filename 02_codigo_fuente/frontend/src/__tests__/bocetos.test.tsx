@@ -209,6 +209,28 @@ describe("Confirmación del boceto", () => {
     expect(botonConfirmar().disabled).toBe(false);
   });
 
+  it("la orientación se puede corregir y se guarda con el tipo", async () => {
+    vi.mocked(bocetos.guardarBloquesBoceto).mockResolvedValue(BOCETO() as never);
+    await abrirConfirmacion();
+    const orientacion = screen.getByLabelText("Orientación del tipo B") as HTMLSelectElement;
+    expect(orientacion.value).toBe("vertical");
+    fireEvent.change(orientacion, { target: { value: "horizontal" } });
+    expect(screen.getByText("Guarda los cambios antes de confirmar.")).toBeTruthy();
+
+    await act(async () => fireEvent.click(screen.getByText("Guardar cambios")));
+    expect(vi.mocked(bocetos.guardarBloquesBoceto).mock.calls[0][1][1]).toMatchObject({ orientacion: "horizontal" });
+  });
+
+  it("el esquema dibuja cada tipo como en el plano", async () => {
+    await abrirConfirmacion();
+    const tipoA = screen.getByRole("img", { name: "Tipo A: 4 × 24" });
+    // Filas verticales: A (27,2 m) hacia abajo y L (9,1 m) hacia el costado
+    expect(Number(tipoA.getAttribute("height"))).toBeGreaterThan(Number(tipoA.getAttribute("width")));
+    fireEvent.change(screen.getByLabelText("Orientación del tipo A"), { target: { value: "horizontal" } });
+    const girado = screen.getByRole("img", { name: "Tipo A: 4 × 24" });
+    expect(Number(girado.getAttribute("width"))).toBeGreaterThan(Number(girado.getAttribute("height")));
+  });
+
   it("con bloques fuera de proporción exige aceptarlos y confirma una sola vez", async () => {
     vi.mocked(bocetos.confirmarYCotizarBoceto).mockResolvedValue({ id: 42, numero_proforma: "CT-001-2026", total: "10.00" });
     await abrirConfirmacion();
