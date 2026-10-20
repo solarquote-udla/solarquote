@@ -129,8 +129,25 @@ function VistaOriginal({ proyectoId, boceto }: { proyectoId: number; boceto: Boc
   );
 }
 
-/** Un rectángulo por tipo, con la proporción real del bloque. */
-function EsquemaTipos({ tipos }: { tipos: { clave: number; nombre: string; L: number; A: number; B: number; ok: boolean; ancho: number; largo: number }[] }) {
+interface TipoEsquema {
+  clave: number;
+  nombre: string;
+  L: number;
+  A: number;
+  B: number;
+  ok: boolean;
+  /** Metros a lo largo de la fila (A) */
+  ancho: number;
+  /** Metros en la pendiente (L) */
+  largo: number;
+  orientacion: "vertical" | "horizontal";
+}
+
+/**
+ * Un rectángulo por tipo, con la proporción real del bloque y girado como
+ * en el plano: "vertical" = las filas (A) corren de arriba hacia abajo.
+ */
+function EsquemaTipos({ tipos }: { tipos: TipoEsquema[] }) {
   if (tipos.length === 0) return null;
   const maximo = Math.max(...tipos.map((t) => Math.max(t.ancho, t.largo)));
   return (
@@ -139,8 +156,9 @@ function EsquemaTipos({ tipos }: { tipos: { clave: number; nombre: string; L: nu
       <div className="mt-4 flex flex-wrap items-end gap-6">
         {tipos.map((t) => {
           const escala = 160 / maximo;
-          const ancho = Math.max(t.ancho * escala, 8);
-          const largo = Math.max(t.largo * escala, 8);
+          const vertical = t.orientacion === "vertical";
+          const ancho = Math.max((vertical ? t.largo : t.ancho) * escala, 8);
+          const largo = Math.max((vertical ? t.ancho : t.largo) * escala, 8);
           return (
             <figure key={t.clave} className="text-center">
               <svg width={ancho + 2} height={largo + 2} role="img" aria-label={`Tipo ${t.nombre}: ${t.L} × ${t.A}`}>
@@ -160,7 +178,7 @@ function EsquemaTipos({ tipos }: { tipos: { clave: number; nombre: string; L: nu
           );
         })}
       </div>
-      <p className="mt-3 text-xs text-acero-400">Ancho (A) en horizontal y largo (L) en vertical, a la misma escala.</p>
+      <p className="mt-3 text-xs text-acero-400">Cada tipo orientado como en el plano y a la misma escala.</p>
     </div>
   );
 }
@@ -387,6 +405,7 @@ export function ConfirmacionBocetoPage() {
               ok: e.ok!,
               ancho: e.valores!.A * menor,
               largo: e.valores!.L * mayor,
+              orientacion: e.fila.orientacion,
             }))}
           />
         </div>
@@ -446,6 +465,19 @@ export function ConfirmacionBocetoPage() {
                           disabled={cotizado}
                           onChange={(ev) => cambiar(e.fila.clave, { etiqueta: ev.target.value })}
                         />
+                        <select
+                          aria-label={`Orientación del tipo ${e.nombre}`}
+                          title="Hacia dónde corren las filas (A) en el plano"
+                          className="mt-1 w-full rounded border border-acero-300 bg-acero-50 px-1 py-0.5 text-[11px] text-acero-700 focus:border-solar-500 focus:outline-none disabled:opacity-60"
+                          value={e.fila.orientacion}
+                          disabled={cotizado}
+                          onChange={(ev) =>
+                            cambiar(e.fila.clave, { orientacion: ev.target.value as FilaBoceto["orientacion"] })
+                          }
+                        >
+                          <option value="vertical">Filas verticales</option>
+                          <option value="horizontal">Filas horizontales</option>
+                        </select>
                         {confianza != null && (
                           <span
                             className={`mt-0.5 block text-[11px] ${confianza < 0.7 ? "text-amber-700" : "text-acero-400"}`}

@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* Variante para los pocos colores que no salen del tema: `claro:text-sky-700`
+   aplica solo con <html data-tema="claro">. Ver utils/inversores.ts. */
+@custom-variant claro (&:where([data-tema="claro"], [data-tema="claro"] *));
+
 /* ─── Tema de SolarQuote: oscuro, como el prototipo ─────
    Tailwind 4 define el tema con variables CSS en @theme.
    No hace falta tailwind.config.js.
