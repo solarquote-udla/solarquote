@@ -32,7 +32,7 @@ vi.mock("@/hooks/useAuth", () => ({
 }));
 
 const TABLERO_CON_DATOS: Tablero = {
-  resumen: { total_cotizaciones: 3, monto_total: "300.00", paneles_cotizados: 48, potencia_total_kwp: "14.40" },
+  resumen: { total_cotizaciones: 3, monto_total: "300.00", paneles_cotizados: 48, potencia_total_kwp: "14.40", bocetos_procesados: 2 },
   cotizaciones_por_periodo: [
     { periodo: "2026-09", cantidad: 1, total: "100.00" },
     { periodo: "2026-10", cantidad: 2, total: "200.00" },
@@ -48,7 +48,7 @@ const TABLERO_CON_DATOS: Tablero = {
 };
 
 const TABLERO_VACIO: Tablero = {
-  resumen: { total_cotizaciones: 0, monto_total: "0", paneles_cotizados: 0, potencia_total_kwp: "0" },
+  resumen: { total_cotizaciones: 0, monto_total: "0", paneles_cotizados: 0, potencia_total_kwp: "0", bocetos_procesados: 0 },
   cotizaciones_por_periodo: [
     { periodo: "2026-09", cantidad: 0, total: "0" },
     { periodo: "2026-10", cantidad: 0, total: "0" },
@@ -95,6 +95,7 @@ describe("TableroIndicadores", () => {
     expect(screen.getByText("$300.00")).toBeTruthy();
     expect(screen.getByText("48")).toBeTruthy();
     expect(screen.getByText("14.4 kWp")).toBeTruthy();
+    expect(screen.getByText("Bocetos procesados").parentElement?.textContent).toBe("Bocetos procesados2");
     // 3 cotizaciones × 35 min (45 manual − 10 con el sistema, acordado con Joseph) = 105 min.
     expect(screen.getByText("1 h 45 min")).toBeTruthy();
     // materiales_mas_consumidos vino vacío del servicio simulado.

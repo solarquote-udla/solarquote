@@ -192,6 +192,8 @@ export function InversoresPage() {
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [incluirInactivos, setIncluirInactivos] = useState(false);
+  // RF-08: búsqueda por marca o modelo (el catálogo es corto: se filtra en la pantalla)
+  const [buscar, setBuscar] = useState("");
 
   const [mostrarForm, setMostrarForm] = useState(false);
   const [formNuevo, setFormNuevo] = useState<FormularioInversor>(FORM_VACIO);
@@ -300,6 +302,11 @@ export function InversoresPage() {
     }
   }
 
+  const texto = buscar.trim().toLowerCase();
+  const visibles = texto
+    ? inversores.filter((i) => `${i.marca} ${i.modelo}`.toLowerCase().includes(texto))
+    : inversores;
+
   return (
     <div className="mx-auto max-w-5xl">
       <nav className="text-sm text-acero-500">
@@ -357,7 +364,16 @@ export function InversoresPage() {
         </div>
       )}
 
-      <label className="mt-4 flex items-center gap-2 text-sm text-acero-600">
+      <input
+        type="search"
+        value={buscar}
+        onChange={(e) => setBuscar(e.target.value)}
+        placeholder="Buscar por marca o modelo"
+        aria-label="Buscar inversores"
+        className="mt-4 w-full max-w-sm rounded-lg border border-acero-300 bg-acero-50 px-3 py-2 text-sm text-acero-900 placeholder:text-acero-400 focus:border-solar-500 focus:outline-none focus:ring-1 focus:ring-solar-500"
+      />
+
+      <label className="mt-3 flex items-center gap-2 text-sm text-acero-600">
         <input
           type="checkbox"
           checked={incluirInactivos}
@@ -375,6 +391,8 @@ export function InversoresPage() {
           <p className="p-6 text-sm text-acero-500">Cargando inversores…</p>
         ) : inversores.length === 0 ? (
           <p className="p-10 text-center text-sm text-acero-500">Todavía no hay inversores en el catálogo.</p>
+        ) : visibles.length === 0 ? (
+          <p className="p-10 text-center text-sm text-acero-500">Ningún inversor coincide con la búsqueda.</p>
         ) : (
           <table className="w-full text-sm">
             <thead className="bg-acero-50 text-left text-xs uppercase tracking-wide text-acero-500">
@@ -387,7 +405,7 @@ export function InversoresPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-acero-100">
-              {inversores.map((inversor) => (
+              {visibles.map((inversor) => (
                 <Fragment key={inversor.id}>
                   <tr className={inversor.activo ? "hover:bg-acero-50" : "bg-acero-50/40"}>
                     <td className="px-4 py-3">

@@ -680,6 +680,8 @@ export interface ResumenTablero {
   monto_total: string;
   paneles_cotizados: number;
   potencia_total_kwp: string;
+  /** Bocetos del cliente cargados en el período (RF-04) */
+  bocetos_procesados: number;
 }
 
 export interface Tablero {
