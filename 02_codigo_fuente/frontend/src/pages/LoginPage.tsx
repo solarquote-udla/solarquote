@@ -30,6 +30,7 @@ export function LoginPage() {
   const unaVez = useAccionUnica();
 
   const sesionExpirada = parametros.get("expirado") === "1";
+  const cerradaPorInactividad = parametros.get("inactividad") === "1";
   const destino = (ubicacion.state as EstadoUbicacion | null)?.destino ?? "/";
 
   if (autenticado) {
@@ -73,6 +74,11 @@ export function LoginPage() {
             {sesionExpirada && !error && (
               <div className="mb-4 rounded-lg border border-solar-200 bg-solar-50 px-4 py-3 text-sm text-solar-800">
                 Tu sesión expiró. Vuelve a iniciar sesión.
+              </div>
+            )}
+            {cerradaPorInactividad && !error && (
+              <div className="mb-4 rounded-lg border border-solar-200 bg-solar-50 px-4 py-3 text-sm text-solar-800">
+                Cerramos tu sesión tras 30 minutos sin actividad. Vuelve a iniciar sesión.
               </div>
             )}
 

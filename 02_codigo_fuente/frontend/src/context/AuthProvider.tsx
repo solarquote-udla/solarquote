@@ -4,11 +4,13 @@
  * Mantiene el usuario en memoria y el token en localStorage. Al montar,
  * si hay token guardado, pregunta al backend quién es el usuario — así una
  * recarga de página no pierde la sesión, y un token revocado se detecta.
+ * Con la sesión abierta, 30 minutos sin actividad la cierran (RNF-04).
  */
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { AuthContext, type EstadoAuth } from "@/context/AuthContext";
+import { useCierrePorInactividad } from "@/hooks/useCierrePorInactividad";
 import { borrarToken, guardarToken, obtenerToken } from "@/services/api";
 import {
   cambiarPassword as cambiarPasswordApi,
@@ -59,6 +61,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     borrarToken();
     setUsuario(null);
   }, []);
+
+  // RNF-04: 30 minutos sin actividad cierran la sesión. Se recarga la
+  // página en el login para descartar todo lo que quedó en memoria.
+  const cerrarPorInactividad = useCallback(() => {
+    borrarToken();
+    setUsuario(null);
+    window.location.replace("/login?inactividad=1");
+  }, []);
+  useCierrePorInactividad(usuario !== null, cerrarPorInactividad);
 
   const cambiarPassword = useCallback(async (datos: CambioPassword) => {
     const respuesta = await cambiarPasswordApi(datos);

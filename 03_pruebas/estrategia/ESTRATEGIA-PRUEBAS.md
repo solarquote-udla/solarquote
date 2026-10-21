@@ -103,17 +103,18 @@ incidente real del Sprint 2 (ver el reporte del sprint).
 
 ## 4. Canalización de integración continua
 
-`.github/workflows/ci.yml` corre tres jobs en paralelo:
+`.github/workflows/ci.yml` corre cuatro jobs en paralelo:
 
 | Job | Pasos |
 |---|---|
 | `backend` | Instalar dependencias → pytest → verificar una sola *head* de Alembic → `upgrade → downgrade → upgrade` |
 | `calc-service` | Instalar dependencias → pytest |
+| `ia-service` | Instalar dependencias → pytest (la API de Claude se simula; no usa clave) |
 | `frontend` | `npm ci` → ESLint → pruebas de interfaz (`npm test`) → `tsc -b && vite build` |
 
 **Criterio de entrada a `develop` y `main`** (rulesets de GitHub):
 
-- Los tres jobs en verde.
+- Los cuatro jobs en verde.
 - La rama al día con la base (*require branches to be up to date*).
 - Una aprobación del otro integrante.
 - Merge con *merge commit*; nunca *squash* ni *force push*.
