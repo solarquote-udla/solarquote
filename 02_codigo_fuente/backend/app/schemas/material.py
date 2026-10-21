@@ -51,7 +51,7 @@ class PrecioMaterialLeer(BaseModel):
 
 
 class PrecioActualizar(BaseModel):
-    precio: Decimal = Field(gt=0, decimal_places=2)
+    precio: Decimal = Field(ge=0, decimal_places=2)
 
 
 class MaterialCrear(BaseModel):

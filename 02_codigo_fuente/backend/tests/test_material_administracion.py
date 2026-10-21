@@ -215,9 +215,10 @@ class TestPrecioActualizarSchema:
     def test_acepta_un_precio_positivo(self) -> None:
         assert PrecioActualizar(precio=Decimal("8.50")).precio == Decimal("8.50")
 
-    def test_rechaza_cero(self) -> None:
-        with pytest.raises(ValidationError):
-            PrecioActualizar(precio=Decimal("0"))
+    def test_acepta_cero(self) -> None:
+        # RF-09: "precio mayor o igual a cero" — la logística (LOG) nace en $0
+        # y debe poder volver a $0.
+        assert PrecioActualizar(precio=Decimal("0")).precio == Decimal("0")
 
     def test_rechaza_negativo(self) -> None:
         with pytest.raises(ValidationError):
