@@ -19,9 +19,9 @@ function formatearFecha(iso: string): string {
   return new Date(iso).toLocaleDateString("es-EC", { year: "numeric", month: "short", day: "numeric" });
 }
 
-/** Número válido y mayor que cero, con hasta dos decimales (lo que exige el backend). */
+/** Número válido, mayor o igual a cero, con hasta dos decimales (lo que exige el backend, RF-09). */
 function precioValido(valor: string): boolean {
-  return /^\d+(\.\d{1,2})?$/.test(valor.trim()) && Number(valor) > 0;
+  return /^\d+(\.\d{1,2})?$/.test(valor.trim()) && Number(valor) >= 0;
 }
 
 export function PreciosPage() {
@@ -65,7 +65,7 @@ export function PreciosPage() {
 
   async function guardarPrecio(material: Material) {
     if (!precioValido(nuevoPrecio)) {
-      setError("El precio debe ser un número mayor a cero, con hasta dos decimales.");
+      setError("El precio debe ser un número mayor o igual a cero, con hasta dos decimales.");
       return;
     }
     setError(null);

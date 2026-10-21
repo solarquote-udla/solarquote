@@ -17,11 +17,11 @@ requisito es la corrida verde del PR indicado.
 
 | Componente | Pruebas | Cobertura de líneas | Cómo se ejecutan |
 |---|---|---|---|
-| Backend (API principal) | 413 | 96 % | `pytest` en `02_codigo_fuente/backend` |
+| Backend (API principal) | 414 | 96 % | `pytest` en `02_codigo_fuente/backend` |
 | calc-service | 32 | 100 % | `pytest` en `02_codigo_fuente/calc-service` |
 | ia-service | 38 | 93 % | `pytest` en `02_codigo_fuente/ia-service` |
-| Frontend (interfaz) | 150 | — | `npm test` en `02_codigo_fuente/frontend` |
-| **Total** | **633** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
+| Frontend (interfaz) | 151 | — | `npm test` en `02_codigo_fuente/frontend` |
+| **Total** | **635** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
 
 La cobertura se midió con `pytest --cov=app`. RNF-02 pide al menos 60 %
 en el backend.
@@ -132,6 +132,7 @@ configurables y el límite de 10 s de RNF-03.
 | Regla del requisito | Pruebas |
 |---|---|
 | Registrar, consultar, actualizar, dar de baja | `test_inversor_administracion` (25 pruebas); `test_api_administracion`: `test_inversor_ciclo_completo_y_errores` |
+| Búsqueda por marca o modelo | `inversores-catalogo.test.tsx` |
 | Vmax mayor que Vmin cuando se registran | `test_inversor_administracion`: `test_rechaza_vmax_menor_o_igual_que_vmin`; `test_api_administracion` (422) |
 | Marca y modelo únicos | `test_api_administracion` (409) |
 | Solo con permiso de parametrización | `test_api_administracion`: `test_inversores_por_permiso`; `test_seguridad`: `test_generar_layout_puede_leer_inversores_pero_no_administrarlos` |
@@ -146,7 +147,7 @@ Evidencia: PR #37 y el PR de SQ-135.
 | Precio con fecha de vigencia e historial | `test_material_administracion`: `test_actualizar_precio_cierra_el_anterior_y_crea_uno_nuevo`, `test_historial_queda_ordenado_*`; `test_api_administracion`: `test_material_ciclo_completo` |
 | Las cotizaciones emitidas conservan sus precios | `test_cotizacion_servicio`: `test_persiste_la_cantidad_y_precio_unitario_de_cada_material` |
 | Los materiales de las fórmulas no se desactivan | `test_material_administracion`: `test_desactivar_un_codigo_de_formula_*`; `test_api_administracion` (409) |
-| Precio no negativo | `test_material_administracion`: `test_rechaza_negativo`; `test_api_administracion` (422) |
+| Precio mayor o igual a cero | `test_material_administracion`: `test_acepta_cero`, `test_rechaza_negativo`; `test_api_administracion` (422) |
 | Precios y catálogo con permisos separados | `test_api_administracion`: `test_precios_y_materiales_por_permiso`; `test_seguridad`: `test_ver_materiales_no_permite_cambiar_precios` |
 
 Evidencia: PR #23 a #25, #35 y el PR de SQ-135.
@@ -196,7 +197,8 @@ Evidencia: PR #17, #18, #22 y el PR de SQ-135.
 | Gráficos por período y por estado | `test_tablero`: `test_cotizaciones_por_periodo_*`, `test_cotizaciones_por_estado_*`; `tablero.test.tsx` |
 | Rango de fechas válido | `test_tablero`: `test_desde_posterior_a_hasta_*`, `test_rango_de_mas_de_24_meses_*` |
 | Solo con permiso | `test_seguridad`: `test_tablero_lo_lee_quien_tiene_*` |
-| Bocetos procesados, lotes despachados y recibidos | Pendiente: los bocetos existen desde el PR #44; los lotes dependen de RF-14 y RF-15 |
+| Bocetos procesados | `test_tablero`: `test_resumen_cuenta_los_bocetos_procesados_en_el_rango`; `tablero.test.tsx` |
+| Lotes despachados y recibidos | Pendiente: dependen de RF-14 y RF-15 |
 
 Evidencia: PR #40 y #43.
 
@@ -234,10 +236,11 @@ todavía.
 | 2 | RNF-04 pedía cerrar la sesión tras 30 minutos de inactividad; el sistema solo vencía el token a las 8 horas | Cierre por inactividad en el frontend (`useCierrePorInactividad`), compartido entre pestañas, con aviso en el login; `inactividad.test.tsx` |
 | 3 | El factor de bcrypt (RNF-04) no tenía prueba | `test_rnf04_bcrypt_con_factor_de_al_menos_10` |
 | 4 | RNF-03 no tenía ninguna medición automatizada | Dos pruebas de tiempo del layout en `test_rnf` |
-| 5 | RF-09 dice "precio mayor o igual a cero", pero la API rechaza 0 (`PrecioActualizar`, `gt=0`). La logística (LOG) nace en $0 y no se podría volver a poner en $0 | **Por decidir** con el responsable del módulo: aceptar 0 o corregir el requisito |
-| 6 | RF-04 lista DWG entre los formatos; el sistema pide exportarlo a DXF porque ezdxf no lee DWG | Decisión de diseño documentada en el PR #44; corregir la redacción del requisito |
-| 7 | RF-13 pide bocetos procesados y lotes despachados y recibidos | Bocetos: se puede agregar ahora. Lotes: con RF-14 y RF-15 |
+| 5 | RF-09 dice "precio mayor o igual a cero", pero la API rechazaba 0 (`gt=0`), y la logística (LOG) nace en $0 | La API y la pantalla de precios aceptan 0 (`ge=0`); `test_acepta_cero` |
+| 6 | RF-04 lista DWG entre los formatos; el sistema pide exportarlo a DXF porque ezdxf no lee DWG | Decisión de diseño (PR #44); el requisito se corrigió en la tesis (sección 2.1.3, control de cambios CC-09) |
+| 7 | RF-13 pide bocetos procesados y lotes despachados y recibidos | Bocetos procesados agregado al tablero. Lotes: con RF-14 y RF-15 |
 | 8 | RF-07, RF-14, RF-15 y RF-16 sin implementar; sin pruebas de extremo a extremo | Planificado (Sprints 4 a 7); las pruebas de extremo a extremo, en el Sprint 7 |
+| 9 | RF-08 pide buscar inversores por marca o modelo; la pantalla no tenía búsqueda | Búsqueda en el catálogo de inversores; `inversores-catalogo.test.tsx` |
 
 ---
 
