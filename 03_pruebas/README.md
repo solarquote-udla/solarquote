@@ -23,29 +23,30 @@ encontrados por severidad y correcciones aplicadas.
 ## Documentos
 
 - [Estrategia de pruebas](estrategia/ESTRATEGIA-PRUEBAS.md)
+- [Matriz de trazabilidad requisitos → pruebas](trazabilidad/MATRIZ-TRAZABILIDAD.md)
 - [Reporte del Sprint 2](reportes/sprint-02.md)
+
+### `trazabilidad/`
+
+Qué prueba cubre cada regla de cada requisito (RF y RNF), la cobertura de
+código por servicio y los huecos pendientes.
 
 ## Cobertura actual
 
-Al cierre del Sprint 2: **228 pruebas automatizadas**, todas aprobadas.
+Corte del 21 de octubre de 2026: **633 pruebas automatizadas**, todas
+aprobadas. Detalle por requisito en la
+[matriz de trazabilidad](trazabilidad/MATRIZ-TRAZABILIDAD.md).
 
-| Componente | Pruebas | Estado |
+| Componente | Pruebas | Cobertura de líneas |
 |---|---|---|
-| Cálculo de materiales f(L,A,B) | Unitarias | Implementadas |
-| Endpoint de cotización (calc-service) | Integración | Implementadas |
-| Orquestador de cotización y snapshot del total | Integración | Implementadas |
-| Terreno y área útil (RF-01) | Unitarias | Implementadas |
-| Panel e inversor (RF-02) | Unitarias | Implementadas |
-| Algoritmo de layout solar (RF-03) | Unitarias | Implementadas |
-| Edición manual de bloques (SQ-64) | Unitarias + integración + paridad | Implementadas |
-| Autenticación entre servicios (SQ-37) | Integración | Implementadas |
-| Clientes y validación de identificación (RF-12) | Unitarias + integración + paridad | Implementadas |
-| Precios de materiales (RF-09) | Integración | Implementadas |
-| CORS y configuración | Unitarias | Implementadas |
-| Migraciones (ciclo completo, *head* única) | CI | Implementadas |
-| Diagnóstico de servicios | Integración | Implementadas |
-| Autenticación y autorización | Unitarias | Pendiente — Sprint 6 |
-| Flujo completo del usuario | Extremo a extremo | Pendiente — Sprint 8 |
+| Backend (API principal) | 413 | 96 % |
+| calc-service | 32 | 100 % |
+| ia-service | 38 | 93 % |
+| Frontend (interfaz) | 150 | — |
+
+Pendientes: RF-07 y RF-14 a RF-16 (con sus módulos), pruebas de extremo a
+extremo (Sprint 7) y las mediciones de RNF-01 con bocetos reales, RNF-05 y
+RNF-06.
 
 ## Ejecución
 
@@ -55,4 +56,10 @@ pytest
 
 cd 02_codigo_fuente/calc-service
 pytest
+
+cd 02_codigo_fuente/ia-service
+pytest
+
+cd 02_codigo_fuente/frontend
+npm test
 ```

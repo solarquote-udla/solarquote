@@ -49,7 +49,11 @@ vulnerabilidad XSS de origen.
    proyecto no utiliza `dangerouslySetInnerHTML` en ningún componente.
 2. **Vigencia acotada.** El token expira a las 8 horas
    (`ACCESS_TOKEN_EXPIRE_MINUTES=480`), cubriendo una jornada laboral sin
-   prolongar indefinidamente la ventana de exposición.
+   prolongar indefinidamente la ventana de exposición. Además, 30 minutos
+   sin actividad en la pantalla cierran la sesión (RNF-04): lo controla el
+   frontend (`useCierrePorInactividad`), porque la inactividad depende de
+   lo que hace la persona y no de las peticiones. La última actividad se
+   comparte entre pestañas, igual que el token.
 3. **Invalidación en el servidor.** La dependencia `get_usuario_actual`
    consulta el estado del usuario en cada petición: desactivar una cuenta
    revoca el acceso de inmediato, sin esperar a que expire el token.
