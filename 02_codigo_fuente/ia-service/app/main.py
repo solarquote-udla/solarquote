@@ -1,12 +1,12 @@
 from fastapi import FastAPI
 
 from app.core.config import settings
-from app.routers import bocetos, health
+from app.routers import bocetos, health, varillas
 
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    description="Servicio de interpretación de bocetos (RF-04) — HEXtructure S.A.S.",
+    description="Interpretación de bocetos (RF-04) y conteo de varillas (RF-14) — HEXtructure S.A.S.",
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -14,6 +14,7 @@ app = FastAPI(
 # Sin CORS: el navegador nunca llama a este servicio, solo la API principal.
 app.include_router(health.router)
 app.include_router(bocetos.router)
+app.include_router(varillas.router)
 
 
 @app.get("/", tags=["Diagnóstico"])

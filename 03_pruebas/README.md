@@ -33,19 +33,19 @@ código por servicio y los huecos pendientes.
 
 ## Cobertura actual
 
-Corte del 21 de octubre de 2026: **635 pruebas automatizadas**, todas
+Corte del 25 de octubre de 2026: **696 pruebas automatizadas**, todas
 aprobadas. Detalle por requisito en la
 [matriz de trazabilidad](trazabilidad/MATRIZ-TRAZABILIDAD.md).
 
 | Componente | Pruebas | Cobertura de líneas |
 |---|---|---|
-| Backend (API principal) | 414 | 96 % |
+| Backend (API principal) | 444 | 96 % |
 | calc-service | 32 | 100 % |
-| ia-service | 38 | 93 % |
-| Frontend (interfaz) | 151 | — |
+| ia-service | 52 | 94 % |
+| Frontend (interfaz) | 168 | — |
 
-Pendientes: RF-07 y RF-14 a RF-16 (con sus módulos), pruebas de extremo a
-extremo (Sprint 7) y las mediciones de RNF-01 con bocetos reales, RNF-05 y
+Pendientes: RF-07 (con su módulo), pruebas de extremo a extremo (Sprint 7) y
+las mediciones de RNF-01 con bocetos y fotos de lotes reales, RNF-05 y
 RNF-06.
 
 ## Ejecución

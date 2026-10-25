@@ -28,9 +28,9 @@ export function AppLayout() {
     .toUpperCase();
 
   return (
-    <div className="flex h-screen bg-acero-50">
+    <div className="flex h-screen bg-acero-50 print:block print:h-auto">
       {/* ─── Barra lateral ─────────────────────────────── */}
-      <aside className="flex w-64 shrink-0 flex-col border-r border-acero-200 bg-superficie">
+      <aside className="flex w-64 shrink-0 flex-col border-r border-acero-200 bg-superficie print:hidden">
         <div className="border-b border-acero-200 px-6 py-5">
           <span className="text-xl font-bold tracking-tight text-acero-900">
             Solar<span className="text-solar-500">Quote</span>
@@ -80,8 +80,8 @@ export function AppLayout() {
       </aside>
 
       {/* ─── Contenido ─────────────────────────────────── */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex h-16 shrink-0 items-center justify-end gap-4 border-b border-acero-200 bg-superficie px-6">
+      <div className="flex flex-1 flex-col overflow-hidden print:overflow-visible">
+        <header className="flex h-16 shrink-0 items-center justify-end gap-4 border-b border-acero-200 bg-superficie px-6 print:hidden">
           <div className="text-right">
             <p className="text-sm font-medium text-acero-800">{usuario?.nombre}</p>
             <p className="text-xs text-acero-500">{usuario?.perfil.nombre}</p>
@@ -148,7 +148,7 @@ export function AppLayout() {
           </button>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-6 print:overflow-visible print:p-0">
           <Outlet />
         </main>
       </div>

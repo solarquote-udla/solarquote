@@ -48,6 +48,8 @@ def _crear_cotizacion(
         total=Decimal(total),
         potencia_kwp=Decimal(potencia_kwp) if potencia_kwp is not None else None,
         created_at=created_at,
+        # La base exige la fecha de instalación en las instaladas (RF-16)
+        instalada_at=created_at if estado == EstadoCotizacion.INSTALADA else None,
         items=[
             ItemCotizacion(paneles_largo=largo, paneles_ancho=ancho, bloques=bloques)
             for largo, ancho, bloques in items

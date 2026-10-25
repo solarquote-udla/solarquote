@@ -29,7 +29,7 @@ import { ClientesPage } from "@/pages/ClientesPage";
 import { ConfirmacionBocetoPage } from "@/pages/ConfirmacionBocetoPage";
 import { ConfirmacionPage } from "@/pages/ConfirmacionPage";
 import { CotizacionDetallePage } from "@/pages/CotizacionDetallePage";
-import { EnConstruccionPage } from "@/pages/EnConstruccionPage";
+import { DespachoPage } from "@/pages/DespachoPage";
 import { EquipoPage } from "@/pages/EquipoPage";
 import { HistorialPage } from "@/pages/HistorialPage";
 import { InicioPage } from "@/pages/InicioPage";
@@ -39,6 +39,8 @@ import { LoginPage } from "@/pages/LoginPage";
 import { MaterialesPage } from "@/pages/MaterialesPage";
 import { PerfilesPage } from "@/pages/PerfilesPage";
 import { PreciosPage } from "@/pages/PreciosPage";
+import { RecepcionPage } from "@/pages/RecepcionPage";
+import { SeguimientoPage } from "@/pages/SeguimientoPage";
 import { SinPermisosPage } from "@/pages/SinPermisosPage";
 import { TerrenoPage } from "@/pages/TerrenoPage";
 import { UsuarioFormPage } from "@/pages/UsuarioFormPage";
@@ -58,12 +60,6 @@ function conPermiso(permiso: Permiso | Permiso[], rutas: ReactNode) {
 function RedirigirPaso({ paso }: { paso: string }) {
   const { proyectoId } = useParams();
   return <Navigate to={`/generar/${proyectoId}/${paso}`} replace />;
-}
-
-function pendiente(titulo: string, modulo: string, requerimientos: string) {
-  return (
-    <EnConstruccionPage titulo={titulo} modulo={modulo} requerimientos={requerimientos} sprint="cronograma" />
-  );
 }
 
 /** El tema y la sesión envuelven a todas las rutas. */
@@ -133,14 +129,22 @@ const router = createBrowserRouter(
           {/* ─── OPERACIONES ────────────────────────── */}
           {conPermiso(
             Permiso.DESPACHO,
-            <Route path="validacion/despacho" element={pendiente("Despacho en planta", "Módulo 5", "RF-14 y RF-16")} />,
+            <>
+              <Route path="validacion/despacho" element={<DespachoPage />} />
+              <Route path="validacion/despacho/:cotizacionId" element={<DespachoPage />} />
+            </>,
           )}
           {conPermiso(
             Permiso.RECEPCION,
-            <Route
-              path="validacion/recepcion"
-              element={pendiente("Recepción en terreno", "Módulo 5", "RF-15 y RF-16")}
-            />,
+            <>
+              <Route path="validacion/recepcion" element={<RecepcionPage />} />
+              <Route path="validacion/recepcion/:cotizacionId" element={<RecepcionPage />} />
+            </>,
+          )}
+          {/* Seguimiento (RF-16): lo ve quien valida y quien consulta el historial */}
+          {conPermiso(
+            [Permiso.DESPACHO, Permiso.RECEPCION, Permiso.HISTORIAL, Permiso.GENERAR_LAYOUT],
+            <Route path="validacion/seguimiento/:cotizacionId" element={<SeguimientoPage />} />,
           )}
           {conPermiso(Permiso.CLIENTES, <Route path="clientes" element={<ClientesPage />} />)}
 

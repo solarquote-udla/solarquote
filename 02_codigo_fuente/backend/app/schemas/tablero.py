@@ -48,6 +48,10 @@ class ResumenTableroLeer(BaseModel):
     # Bocetos del cliente cargados en el rango (RF-04). Si un proyecto
     # reemplaza su boceto, cuenta el vigente.
     bocetos_procesados: int = 0
+    # Lotes despachados y recibidos en el rango (RF-14 y RF-15), por la
+    # fecha del despacho o de la recepción, no la de la cotización.
+    lotes_despachados: int = 0
+    lotes_recibidos: int = 0
 
 
 class TableroLeer(BaseModel):
