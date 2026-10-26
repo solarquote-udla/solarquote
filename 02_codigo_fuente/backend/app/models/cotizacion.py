@@ -13,6 +13,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    CheckConstraint,
     DateTime,
     Enum as SAEnum,
     ForeignKey,
@@ -37,6 +38,13 @@ class EstadoCotizacion(str, enum.Enum):
 
 class Cotizacion(Base):
     __tablename__ = "cotizaciones"
+    __table_args__ = (
+        # RF-16: la fecha de instalación existe si y solo si está instalada
+        CheckConstraint(
+            "(estado = 'instalada') = (instalada_at IS NOT NULL)",
+            name="ck_cotizaciones_instalacion",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
 
@@ -113,6 +121,12 @@ class Cotizacion(Base):
         nullable=False,
     )
 
+    # ─── Cierre del ciclo (RF-16) ───────────────────────────────────────
+    # La instalación se registra a mano; despacho y recepción tienen sus
+    # propias tablas (models/validacion.py) con su fecha y responsable.
+    instalada_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    instalada_por_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -140,6 +154,12 @@ class Cotizacion(Base):
 
     cliente: Mapped["Cliente | None"] = relationship()  # noqa: F821
     proyecto: Mapped["Proyecto | None"] = relationship()  # noqa: F821
+    usuario: Mapped["Usuario"] = relationship(foreign_keys=[usuario_id])  # noqa: F821
+    instalada_por: Mapped["Usuario | None"] = relationship(foreign_keys=[instalada_por_id])  # noqa: F821
+
+    # Validación de materiales (RF-14 y RF-15): a lo sumo uno de cada uno
+    despacho: Mapped["Despacho | None"] = relationship(cascade="all, delete-orphan", uselist=False)  # noqa: F821
+    recepcion: Mapped["Recepcion | None"] = relationship(cascade="all, delete-orphan", uselist=False)  # noqa: F821
 
     def __repr__(self) -> str:
         return f"<Cotizacion {self.id} {self.numero_proforma} ({self.estado.value})>"

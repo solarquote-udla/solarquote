@@ -4,15 +4,20 @@
  * Todo lo que quedó persistido al emitirla: snapshot del cliente,
  * ítems (L, A, B), desglose de materiales y totales. No se recalcula
  * contra el catálogo actual — ver CotizacionDetalleLeer en el backend.
+ *
+ * Arriba, la línea de tiempo de la propuesta (RF-16) con el enlace a los
+ * reportes de despacho y recepción.
  */
 
 import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 
 import { EstadoCotizacionBadge } from "@/components/EstadoCotizacionBadge";
+import { LineaTiempoPropuesta } from "@/components/LineaTiempoPropuesta";
 import { mensajeDeError } from "@/services/api";
 import { obtenerCotizacion, obtenerProformaExcel, obtenerProformaWord } from "@/services/cotizaciones";
-import type { CotizacionDetalle } from "@/types/api";
+import { obtenerValidacion } from "@/services/validacion";
+import type { CotizacionDetalle, EventoEstado } from "@/types/api";
 import { formatoMoneda } from "@/utils/dinero";
 import { fechaHora } from "@/utils/fechas";
 import { nombreArchivoProforma } from "@/utils/proforma";
@@ -34,6 +39,7 @@ export function CotizacionDetallePage() {
   const [error, setError] = useState<string | null>(null);
   const [descargando, setDescargando] = useState<"docx" | "xlsx" | null>(null);
   const [errorDescarga, setErrorDescarga] = useState<string | null>(null);
+  const [lineaTiempo, setLineaTiempo] = useState<EventoEstado[] | null>(null);
 
   async function descargarProforma(extension: "docx" | "xlsx") {
     if (!cotizacion) return;
@@ -52,6 +58,21 @@ export function CotizacionDetallePage() {
       setDescargando(null);
     }
   }
+
+  // La línea de tiempo es complementaria: si no carga, el detalle se muestra igual
+  useEffect(() => {
+    let cancelado = false;
+    obtenerValidacion(Number(cotizacionId))
+      .then((v) => {
+        if (!cancelado) setLineaTiempo(v.linea_tiempo);
+      })
+      .catch(() => {
+        if (!cancelado) setLineaTiempo(null);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [cotizacionId]);
 
   useEffect(() => {
     let cancelado = false;
@@ -121,6 +142,23 @@ export function CotizacionDetallePage() {
             <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {errorDescarga}
             </div>
+          )}
+
+          {lineaTiempo && (
+            <section className="mt-6 rounded-xl border border-acero-200 bg-superficie p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-sm font-semibold text-acero-900">Estado de la propuesta</h2>
+                <Link
+                  to={`/validacion/seguimiento/${cotizacion.id}`}
+                  className="text-sm font-medium text-solar-700 hover:underline"
+                >
+                  Ver despacho y recepción
+                </Link>
+              </div>
+              <div className="mt-4">
+                <LineaTiempoPropuesta eventos={lineaTiempo} />
+              </div>
+            </section>
           )}
 
           <div className="mt-6 grid gap-6 sm:grid-cols-2">

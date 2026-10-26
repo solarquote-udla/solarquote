@@ -680,6 +680,11 @@ export interface ResumenTablero {
   monto_total: string;
   paneles_cotizados: number;
   potencia_total_kwp: string;
+  /** Bocetos del cliente cargados en el período (RF-04) */
+  bocetos_procesados: number;
+  /** Lotes despachados y recibidos en el período (RF-14 y RF-15) */
+  lotes_despachados: number;
+  lotes_recibidos: number;
 }
 
 export interface Tablero {
@@ -734,4 +739,142 @@ export interface Boceto {
   ediciones_manuales: number;
   created_at: string;
   updated_at: string;
+}
+
+// ─── Validación de materiales (RF-14, RF-15 y RF-16) ────
+
+/** Espejo de `EstadoItemRecepcion` en backend/app/schemas/validacion.py */
+export type EstadoItemRecepcion = "ok" | "diferencia" | "pendiente";
+
+export const ETIQUETAS_ESTADO_ITEM: Record<EstadoItemRecepcion, string> = {
+  ok: "OK",
+  diferencia: "Diferencia",
+  pendiente: "Pendiente",
+};
+
+/** Fila de las listas de cotizaciones por despachar o por recibir */
+export interface CotizacionAValidar {
+  cotizacion_id: number;
+  numero_proforma: string | null;
+  cliente_nombre: string;
+  proyecto_nombre: string | null;
+  estado: EstadoCotizacion;
+  created_at: string;
+  fecha_despacho: string | null;
+}
+
+export interface MaterialAValidar {
+  material_id: number;
+  codigo: string;
+  nombre: string;
+  unidad: string;
+  /** Cantidad cotizada */
+  cantidad: number;
+}
+
+export interface FotoValidacion {
+  id: number;
+  nombre_archivo: string;
+  material_id: number | null;
+  conteo_ia: number | null;
+}
+
+export interface ItemDespacho {
+  material_id: number;
+  codigo: string;
+  nombre: string;
+  cantidad_cotizada: number;
+  cantidad_despachada: number;
+  conteo_ia: number | null;
+  diferencia: number;
+}
+
+export interface Despacho {
+  fabricado_por: string;
+  soldado_por: string;
+  contado_por: string;
+  despachado_por: string;
+  destino: string;
+  justificacion: string | null;
+  registrado_por: string;
+  created_at: string;
+  items: ItemDespacho[];
+  fotos: FotoValidacion[];
+  con_diferencias: boolean;
+}
+
+export interface ItemRecepcion {
+  material_id: number;
+  codigo: string;
+  nombre: string;
+  cantidad_esperada: number;
+  cantidad_recibida: number | null;
+  estado: EstadoItemRecepcion;
+  observacion: string | null;
+  diferencia: number | null;
+}
+
+export interface Recepcion {
+  recibido_por: string;
+  observaciones: string | null;
+  registrado_por: string;
+  created_at: string;
+  items: ItemRecepcion[];
+  fotos: FotoValidacion[];
+  revisados: number;
+  diferencias: number;
+  pendientes: number;
+}
+
+/** Un punto de la línea de tiempo de la propuesta (RF-16) */
+export interface EventoEstado {
+  estado: EstadoCotizacion;
+  alcanzado: boolean;
+  fecha: string | null;
+  responsable: string | null;
+}
+
+/** Espejo de `ValidacionLeer` */
+export interface Validacion {
+  cotizacion_id: number;
+  numero_proforma: string | null;
+  cliente_nombre: string;
+  cliente_empresa: string | null;
+  proyecto_nombre: string | null;
+  estado: EstadoCotizacion;
+  created_at: string;
+  materiales: MaterialAValidar[];
+  despacho: Despacho | null;
+  recepcion: Recepcion | null;
+  linea_tiempo: EventoEstado[];
+}
+
+export interface DespachoCrear {
+  fabricado_por: string;
+  soldado_por: string;
+  contado_por: string;
+  despachado_por: string;
+  destino: string;
+  justificacion: string | null;
+  items: { material_id: number; cantidad_despachada: number; conteo_ia: number | null }[];
+  /** Una por foto enviada, en el mismo orden */
+  fotos: { material_id: number; conteo_ia: number | null }[];
+}
+
+export interface RecepcionCrear {
+  recibido_por: string;
+  observaciones: string | null;
+  items: {
+    material_id: number;
+    estado: EstadoItemRecepcion;
+    cantidad_recibida: number | null;
+    observacion: string | null;
+  }[];
+}
+
+/** Lo que contó la IA en una foto: una estimación que el operario revisa */
+export interface ConteoVarillas {
+  cantidad: number;
+  confianza: number;
+  advertencias: string[];
 }

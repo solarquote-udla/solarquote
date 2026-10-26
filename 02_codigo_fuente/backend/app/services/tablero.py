@@ -28,8 +28,10 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.fechas import ZONA_ECUADOR
+from app.models.boceto import Boceto
 from app.models.cotizacion import Cotizacion, EstadoCotizacion, ItemCotizacion, MaterialCotizado
 from app.models.material import Material
+from app.models.validacion import Despacho, Recepcion
 from app.schemas.tablero import (
     ClienteFrecuenteLeer,
     CotizacionesPorEstadoLeer,
@@ -167,11 +169,29 @@ def _resumen(db: Session, desde_dt: datetime, hasta_dt: datetime) -> ResumenTabl
         .filter(Cotizacion.created_at >= desde_dt, Cotizacion.created_at <= hasta_dt)
         .scalar()
     )
+    bocetos_procesados = (
+        db.query(func.count(Boceto.id))
+        .filter(Boceto.created_at >= desde_dt, Boceto.created_at <= hasta_dt)
+        .scalar()
+    )
+    lotes_despachados = (
+        db.query(func.count(Despacho.id))
+        .filter(Despacho.created_at >= desde_dt, Despacho.created_at <= hasta_dt)
+        .scalar()
+    )
+    lotes_recibidos = (
+        db.query(func.count(Recepcion.id))
+        .filter(Recepcion.created_at >= desde_dt, Recepcion.created_at <= hasta_dt)
+        .scalar()
+    )
     return ResumenTableroLeer(
         total_cotizaciones=total_cotizaciones,
         monto_total=monto_total,
         paneles_cotizados=int(paneles_cotizados),
         potencia_total_kwp=potencia_total_kwp,
+        bocetos_procesados=bocetos_procesados,
+        lotes_despachados=lotes_despachados,
+        lotes_recibidos=lotes_recibidos,
     )
 
 

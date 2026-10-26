@@ -19,6 +19,7 @@ from app.models.boceto import BloqueBoceto, Boceto
 from app.models.terreno import Camino, Terreno, TipoCamino
 from app.models.perfil import Perfil, PerfilPermiso
 from app.models.usuario import Usuario
+from app.models.validacion import Despacho, FotoValidacion, ItemDespacho, ItemRecepcion, Recepcion
 
 __all__ = [
     # Usuarios y seguridad
@@ -51,4 +52,10 @@ __all__ = [
     "PrecioMaterial",
     # Inversores
     "Inversor",
+    # Validación de materiales (RF-14 a RF-16)
+    "Despacho",
+    "ItemDespacho",
+    "Recepcion",
+    "ItemRecepcion",
+    "FotoValidacion",
 ]

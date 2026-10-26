@@ -146,7 +146,7 @@ export function TableroIndicadores() {
         <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
       ) : tablero ? (
         <div className={`mt-4 transition-opacity ${cargando ? "opacity-50" : ""}`}>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <div className="rounded-xl border border-acero-200 bg-superficie p-4">
               <p className="text-xs text-acero-500">Cotizaciones</p>
               <p className="mt-1 text-2xl font-bold text-acero-900">
@@ -169,6 +169,24 @@ export function TableroIndicadores() {
               <p className="text-xs text-acero-500">Potencia cotizada</p>
               <p className="mt-1 text-2xl font-bold text-acero-900">
                 {formatoKwp(Number(tablero.resumen.potencia_total_kwp))}
+              </p>
+            </div>
+            <div className="rounded-xl border border-acero-200 bg-superficie p-4">
+              <p className="text-xs text-acero-500">Bocetos procesados</p>
+              <p className="mt-1 text-2xl font-bold text-acero-900">
+                {formatoEntero.format(tablero.resumen.bocetos_procesados)}
+              </p>
+            </div>
+            <div className="rounded-xl border border-acero-200 bg-superficie p-4">
+              <p className="text-xs text-acero-500">Lotes despachados</p>
+              <p className="mt-1 text-2xl font-bold text-acero-900">
+                {formatoEntero.format(tablero.resumen.lotes_despachados)}
+              </p>
+            </div>
+            <div className="rounded-xl border border-acero-200 bg-superficie p-4">
+              <p className="text-xs text-acero-500">Lotes recibidos</p>
+              <p className="mt-1 text-2xl font-bold text-acero-900">
+                {formatoEntero.format(tablero.resumen.lotes_recibidos)}
               </p>
             </div>
             <div className="rounded-xl border border-acero-200 bg-superficie p-4">

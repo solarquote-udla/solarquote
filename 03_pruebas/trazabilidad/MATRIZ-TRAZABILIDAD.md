@@ -1,7 +1,8 @@
 # Matriz de trazabilidad requisitos → pruebas
 
-Historia: SQ-135 · Corte: 21 de octubre de 2026 (develop después del PR #46)
-· Complementa la Tabla 44 del documento de titulación (sección 7.3).
+Historia: SQ-135 · Corte: 26 de octubre de 2026 (con el documento de la
+proforma y el módulo de validación de materiales) · Complementa la Tabla 44
+del documento de titulación (sección 7.3).
 
 Esta matriz conecta cada requisito de la especificación (secciones 2.1.3 y
 2.1.4 del documento: RF-01 a RF-16 y RNF-01 a RNF-06) con las pruebas
@@ -17,20 +18,20 @@ requisito es la corrida verde del PR indicado.
 
 | Componente | Pruebas | Cobertura de líneas | Cómo se ejecutan |
 |---|---|---|---|
-| Backend (API principal) | 424 | 96 % | `pytest` en `02_codigo_fuente/backend` |
+| Backend (API principal) | 455 | 96 % | `pytest` en `02_codigo_fuente/backend` |
 | calc-service | 32 | 100 % | `pytest` en `02_codigo_fuente/calc-service` |
-| ia-service | 38 | 93 % | `pytest` en `02_codigo_fuente/ia-service` |
-| Frontend (interfaz) | 153 | — | `npm test` en `02_codigo_fuente/frontend` |
-| **Total** | **647** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
+| ia-service | 52 | 94 % | `pytest` en `02_codigo_fuente/ia-service` |
+| Frontend (interfaz) | 171 | — | `npm test` en `02_codigo_fuente/frontend` |
+| **Total** | **710** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
 
 La cobertura se midió con `pytest --cov=app`. RNF-02 pide al menos 60 %
 en el backend.
 
 | Estado de los requisitos | Cantidad |
 |---|---|
-| Cubiertos por pruebas automatizadas | RF-01 a RF-13; RNF-01 (layout), RNF-02, RNF-03, RNF-04 |
-| Implementación pendiente | RF-14, RF-15, RF-16 |
-| Requieren verificación fuera del CI | RNF-01 (precisión con bocetos reales), RNF-03 (boceto con IA y documento), RNF-05, RNF-06 |
+| Cubiertos por pruebas automatizadas | RF-01 a RF-16; RNF-01 (layout), RNF-02, RNF-03, RNF-04 |
+| Implementación pendiente | Ninguna |
+| Requieren verificación fuera del CI | RNF-01 (precisión con bocetos reales y del conteo de varillas con fotos reales), RNF-03 (boceto con IA y documento), RNF-05, RNF-06 |
 
 **Convenciones.** Los archivos `test_*.py` son del backend salvo que se
 indique otro servicio. Los nombres terminados en `.test.tsx` son pruebas de
@@ -139,6 +140,7 @@ Evidencia: PR de SQ-79/SQ-80/SQ-81/SQ-83/SQ-84.
 | Regla del requisito | Pruebas |
 |---|---|
 | Registrar, consultar, actualizar, dar de baja | `test_inversor_administracion` (25 pruebas); `test_api_administracion`: `test_inversor_ciclo_completo_y_errores` |
+| Búsqueda por marca o modelo | `inversores-catalogo.test.tsx` |
 | Vmax mayor que Vmin cuando se registran | `test_inversor_administracion`: `test_rechaza_vmax_menor_o_igual_que_vmin`; `test_api_administracion` (422) |
 | Marca y modelo únicos | `test_api_administracion` (409) |
 | Solo con permiso de parametrización | `test_api_administracion`: `test_inversores_por_permiso`; `test_seguridad`: `test_generar_layout_puede_leer_inversores_pero_no_administrarlos` |
@@ -153,7 +155,7 @@ Evidencia: PR #37 y el PR de SQ-135.
 | Precio con fecha de vigencia e historial | `test_material_administracion`: `test_actualizar_precio_cierra_el_anterior_y_crea_uno_nuevo`, `test_historial_queda_ordenado_*`; `test_api_administracion`: `test_material_ciclo_completo` |
 | Las cotizaciones emitidas conservan sus precios | `test_cotizacion_servicio`: `test_persiste_la_cantidad_y_precio_unitario_de_cada_material` |
 | Los materiales de las fórmulas no se desactivan | `test_material_administracion`: `test_desactivar_un_codigo_de_formula_*`; `test_api_administracion` (409) |
-| Precio no negativo | `test_material_administracion`: `test_rechaza_negativo`; `test_api_administracion` (422) |
+| Precio mayor o igual a cero | `test_material_administracion`: `test_acepta_cero`, `test_rechaza_negativo`; `test_api_administracion` (422) |
 | Precios y catálogo con permisos separados | `test_api_administracion`: `test_precios_y_materiales_por_permiso`; `test_seguridad`: `test_ver_materiales_no_permite_cambiar_precios` |
 
 Evidencia: PR #23 a #25, #35 y el PR de SQ-135.
@@ -203,14 +205,43 @@ Evidencia: PR #17, #18, #22 y el PR de SQ-135.
 | Gráficos por período y por estado | `test_tablero`: `test_cotizaciones_por_periodo_*`, `test_cotizaciones_por_estado_*`; `tablero.test.tsx` |
 | Rango de fechas válido | `test_tablero`: `test_desde_posterior_a_hasta_*`, `test_rango_de_mas_de_24_meses_*` |
 | Solo con permiso | `test_seguridad`: `test_tablero_lo_lee_quien_tiene_*` |
-| Bocetos procesados, lotes despachados y recibidos | Pendiente: los bocetos existen desde el PR #44; los lotes dependen de RF-14 y RF-15 |
+| Bocetos procesados | `test_tablero`: `test_resumen_cuenta_los_bocetos_procesados_en_el_rango`; `tablero.test.tsx` |
+| Lotes despachados y recibidos | `test_validacion`: `test_tablero_cuenta_lotes_despachados_y_recibidos`; `tablero.test.tsx` |
 
 Evidencia: PR #40 y #43.
 
-### RF-14, RF-15 y RF-16 Validación de materiales
+### RF-14 Validación de despacho y conteo de varillas por IA
 
-Implementación pendiente (planificada para los Sprints 5 y 6). Sin pruebas
-todavía.
+| Regla del requisito | Pruebas |
+|---|---|
+| El despacho cubre exactamente los materiales cotizados | `test_validacion`: `test_el_despacho_debe_cubrir_exactamente_los_materiales_cotizados` (3 casos), `test_trazabilidad_obligatoria_y_cantidades_no_negativas` |
+| Diferencia contra lo cotizado exige justificación | `test_validacion`: `test_diferencia_en_el_despacho_exige_justificacion`; `validacion.test.tsx`: "una cantidad distinta a la cotizada exige justificación" |
+| Trazabilidad: fabricó, soldó, contó, despachó, destino, fecha | `test_validacion`: `test_despacho_sin_diferencias_pasa_a_despachada`, `test_trazabilidad_obligatoria_y_cantidades_no_negativas` |
+| Conteo con IA de los extremos de varilla | `ia: test_conteo` (14 pruebas, API de Claude simulada); `test_validacion`: `test_conteo_de_varillas_reenvia_la_foto_a_ia_service`, `test_conteo_errores`; `validacion.test.tsx`: "el conteo de la IA llena la cantidad despachada", "si la IA no está disponible la foto queda como evidencia" |
+| Fotos JPG o PNG hasta 10 MB, guardadas como evidencia | `test_validacion`: `test_fotos_del_despacho_se_guardan_y_se_pueden_ver`, `test_fotos_invalidas_se_rechazan_sin_despachar`, `test_foto_de_mas_de_10_mb` |
+| Un solo despacho por propuesta, también con dos confirmaciones a la vez | `test_validacion`: `test_no_se_despacha_dos_veces`, `test_dos_despachos_simultaneos_solo_uno_gana`; `validacion.test.tsx`: "confirma una sola vez" |
+| Reporte de despacho | `validacion.test.tsx`: "muestra la línea de tiempo y los reportes de despacho y recepción" |
+| Solo con permiso (Personal de Producción por defecto) | `test_validacion`: `test_permisos_de_cada_opcion` |
+
+### RF-15 Validación de recepción en terreno
+
+| Regla del requisito | Pruebas |
+|---|---|
+| Checklist por material con OK, Diferencia o Pendiente | `test_validacion`: `test_checklist_con_ok_diferencia_y_pendiente`; `validacion.test.tsx`: "espera lo despachado, no lo cotizado" |
+| Toda diferencia con cantidad y observación | `test_validacion`: `test_checklist_incoherente_se_rechaza` (6 casos), `test_la_base_rechaza_un_item_de_recepcion_incoherente`; `validacion.test.tsx`: "una diferencia exige la cantidad recibida y la observación" |
+| Se compara contra lo despachado | `test_validacion`: `test_checklist_con_ok_diferencia_y_pendiente` |
+| Solo después del despacho; confirmada no se modifica | `test_validacion`: `test_recepcion_antes_del_despacho`, `test_la_recepcion_confirmada_no_se_modifica` |
+| Reporte de recepción con evidencia fotográfica | `test_validacion`: `test_checklist_con_ok_diferencia_y_pendiente`; `validacion.test.tsx`: "confirma el checklist una sola vez y abre el seguimiento" |
+
+### RF-16 Seguimiento del estado de la propuesta
+
+| Regla del requisito | Pruebas |
+|---|---|
+| Transiciones en orden: cotizada, despachada, recibida, instalada | `test_validacion`: `test_ciclo_completo_hasta_instalada`, `test_la_base_exige_fecha_de_instalacion_coherente` |
+| Línea de tiempo con fecha y responsable | `test_validacion`: `test_ciclo_completo_hasta_instalada`, `test_consultar_seguimiento`; `historial.test.tsx`: "muestra la línea de tiempo de la propuesta" |
+| Instalación registrada a mano por quien tiene permiso | `test_validacion`: `test_permisos_de_cada_opcion`; `validacion.test.tsx`: "marca la propuesta recibida como instalada", "sin el permiso no ofrece marcarla" |
+| Visible en el historial y en el tablero | `historial.test.tsx`; `test_validacion`: `test_tablero_cuenta_lotes_despachados_y_recibidos` |
+| Listas de lotes por despachar y por recibir | `test_validacion`: `test_listas_de_despacho_y_recepcion` |
 
 ---
 
@@ -241,10 +272,11 @@ todavía.
 | 2 | RNF-04 pedía cerrar la sesión tras 30 minutos de inactividad; el sistema solo vencía el token a las 8 horas | Cierre por inactividad en el frontend (`useCierrePorInactividad`), compartido entre pestañas, con aviso en el login; `inactividad.test.tsx` |
 | 3 | El factor de bcrypt (RNF-04) no tenía prueba | `test_rnf04_bcrypt_con_factor_de_al_menos_10` |
 | 4 | RNF-03 no tenía ninguna medición automatizada | Dos pruebas de tiempo del layout en `test_rnf` |
-| 5 | RF-09 dice "precio mayor o igual a cero", pero la API rechaza 0 (`PrecioActualizar`, `gt=0`). La logística (LOG) nace en $0 y no se podría volver a poner en $0 | **Por decidir** con el responsable del módulo: aceptar 0 o corregir el requisito |
-| 6 | RF-04 lista DWG entre los formatos; el sistema pide exportarlo a DXF porque ezdxf no lee DWG | Decisión de diseño documentada en el PR #44; corregir la redacción del requisito |
-| 7 | RF-13 pide bocetos procesados y lotes despachados y recibidos | Bocetos: se puede agregar ahora. Lotes: con RF-14 y RF-15 |
-| 8 | RF-14, RF-15 y RF-16 sin implementar; sin pruebas de extremo a extremo | Planificado (Sprints 5 a 7); las pruebas de extremo a extremo, en el Sprint 7 |
+| 5 | RF-09 dice "precio mayor o igual a cero", pero la API rechazaba 0 (`gt=0`), y la logística (LOG) nace en $0 | La API y la pantalla de precios aceptan 0 (`ge=0`); `test_acepta_cero` |
+| 6 | RF-04 lista DWG entre los formatos; el sistema pide exportarlo a DXF porque ezdxf no lee DWG | Decisión de diseño (PR #44); el requisito se corrigió en la tesis (sección 2.1.3, control de cambios CC-09) |
+| 7 | RF-13 pide bocetos procesados y lotes despachados y recibidos | Bocetos procesados agregado al tablero; lotes despachados y recibidos con el módulo de validación |
+| 8 | RF-07 y RF-14 a RF-16 sin implementar; sin pruebas de extremo a extremo | Todos implementados con sus pruebas; las de extremo a extremo, en el Sprint 7 |
+| 9 | RF-08 pide buscar inversores por marca o modelo; la pantalla no tenía búsqueda | Búsqueda en el catálogo de inversores; `inversores-catalogo.test.tsx` |
 
 ---
 
