@@ -32,6 +32,7 @@ const DESTINOS = [
   { path: "/bocetos/:proyectoId/confirmacion", element: <p>CONFIRMACION BOCETO</p> },
   { path: "/cotizaciones/:cotizacionId", element: <p>DETALLE COTIZACION</p> },
   { path: "/historial", element: <p>HISTORIAL</p> },
+  { path: "/validacion/seguimiento/:cotizacionId", element: <p>SEGUIMIENTO</p> },
   { path: "/seguridad/usuarios", element: <p>LISTA USUARIOS</p> },
 ];
 

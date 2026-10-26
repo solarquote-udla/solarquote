@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { CotizacionDetallePage } from "@/pages/CotizacionDetallePage";
 import { HistorialPage } from "@/pages/HistorialPage";
 import * as cotizaciones from "@/services/cotizaciones";
+import * as validacion from "@/services/validacion";
 
 import { PROYECTO, montar } from "./utilidades";
 
@@ -15,6 +16,16 @@ vi.mock("@/hooks/useAuth", () => ({
 }));
 vi.mock("@/services/proyectos", () => ({
   listarProyectos: vi.fn(async () => [PROYECTO]),
+}));
+vi.mock("@/services/validacion", () => ({
+  obtenerValidacion: vi.fn(async () => ({
+    linea_tiempo: [
+      { estado: "cotizada", alcanzado: true, fecha: "2026-10-17T10:00:00Z", responsable: "Santiago" },
+      { estado: "despachada", alcanzado: true, fecha: "2026-10-20T10:00:00Z", responsable: "Jorge Vela" },
+      { estado: "recibida", alcanzado: false, fecha: null, responsable: null },
+      { estado: "instalada", alcanzado: false, fecha: null, responsable: null },
+    ],
+  })),
 }));
 vi.mock("@/services/cotizaciones", () => ({
   listarCotizaciones: vi.fn(async () => ({
@@ -128,5 +139,17 @@ describe("CotizacionDetallePage", () => {
     expect(screen.getByText("VAR1650")).toBeTruthy();
     expect(screen.getByText("$436.77")).toBeTruthy();
     expect(vi.mocked(cotizaciones.obtenerCotizacion)).toHaveBeenCalledWith(1);
+  });
+
+  it("muestra la línea de tiempo de la propuesta con el enlace al seguimiento (RF-16)", async () => {
+    montar(<CotizacionDetallePage />, "/cotizaciones/1", ["/cotizaciones/:cotizacionId"]);
+
+    const linea = await screen.findByRole("list", { name: "Estado de la propuesta" });
+    expect(within(linea).getByText("Jorge Vela")).toBeTruthy();
+    expect(within(linea).getByText("siguiente")).toBeTruthy();
+    expect(screen.getByText("Ver despacho y recepción").closest("a")?.getAttribute("href")).toBe(
+      "/validacion/seguimiento/1",
+    );
+    expect(vi.mocked(validacion.obtenerValidacion)).toHaveBeenCalledWith(1);
   });
 });

@@ -27,6 +27,7 @@ from app.routers import (
     tablero,
     terreno,
     usuarios,
+    validacion,
 )
 
 app = FastAPI(
@@ -82,9 +83,8 @@ app.include_router(cotizacion.router)
 # Módulo 4 — Administración: tablero de indicadores (RF-13)
 app.include_router(tablero.router)
 
-# A medida que avancemos, cada módulo registra su router aquí:
-# app.include_router(admin.router,      prefix="/api/admin",     tags=["Módulo 4 — Administración"])
-# app.include_router(validacion.router, prefix="/api/validacion",tags=["Módulo 5 — Validación"])
+# Validación de materiales: despacho, recepción y estado de la propuesta (RF-14 a RF-16)
+app.include_router(validacion.router)
 
 
 @app.get("/", tags=["Diagnóstico"])
