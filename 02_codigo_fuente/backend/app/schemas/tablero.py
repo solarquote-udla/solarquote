@@ -45,6 +45,9 @@ class ResumenTableroLeer(BaseModel):
     # Suma de Cotizacion.potencia_kwp. Solo las cotizaciones que salen de
     # un layout (RF-05) la tienen; las cotizadas al vuelo no cuentan.
     potencia_total_kwp: Decimal
+    # Bocetos del cliente cargados en el rango (RF-04). Si un proyecto
+    # reemplaza su boceto, cuenta el vigente.
+    bocetos_procesados: int = 0
 
 
 class TableroLeer(BaseModel):

@@ -10,7 +10,10 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import crear_access_token
 from app.main import app
+from app.models.boceto import Boceto
+from app.models.cliente import Cliente, TipoIdentificacion
 from app.models.cotizacion import Cotizacion, EstadoCotizacion, ItemCotizacion, MaterialCotizado
+from app.models.proyecto import Proyecto
 from app.models.material import Material
 from app.services.tablero import RangoInvalido, ZONA_ECUADOR, _meses_entre, _restar_meses, obtener_tablero
 from tests.fabricas import crear_usuario
@@ -295,3 +298,26 @@ def test_rango_de_mas_de_24_meses_responde_422(api, db: Session) -> None:
     r = api.get("/api/tablero", params={"desde": "2000-01-01", "hasta": "2026-10-01"}, headers=sesion)
 
     assert r.status_code == 422
+
+
+def test_resumen_cuenta_los_bocetos_procesados_en_el_rango(db: Session) -> None:
+    """RF-13: número de bocetos procesados del período."""
+    ahora = datetime.now(ZONA_ECUADOR)
+    cliente = Cliente(nombre="Cliente tablero", tipo_identificacion=TipoIdentificacion.RUC, identificacion="1710034065001")
+    db.add(cliente)
+    db.flush()
+    for i, cuando in enumerate([ahora, ahora, datetime(2020, 1, 15, tzinfo=ZONA_ECUADOR)]):
+        proyecto = Proyecto(nombre=f"Proyecto {i}", cliente_id=cliente.id, usuario_id=_usuario_id(db))
+        db.add(proyecto)
+        db.flush()
+        db.add(
+            Boceto(
+                proyecto_id=proyecto.id, usuario_id=_usuario_id(db), nombre_archivo="b.pdf", formato="pdf",
+                tamano_bytes=4, contenido=b"%PDF", metodo="ia", advertencias=[], created_at=cuando,
+            )
+        )
+    db.flush()
+
+    tablero = obtener_tablero(db, desde=ahora.date(), hasta=ahora.date())
+
+    assert tablero.resumen.bocetos_procesados == 2
