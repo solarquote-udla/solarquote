@@ -32,3 +32,15 @@ export async function obtenerCotizacion(cotizacionId: number): Promise<Cotizacio
   const { data } = await api.get<CotizacionDetalle>(`/api/cotizaciones/${cotizacionId}`);
   return data;
 }
+
+/** Proforma en Word, con el detalle de materiales — RF-07. */
+export async function obtenerProformaWord(cotizacionId: number): Promise<Blob> {
+  const { data } = await api.get<Blob>(`/api/cotizaciones/${cotizacionId}/proforma.docx`, { responseType: "blob" });
+  return data;
+}
+
+/** Proforma en Excel, con las mismas cantidades que el Word — RF-07. */
+export async function obtenerProformaExcel(cotizacionId: number): Promise<Blob> {
+  const { data } = await api.get<Blob>(`/api/cotizaciones/${cotizacionId}/proforma.xlsx`, { responseType: "blob" });
+  return data;
+}

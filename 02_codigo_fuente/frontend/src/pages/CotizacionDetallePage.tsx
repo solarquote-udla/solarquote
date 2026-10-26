@@ -11,10 +11,14 @@ import { Link, useLocation, useParams } from "react-router-dom";
 
 import { EstadoCotizacionBadge } from "@/components/EstadoCotizacionBadge";
 import { mensajeDeError } from "@/services/api";
-import { obtenerCotizacion } from "@/services/cotizaciones";
+import { obtenerCotizacion, obtenerProformaExcel, obtenerProformaWord } from "@/services/cotizaciones";
 import type { CotizacionDetalle } from "@/types/api";
 import { formatoMoneda } from "@/utils/dinero";
 import { fechaHora } from "@/utils/fechas";
+import { nombreArchivoProforma } from "@/utils/proforma";
+
+const BOTON_DESCARGA =
+  "rounded-lg border border-acero-300 px-4 py-2 text-center text-sm text-acero-700 hover:bg-acero-100 disabled:cursor-not-allowed disabled:opacity-50";
 
 /** Ruta por la que se llegó al detalle (con los filtros del historial activos) */
 interface EstadoNavegacion {
@@ -28,6 +32,26 @@ export function CotizacionDetallePage() {
   const [cotizacion, setCotizacion] = useState<CotizacionDetalle | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [descargando, setDescargando] = useState<"docx" | "xlsx" | null>(null);
+  const [errorDescarga, setErrorDescarga] = useState<string | null>(null);
+
+  async function descargarProforma(extension: "docx" | "xlsx") {
+    if (!cotizacion) return;
+    setDescargando(extension);
+    setErrorDescarga(null);
+    try {
+      const blob = extension === "docx" ? await obtenerProformaWord(cotizacion.id) : await obtenerProformaExcel(cotizacion.id);
+      const enlace = document.createElement("a");
+      enlace.href = URL.createObjectURL(blob);
+      enlace.download = nombreArchivoProforma(cotizacion, extension);
+      enlace.click();
+      URL.revokeObjectURL(enlace.href);
+    } catch (e) {
+      setErrorDescarga(mensajeDeError(e, "No se pudo descargar la proforma"));
+    } finally {
+      setDescargando(null);
+    }
+  }
 
   useEffect(() => {
     let cancelado = false;
@@ -72,8 +96,32 @@ export function CotizacionDetallePage() {
               {cotizacion.numero_proforma && (
                 <p className="mt-1 text-xs text-acero-500">Proforma {cotizacion.numero_proforma}</p>
               )}
+              <div className="mt-3 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => void descargarProforma("docx")}
+                  disabled={descargando !== null}
+                  className={BOTON_DESCARGA}
+                >
+                  {descargando === "docx" ? "Descargando…" : "Descargar Word"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void descargarProforma("xlsx")}
+                  disabled={descargando !== null}
+                  className={BOTON_DESCARGA}
+                >
+                  {descargando === "xlsx" ? "Descargando…" : "Descargar Excel"}
+                </button>
+              </div>
             </div>
           </div>
+
+          {errorDescarga && (
+            <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {errorDescarga}
+            </div>
+          )}
 
           <div className="mt-6 grid gap-6 sm:grid-cols-2">
             <section className="rounded-xl border border-acero-200 bg-superficie p-5">

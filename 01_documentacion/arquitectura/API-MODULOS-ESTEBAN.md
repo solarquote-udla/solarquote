@@ -6,10 +6,11 @@
 construida, para el capítulo 7 del documento de titulación.
 
 **Alcance:** los endpoints de los módulos a cargo de Esteban — RF-06
-(creación de cotización), RF-08 (Inversores), RF-09 (Materiales y precios),
-RF-10 (Historial de cotizaciones), RF-12 (Clientes) y RF-13 (Tablero de
-indicadores). No cubre RF-01/02/03/05 (Módulo 1, de Joseph), documentados
-en [ALGORITMO-LAYOUT.md](ALGORITMO-LAYOUT.md) y
+(creación de cotización), RF-07 (proforma en Word/Excel), RF-08
+(Inversores), RF-09 (Materiales y precios), RF-10 (Historial de
+cotizaciones), RF-12 (Clientes) y RF-13 (Tablero de indicadores). No
+cubre RF-01/02/03/05 (Módulo 1, de Joseph), documentados en
+[ALGORITMO-LAYOUT.md](ALGORITMO-LAYOUT.md) y
 [MODELOS-COMPARTIDOS.md](MODELOS-COMPARTIDOS.md).
 
 El contrato de `Cliente` ya vigente con el frontend de Joseph está en
@@ -326,6 +327,31 @@ respuesta del `POST`, en el momento de crear.
 | `422` | Cliente o proyecto inexistente/no disponible, falta un precio vigente, o falla de validación de entrada |
 | `502` | calc-service no respondió o devolvió un error |
 
+### RF-07 — Documento de la proforma
+
+Dos rutas de descarga, con el mismo permiso que el detalle (RF-10): es la
+misma información del `CotizacionDetalleLeer`, solo que en Word o Excel.
+No se recalcula nada, igual que el detalle.
+
+| Método | Ruta | Permiso | Respuesta | Uso |
+|---|---|---|---|---|
+| `GET` | `/api/cotizaciones/{id}/proforma.docx` | `historial` o `generar_layout` | `200`, documento Word | Descargar la proforma en Word |
+| `GET` | `/api/cotizaciones/{id}/proforma.xlsx` | igual | `200`, hoja de cálculo Excel | Descargar la proforma en Excel |
+
+Ambos documentos incluyen los datos del cliente (y del proyecto, si lo
+hay), la tabla de materiales con código, cantidad, precio unitario y
+subtotal por línea, y los totales (subtotal, addendum, IVA, total). El
+nombre del archivo es `Proforma {numero_proforma}.{docx|xlsx}` — o
+`Proforma cotizacion-{id}.{docx|xlsx}` si todavía no se asignó el número
+(cotización en borrador). Generado en memoria con `python-docx` y
+`openpyxl` (`app/services/documentos.py`); no se guarda en la base.
+
+#### Errores
+
+| Código | Cuándo |
+|---|---|
+| `404` | La cotización no existe |
+
 ---
 
 ## RF-12 — Clientes (`/api/clientes`)
@@ -416,6 +442,6 @@ las cotizadas al vuelo no cuentan, así que puede ser `0` aunque
 
 ## Pendiente, no parte de esta entrega
 
-- **Proforma en Word/Excel (RF-07):** la pantalla de "desglose" del
-  prototipo y la descarga del archivo generado. Sprint 4, no iniciado — no
-  hay endpoint `/api/cotizaciones/{id}/proforma` aún.
+Nada pendiente en el alcance de este capítulo: RF-07 a RF-10, RF-12 y
+RF-13 están implementados. RF-14 a RF-16 (validación de materiales y
+estado de la propuesta) son de otro módulo.
