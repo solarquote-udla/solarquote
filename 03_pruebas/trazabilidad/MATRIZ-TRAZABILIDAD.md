@@ -18,11 +18,11 @@ requisito es la corrida verde del PR indicado.
 
 | Componente | Pruebas | Cobertura de líneas | Cómo se ejecutan |
 |---|---|---|---|
-| Backend (API principal) | 455 | 96 % | `pytest` en `02_codigo_fuente/backend` |
+| Backend (API principal) | 468 | 96 % | `pytest` en `02_codigo_fuente/backend` |
 | calc-service | 32 | 100 % | `pytest` en `02_codigo_fuente/calc-service` |
 | ia-service | 52 | 94 % | `pytest` en `02_codigo_fuente/ia-service` |
 | Frontend (interfaz) | 171 | — | `npm test` en `02_codigo_fuente/frontend` |
-| **Total** | **710** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
+| **Total** | **723** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
 
 La cobertura se midió con `pytest --cov=app`. RNF-02 pide al menos 60 %
 en el backend.
@@ -124,11 +124,23 @@ Evidencia: PR #5, #10 a #13, #16, #19, #28.
 
 ### RF-07 Documento de cotización
 
+Formato institucional, calcado de la proforma real (CT-129-2025, proyecto
+EMIHANA): datos del oferente, concepto, potencia en kWp, notas con la
+configuración L/A/bloques de cada ítem, materiales en el orden de esa
+proforma (no alfabético), condiciones comerciales, tabla de pagos y
+datos bancarios con la firma del representante legal. Los datos del
+oferente (RUC, teléfono, correo, cuenta) se cargan de `settings` (.env
+local o variables de Railway), nunca hardcodeados: el repositorio es
+público.
+
 | Regla del requisito | Pruebas |
 |---|---|
-| Documento Word con el detalle de materiales | `test_proforma_documentos`: `test_word_incluye_cliente_materiales_y_totales` |
-| Hoja de cálculo Excel con las mismas cantidades | `test_proforma_documentos`: `test_excel_incluye_cliente_materiales_y_totales` |
-| Ambos con datos del cliente, subtotal, addendum, IVA y total | mismas pruebas; `test_word_sin_proforma_ni_datos_opcionales_no_falla` cubre los campos opcionales |
+| Documento Word con el detalle de materiales | `test_proforma_documentos`: `test_word_materiales_en_orden_con_moneda_ecuador`, `test_word_totales_notas_condiciones_y_pagos` |
+| Hoja de cálculo Excel con las mismas cantidades, editable | `test_excel_incluye_encabezado_materiales_en_orden_y_datos_bancarios`, `test_excel_subtotales_y_totales_son_formulas` (fórmulas, no valores fijos: cantidad × precio, `SUM`, IVA sobre subtotal + addendum) |
+| Materiales en el orden de la proforma real, no alfabético | `test_materiales_en_el_orden_de_la_proforma_real`, `test_material_fuera_del_orden_conocido_cae_al_final` |
+| Ambos con datos del cliente, subtotal, addendum, IVA y total | mismas pruebas; `test_word_sin_proforma_ni_datos_opcionales_del_cliente_no_falla` cubre los campos opcionales |
+| Datos del oferente, condiciones, pagos y banco sin romper si no están configurados | `test_word_sin_datos_del_oferente_no_falla_y_omite_las_secciones`, `test_excel_sin_datos_del_oferente_no_falla` |
+| Dinero en `Decimal`, formato de Ecuador ($ 5.025,60) | `test_moneda_formato_ecuador` |
 | El número de proforma se asigna al emitir | Ya cubierto (SQ-82): `test_confirmacion`: `siguiente_numero_proforma` |
 | Los archivos se descargan desde la interfaz | `test_proforma_documentos`: `test_descarga_responde_el_archivo_con_su_tipo_y_nombre`; botón en `CotizacionDetallePage` (`cotizacion-detalle.test.tsx`) |
 | Documento de cotización en menos de 10 s (RNF-03) | `test_rnf`: `test_rnf03_documento_de_cotizacion_en_menos_de_10_s` |

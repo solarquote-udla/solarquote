@@ -338,10 +338,34 @@ No se recalcula nada, igual que el detalle.
 | `GET` | `/api/cotizaciones/{id}/proforma.docx` | `historial` o `generar_layout` | `200`, documento Word | Descargar la proforma en Word |
 | `GET` | `/api/cotizaciones/{id}/proforma.xlsx` | igual | `200`, hoja de cálculo Excel | Descargar la proforma en Excel |
 
-Ambos documentos incluyen los datos del cliente (y del proyecto, si lo
-hay), la tabla de materiales con código, cantidad, precio unitario y
-subtotal por línea, y los totales (subtotal, addendum, IVA, total). El
-nombre del archivo es `Proforma {numero_proforma}.{docx|xlsx}` — o
+Formato institucional, calcado de la proforma real de HEXtructure
+(CT-129-2025, proyecto EMIHANA): encabezado con los datos del oferente
+(razón social, RUC, teléfono, correo, dirección), el concepto, la
+potencia en kWp si la cotización la tiene, los datos del cliente (y del
+proyecto, si lo hay), la tabla de materiales en el orden de esa proforma
+(no alfabético: `ORDEN_MATERIALES_PROFORMA` en `documentos.py`) con
+código, cantidad, precio unitario y subtotal por línea, notas (incluida
+la configuración L/A/bloques de cada ítem), los totales, las condiciones
+comerciales (plazo, validez, garantía), la tabla de pagos (30 % anticipo
+/ 40 % entrega / 30 % a 60 días) y, si están configurados, los datos
+bancarios y la firma del representante legal.
+
+El dinero se maneja en `Decimal` y se imprime con el formato de Ecuador
+($ 5.025,60), distinto al de la interfaz a propósito. El Excel es
+editable: los subtotales por material, el subtotal general, el
+addendum, el IVA y la tabla de pagos son fórmulas (`=C9*D9`, `=SUM(...)`,
+IVA sobre subtotal + addendum), no valores fijos — cambiar una cantidad
+recalcula todo lo demás.
+
+Los datos del oferente (RUC, teléfono, correo, dirección, representante,
+cuenta bancaria) viven en `settings` (`HEXTRUCTURE_*`), cargados del
+`.env` local o de las variables de Railway — **nunca** hardcodeados en
+`documentos.py`: el repositorio es público. Un campo vacío simplemente
+no aparece en el documento; las condiciones comerciales (concepto,
+plazo, forma de pago, validez, garantía, notas fijas) sí tienen un valor
+por defecto en `config.py`, porque no son sensibles.
+
+El nombre del archivo es `Proforma {numero_proforma}.{docx|xlsx}` — o
 `Proforma cotizacion-{id}.{docx|xlsx}` si todavía no se asignó el número
 (cotización en borrador). Generado en memoria con `python-docx` y
 `openpyxl` (`app/services/documentos.py`); no se guarda en la base.
