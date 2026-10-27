@@ -93,6 +93,59 @@ class Settings(BaseSettings):
     PROFORMA_PREFIJO: str = Field(default="CT", min_length=1, max_length=6, pattern=r"^[A-Z]+$")
     PROFORMA_PRIMER_NUMERO: int = Field(default=1, ge=1)
 
+    # ─── Datos del oferente para el documento de la proforma (RF-07) ───
+    # Se cargan del .env local o de las variables de Railway, nunca con
+    # un valor por defecto en el código: el repositorio es público. Un
+    # campo vacío simplemente no aparece en el documento (ver
+    # services/documentos.py), así que el arranque no depende de ellos.
+    HEXTRUCTURE_RAZON_SOCIAL: str = ""
+    HEXTRUCTURE_ACTIVIDAD: str = ""
+    HEXTRUCTURE_RUC: str = ""
+    HEXTRUCTURE_TELEFONO: str = ""
+    HEXTRUCTURE_CORREO: str = ""
+    HEXTRUCTURE_DIRECCION: str = ""
+    HEXTRUCTURE_REPRESENTANTE: str = ""
+    HEXTRUCTURE_CARGO_REPRESENTANTE: str = ""
+    HEXTRUCTURE_BANCO: str = ""
+    HEXTRUCTURE_BANCO_TIPO_CUENTA: str = ""
+    HEXTRUCTURE_BANCO_NUMERO_CUENTA: str = ""
+    HEXTRUCTURE_BANCO_TITULAR: str = ""
+
+    # ─── Condiciones comerciales de la proforma (RF-07) ─────────────────
+    # A diferencia de los datos del oferente, esto no es sensible: son
+    # las condiciones comerciales de HEXtructure, no datos de contacto o
+    # de la cuenta bancaria. Van con un valor por defecto, configurable
+    # después si cambian (proforma de referencia: CT-129-2025).
+    PROFORMA_CONCEPTO: str = "Estructura de soporte reusable para la instalación en piso de módulos fotovoltaicos"
+    PROFORMA_PLAZO_DIAS: int = Field(default=20, ge=1)
+    PROFORMA_VALIDEZ_DIAS: int = Field(default=90, ge=1)
+    PROFORMA_GARANTIA_ANIOS: int = Field(default=1, ge=1)
+
+    # Forma de pago: tres porcentajes sobre el total que deben sumar 100.
+    PROFORMA_PAGO_ANTICIPO_PCT: Decimal = Field(default=Decimal("30"), ge=0, le=100)
+    PROFORMA_PAGO_ENTREGA_PCT: Decimal = Field(default=Decimal("40"), ge=0, le=100)
+    PROFORMA_PAGO_60_DIAS_PCT: Decimal = Field(default=Decimal("30"), ge=0, le=100)
+
+    # Notas fijas del documento. La lista de L/A/bloques de cada ítem se
+    # agrega aparte, debajo de la primera.
+    PROFORMA_NOTAS: tuple[str, ...] = (
+        "Las cantidades se calcularon en base al diseño de bloques configurados por el cliente.",
+        "Las estructuras se entregarán en bodegas de HEXtructure S.A.S. – Ibarra.",
+        "El plazo corre a partir de la fecha del anticipo y hoja técnica del panel a usar.",
+    )
+
+    @field_validator("PROFORMA_PAGO_60_DIAS_PCT")
+    @classmethod
+    def _validar_porcentajes_de_pago(cls, valor: Decimal, info) -> Decimal:
+        """Los tres porcentajes de la forma de pago deben sumar 100, igual que en la proforma real."""
+        anticipo = info.data.get("PROFORMA_PAGO_ANTICIPO_PCT")
+        entrega = info.data.get("PROFORMA_PAGO_ENTREGA_PCT")
+        if anticipo is not None and entrega is not None and anticipo + entrega + valor != 100:
+            raise ValueError(
+                f"Los porcentajes de pago deben sumar 100 (anticipo {anticipo} + entrega {entrega} + 60 días {valor})"
+            )
+        return valor
+
     @property
     def cors_origins_list(self) -> list[str]:
         """Convierte el string de orígenes en una lista."""

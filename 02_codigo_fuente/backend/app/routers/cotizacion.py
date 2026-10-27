@@ -9,12 +9,15 @@ Endpoints de cotización.
 Crear exige poder cotizar (lo mismo que generar un layout o cargar un
 boceto); el historial exige el permiso del menú CÁLCULO > Historial, o
 GENERAR_LAYOUT (quien genera layouts retoma sus propios proyectos desde
-ahí) — igual regla que la ruta /historial del frontend.
+ahí) — igual regla que la ruta /historial del frontend. Los documentos
+de la proforma (RF-07) se descargan con el mismo permiso que el detalle:
+es la misma información, solo que en Word o Excel.
 """
 
 from datetime import date
+from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -33,6 +36,7 @@ from app.schemas.cotizacion import (
     ResultadoCalculoCotizacion,
 )
 from app.services import cotizacion as servicio
+from app.services import documentos
 from app.services.calc_service import CalcServiceError
 from app.services.cotizacion import ProyectoNoDisponible
 from app.services.material import PrecioVigenteFaltante
@@ -40,6 +44,11 @@ from app.services.proyecto import ClienteNoDisponible
 
 puede_cotizar = requiere_permiso(Permiso.GENERAR_LAYOUT, Permiso.CARGAR_BOCETO)
 puede_ver_historial = requiere_permiso(Permiso.HISTORIAL, Permiso.GENERAR_LAYOUT)
+
+TIPOS_MEDIO_PROFORMA = {
+    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+}
 
 router = APIRouter(prefix="/api/cotizaciones", tags=["Cotización"])
 
@@ -155,9 +164,37 @@ def listar(
 
 @router.get("/{cotizacion_id}", response_model=CotizacionDetalleLeer, dependencies=[Depends(puede_ver_historial)])
 def detalle(cotizacion_id: int, db: Session = Depends(get_db)) -> CotizacionDetalleLeer:
+    return _detalle(_obtener_o_404(db, cotizacion_id))
+
+
+def _obtener_o_404(db: Session, cotizacion_id: int) -> Cotizacion:
     cotizacion = servicio.obtener_cotizacion(db, cotizacion_id)
     if cotizacion is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"No existe la cotización {cotizacion_id}"
         )
-    return _detalle(cotizacion)
+    return cotizacion
+
+
+def _respuesta_proforma(cotizacion: Cotizacion, extension: str, contenido: bytes) -> Response:
+    return Response(
+        content=contenido,
+        media_type=TIPOS_MEDIO_PROFORMA[extension],
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(documentos.nombre_archivo(cotizacion, extension))}"
+        },
+    )
+
+
+@router.get("/{cotizacion_id}/proforma.docx", dependencies=[Depends(puede_ver_historial)])
+def proforma_word(cotizacion_id: int, db: Session = Depends(get_db)) -> Response:
+    """Proforma en Word: mismo contenido que el detalle, para enviar al cliente con ajustes propios."""
+    cotizacion = _obtener_o_404(db, cotizacion_id)
+    return _respuesta_proforma(cotizacion, "docx", documentos.generar_word(cotizacion))
+
+
+@router.get("/{cotizacion_id}/proforma.xlsx", dependencies=[Depends(puede_ver_historial)])
+def proforma_excel(cotizacion_id: int, db: Session = Depends(get_db)) -> Response:
+    """Proforma en Excel: mismas cantidades que el Word, en hoja de cálculo."""
+    cotizacion = _obtener_o_404(db, cotizacion_id)
+    return _respuesta_proforma(cotizacion, "xlsx", documentos.generar_excel(cotizacion))

@@ -25,6 +25,10 @@ shapely==2.0.6
 # ─── Utilidades ─────────────────────────────────────────
 httpx==0.28.1
 
+# ─── Documentos de la proforma (RF-07) ──────────────────
+python-docx==1.1.2
+openpyxl==3.1.5
+
 # ─── Testing ────────────────────────────────────────────
 pytest==8.3.4
 pytest-asyncio==0.25.0

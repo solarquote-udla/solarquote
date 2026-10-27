@@ -1,7 +1,8 @@
 # Matriz de trazabilidad requisitos → pruebas
 
-Historia: SQ-135 · Corte: 25 de octubre de 2026 (con el módulo de validación de materiales)
-· Complementa la Tabla 44 del documento de titulación (sección 7.3).
+Historia: SQ-135 · Corte: 26 de octubre de 2026 (con el documento de la
+proforma y el módulo de validación de materiales) · Complementa la Tabla 44
+del documento de titulación (sección 7.3).
 
 Esta matriz conecta cada requisito de la especificación (secciones 2.1.3 y
 2.1.4 del documento: RF-01 a RF-16 y RNF-01 a RNF-06) con las pruebas
@@ -17,19 +18,19 @@ requisito es la corrida verde del PR indicado.
 
 | Componente | Pruebas | Cobertura de líneas | Cómo se ejecutan |
 |---|---|---|---|
-| Backend (API principal) | 444 | 96 % | `pytest` en `02_codigo_fuente/backend` |
+| Backend (API principal) | 468 | 96 % | `pytest` en `02_codigo_fuente/backend` |
 | calc-service | 32 | 100 % | `pytest` en `02_codigo_fuente/calc-service` |
 | ia-service | 52 | 94 % | `pytest` en `02_codigo_fuente/ia-service` |
-| Frontend (interfaz) | 168 | — | `npm test` en `02_codigo_fuente/frontend` |
-| **Total** | **696** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
+| Frontend (interfaz) | 171 | — | `npm test` en `02_codigo_fuente/frontend` |
+| **Total** | **723** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
 
 La cobertura se midió con `pytest --cov=app`. RNF-02 pide al menos 60 %
 en el backend.
 
 | Estado de los requisitos | Cantidad |
 |---|---|
-| Cubiertos por pruebas automatizadas | RF-01 a RF-06, RF-08 a RF-16; RNF-01 (layout), RNF-02, RNF-03 (layout), RNF-04 |
-| Implementación pendiente | RF-07 |
+| Cubiertos por pruebas automatizadas | RF-01 a RF-16; RNF-01 (layout), RNF-02, RNF-03, RNF-04 |
+| Implementación pendiente | Ninguna |
 | Requieren verificación fuera del CI | RNF-01 (precisión con bocetos reales y del conteo de varillas con fotos reales), RNF-03 (boceto con IA y documento), RNF-05, RNF-06 |
 
 **Convenciones.** Los archivos `test_*.py` son del backend salvo que se
@@ -123,9 +124,28 @@ Evidencia: PR #5, #10 a #13, #16, #19, #28.
 
 ### RF-07 Documento de cotización
 
-Implementación en curso (Esteban, SQ-79). Las pruebas se agregan con el
-módulo. Pendiente: contenido del Word y del Excel, condiciones
-configurables y el límite de 10 s de RNF-03.
+Formato institucional, calcado de la proforma real (CT-129-2025, proyecto
+EMIHANA): datos del oferente, concepto, potencia en kWp, notas con la
+configuración L/A/bloques de cada ítem, materiales en el orden de esa
+proforma (no alfabético), condiciones comerciales, tabla de pagos y
+datos bancarios con la firma del representante legal. Los datos del
+oferente (RUC, teléfono, correo, cuenta) se cargan de `settings` (.env
+local o variables de Railway), nunca hardcodeados: el repositorio es
+público.
+
+| Regla del requisito | Pruebas |
+|---|---|
+| Documento Word con el detalle de materiales | `test_proforma_documentos`: `test_word_materiales_en_orden_con_moneda_ecuador`, `test_word_totales_notas_condiciones_y_pagos` |
+| Hoja de cálculo Excel con las mismas cantidades, editable | `test_excel_incluye_encabezado_materiales_en_orden_y_datos_bancarios`, `test_excel_subtotales_y_totales_son_formulas` (fórmulas, no valores fijos: cantidad × precio, `SUM`, IVA sobre subtotal + addendum) |
+| Materiales en el orden de la proforma real, no alfabético | `test_materiales_en_el_orden_de_la_proforma_real`, `test_material_fuera_del_orden_conocido_cae_al_final` |
+| Ambos con datos del cliente, subtotal, addendum, IVA y total | mismas pruebas; `test_word_sin_proforma_ni_datos_opcionales_del_cliente_no_falla` cubre los campos opcionales |
+| Datos del oferente, condiciones, pagos y banco sin romper si no están configurados | `test_word_sin_datos_del_oferente_no_falla_y_omite_las_secciones`, `test_excel_sin_datos_del_oferente_no_falla` |
+| Dinero en `Decimal`, formato de Ecuador ($ 5.025,60) | `test_moneda_formato_ecuador` |
+| El número de proforma se asigna al emitir | Ya cubierto (SQ-82): `test_confirmacion`: `siguiente_numero_proforma` |
+| Los archivos se descargan desde la interfaz | `test_proforma_documentos`: `test_descarga_responde_el_archivo_con_su_tipo_y_nombre`; botón en `CotizacionDetallePage` (`cotizacion-detalle.test.tsx`) |
+| Documento de cotización en menos de 10 s (RNF-03) | `test_rnf`: `test_rnf03_documento_de_cotizacion_en_menos_de_10_s` |
+
+Evidencia: PR de SQ-79/SQ-80/SQ-81/SQ-83/SQ-84.
 
 ### RF-08 Lista de referencia de inversores
 
@@ -159,7 +179,7 @@ Evidencia: PR #23 a #25, #35 y el PR de SQ-135.
 | Listado filtrado por fechas, cliente, estado y proforma | `test_cotizacion_historial`: `test_filtra_por_rango_de_fechas_inclusive`, `test_filtra_por_estado`, `test_buscar_*` |
 | Detalle con materiales, cantidades y L/A/B | `test_cotizacion_historial`: `test_obtener_cotizacion_trae_items_y_materiales`; `historial.test.tsx` |
 | Solo con permiso | `test_seguridad`: `test_historial_lo_lee_quien_tiene_*`, `test_historial_no_lo_lee_cualquier_otro_permiso` |
-| Descargar de nuevo el documento | Pendiente: depende de RF-07 |
+| Descargar de nuevo el documento | `test_proforma_documentos`: `test_descarga_responde_el_archivo_con_su_tipo_y_nombre` |
 
 Evidencia: PR #39.
 
@@ -247,7 +267,7 @@ Evidencia: PR #40 y #43.
 | | Separación frontend, backend, base y documentación técnica | Arquitectura de servicios; `01_documentacion/arquitectura` | Cumple |
 | **RNF-03** Desempeño | Layout con validación eléctrica y capacidad ≤ 15 s | `test_rnf`: terreno de 16 ha con caminos, 48 000 paneles y 70 inversores, directo y por la API (≈ 0,5 s) | Cumple |
 | | Boceto procesado ≤ 30 s | DXF: `ia: test_dxf`: `test_planta_grande_en_tiempo_razonable` (< 3 s). PDF e imagen con IA: medición con la clave real | Parcial |
-| | Documento de cotización ≤ 10 s | Se agrega con RF-07 | Pendiente |
+| | Documento de cotización ≤ 10 s | `test_rnf`: `test_rnf03_documento_de_cotizacion_en_menos_de_10_s` | Cumple |
 | **RNF-04** Seguridad | 100 % de las funcionalidades autenticadas | `test_seguridad`: `test_ningun_endpoint_queda_abierto` | Cumple |
 | | bcrypt con factor ≥ 10 | `test_rnf`: `test_rnf04_bcrypt_con_factor_de_al_menos_10` (factor 12) | Cumple |
 | | Expiración tras 30 minutos de inactividad | `inactividad.test.tsx` | Cumple desde este corte |
@@ -267,7 +287,7 @@ Evidencia: PR #40 y #43.
 | 5 | RF-09 dice "precio mayor o igual a cero", pero la API rechazaba 0 (`gt=0`), y la logística (LOG) nace en $0 | La API y la pantalla de precios aceptan 0 (`ge=0`); `test_acepta_cero` |
 | 6 | RF-04 lista DWG entre los formatos; el sistema pide exportarlo a DXF porque ezdxf no lee DWG | Decisión de diseño (PR #44); el requisito se corrigió en la tesis (sección 2.1.3, control de cambios CC-09) |
 | 7 | RF-13 pide bocetos procesados y lotes despachados y recibidos | Bocetos procesados agregado al tablero; lotes despachados y recibidos con el módulo de validación |
-| 8 | RF-07 sin implementar; sin pruebas de extremo a extremo | RF-14 a RF-16 implementados con sus pruebas. RF-07 en curso; las pruebas de extremo a extremo, en el Sprint 7 |
+| 8 | RF-07 y RF-14 a RF-16 sin implementar; sin pruebas de extremo a extremo | Todos implementados con sus pruebas; las de extremo a extremo, en el Sprint 7 |
 | 9 | RF-08 pide buscar inversores por marca o modelo; la pantalla no tenía búsqueda | Búsqueda en el catálogo de inversores; `inversores-catalogo.test.tsx` |
 
 ---

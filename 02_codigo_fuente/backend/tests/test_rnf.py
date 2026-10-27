@@ -2,7 +2,8 @@
 Requerimientos no funcionales verificables con pruebas automatizadas.
 
   RNF-03  El layout, incluida la validación eléctrica y la capacidad en
-          kWp, se genera en menos de 15 segundos.
+          kWp, se genera en menos de 15 segundos. El documento de la
+          proforma (Word o Excel), en menos de 10.
   RNF-04  Las contraseñas se guardan con bcrypt, factor mayor o igual a 10.
 
 Los tiempos se miden en el ambiente de pruebas, con un margen amplio: el
@@ -13,11 +14,16 @@ Origen: matriz de trazabilidad (03_pruebas/trazabilidad).
 """
 
 import time
+from datetime import datetime, timezone
+from decimal import Decimal
 
 import bcrypt
 
 from app.core.security import hash_password, verificar_password
 from app.models.cliente import Cliente, TipoIdentificacion
+from app.models.cotizacion import Cotizacion, ItemCotizacion, MaterialCotizado
+from app.models.material import Material
+from app.services import documentos
 from app.services.calculo_layout import (
     InversorLayout,
     PanelLayout,
@@ -26,6 +32,7 @@ from app.services.calculo_layout import (
     electrica_inversor,
     generar_layout,
 )
+from tests.fabricas import crear_usuario
 from tests.test_varios_inversores import api, equipo, guardar, h, inversor  # noqa: F401
 
 LIMITE_LAYOUT_S = 15
@@ -88,6 +95,41 @@ def test_rnf03_generar_por_la_api_en_menos_de_15_s(api, db, h):  # noqa: F811
     assert r.status_code == 200, r.text
     assert r.json()["total_paneles"] > 40_000
     assert duracion < LIMITE_LAYOUT_S, f"Generar por la API tardó {duracion:.1f} s"
+
+
+def test_rnf03_documento_de_cotizacion_en_menos_de_10_s(db):
+    """Una proforma con muchos materiales: 80 ítems, Word y Excel juntos."""
+    usuario = crear_usuario(db)
+    materiales = [Material(codigo=f"MAT-{i:03d}", nombre=f"Material {i}", unidad="u") for i in range(80)]
+    db.add_all(materiales)
+    db.flush()
+
+    cotizacion = Cotizacion(
+        usuario_id=usuario.id,
+        cliente_nombre="Cliente RNF documento",
+        numero_proforma="CT-999-2026",
+        subtotal=Decimal("10000.00"),
+        addendum_porcentaje=Decimal("5.00"),
+        addendum_monto=Decimal("500.00"),
+        iva_porcentaje=Decimal("15.00"),
+        iva_monto=Decimal("1575.00"),
+        total=Decimal("12075.00"),
+        created_at=datetime.now(timezone.utc),
+        items=[ItemCotizacion(paneles_largo=4, paneles_ancho=3, bloques=10)],
+        materiales=[
+            MaterialCotizado(material=m, cantidad=100 + i, precio_unitario=Decimal("1.25")) for i, m in enumerate(materiales)
+        ],
+    )
+    db.add(cotizacion)
+    db.flush()
+    db.refresh(cotizacion)
+
+    inicio = time.perf_counter()
+    documentos.generar_word(cotizacion)
+    documentos.generar_excel(cotizacion)
+    duracion = time.perf_counter() - inicio
+
+    assert duracion < 10, f"Generar los documentos tardó {duracion:.1f} s"
 
 
 def test_rnf04_bcrypt_con_factor_de_al_menos_10():
