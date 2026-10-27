@@ -18,11 +18,11 @@ requisito es la corrida verde del PR indicado.
 
 | Componente | Pruebas | Cobertura de líneas | Cómo se ejecutan |
 |---|---|---|---|
-| Backend (API principal) | 475 | 96 % | `pytest` en `02_codigo_fuente/backend` |
+| Backend (API principal) | 481 | 96 % | `pytest` en `02_codigo_fuente/backend` |
 | calc-service | 32 | 100 % | `pytest` en `02_codigo_fuente/calc-service` |
-| ia-service | 52 | 94 % | `pytest` en `02_codigo_fuente/ia-service` |
+| ia-service | 76 | 94 % | `pytest` en `02_codigo_fuente/ia-service` |
 | Frontend (interfaz) | 171 | — | `npm test` en `02_codigo_fuente/frontend` |
-| **Total** | **730** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
+| **Total** | **760** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
 
 La cobertura se midió con `pytest --cov=app`. RNF-02 pide al menos 60 %
 en el backend.
@@ -31,7 +31,7 @@ en el backend.
 |---|---|
 | Cubiertos por pruebas automatizadas | RF-01 a RF-16; RNF-01 (layout), RNF-02, RNF-03, RNF-04 |
 | Implementación pendiente | Ninguna |
-| Requieren verificación fuera del CI | RNF-01 (precisión con bocetos reales y del conteo de varillas con fotos reales), RNF-03 (boceto con IA y documento), RNF-05, RNF-06 |
+| Requieren verificación fuera del CI | RNF-01 (precisión con bocetos reales y del conteo de varillas con fotos reales) y RNF-03 (boceto con IA), con el [protocolo de aceptación](../aceptacion/PROTOCOLO-ACEPTACION.md); RNF-05, RNF-06 |
 
 **Convenciones.** Los archivos `test_*.py` son del backend salvo que se
 indique otro servicio. Los nombres terminados en `.test.tsx` son pruebas de
@@ -262,11 +262,11 @@ Evidencia: PR #40 y #43.
 | Requisito | Métrica | Cómo se verifica | Estado |
 |---|---|---|---|
 | **RNF-01** Adecuación funcional | Layout con variación ≤ 5 % frente al óptimo calculado a mano | `test_layout`: `test_cumple_rnf01_frente_al_optimo_teorico`, `test_rectangulo_100_por_60`, `test_encaje_exacto_sin_bloques_cortos` | Cumple |
-| | Detección de bloques ≥ 90 % en bocetos reales | DXF: `ia: test_dxf` con planos sintéticos de resultado conocido. PDF e imagen: medición con los bocetos reales de HEXtructure | Pendiente de medición |
+| | Detección de bloques ≥ 90 % en bocetos reales | DXF: `ia: test_dxf` con planos sintéticos de resultado conocido. PDF e imagen: `ia: scripts/evaluar_ia.py bocetos` con los bocetos reales de HEXtructure (M1 del protocolo de aceptación); sus cuentas, en `ia: test_evaluar_ia` | Pendiente de medición |
 | **RNF-02** Mantenibilidad | Cobertura del backend ≥ 60 % | `pytest --cov`: 96 % backend, 100 % calc-service, 93 % ia-service | Cumple |
 | | Separación frontend, backend, base y documentación técnica | Arquitectura de servicios; `01_documentacion/arquitectura` | Cumple |
 | **RNF-03** Desempeño | Layout con validación eléctrica y capacidad ≤ 15 s | `test_rnf`: terreno de 16 ha con caminos, 48 000 paneles y 70 inversores, directo y por la API (≈ 0,5 s) | Cumple |
-| | Boceto procesado ≤ 30 s | DXF: `ia: test_dxf`: `test_planta_grande_en_tiempo_razonable` (< 3 s). PDF e imagen con IA: medición con la clave real | Parcial |
+| | Boceto procesado ≤ 30 s | DXF: `ia: test_dxf`: `test_planta_grande_en_tiempo_razonable` (< 3 s). PDF e imagen con IA: `ia: scripts/evaluar_ia.py bocetos` con la clave real (M2 del protocolo de aceptación) | Parcial |
 | | Documento de cotización ≤ 10 s | `test_rnf`: `test_rnf03_documento_de_cotizacion_en_menos_de_10_s` | Cumple |
 | **RNF-04** Seguridad | 100 % de las funcionalidades autenticadas | `test_seguridad`: `test_ningun_endpoint_queda_abierto` | Cumple |
 | | bcrypt con factor ≥ 10 | `test_rnf`: `test_rnf04_bcrypt_con_factor_de_al_menos_10` (factor 12) | Cumple |
