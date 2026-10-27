@@ -1,18 +1,24 @@
 """
 Siembra datos de demostración en la base de desarrollo: el cliente
-SolarAndes, el inversor Genérico INV-200K en el catálogo (RF-08), los
-materiales de las fórmulas f(L,A,B) con precio vigente (RF-09), y un
-proyecto con terreno y equipo configurado (el panel de referencia y
-ese inversor) — listo para generar el layout (RF-03) sin configurar
-nada más. Se usa en la revisión de la semana 8.
+SolarAndes, el inversor Genérico INV-200K en el catálogo (RF-08), y un
+proyecto con terreno y equipo configurado (el panel de referencia y 5
+unidades de ese inversor) — listo para generar el layout (RF-03) sin
+configurar nada más. Se usa en la revisión de la semana 8.
+
+Los materiales de las fórmulas f(L,A,B) con su precio vigente (RF-09)
+no los siembra este script: ya los crea la migración
+f08f77f098c9_crear_tablas_materiales_y_precios. Este script solo
+verifica que estén — si falta alguno, es que no se corrieron las
+migraciones, y pide correrlas en vez de crear un material con otro
+nombre (habría dos catálogos distintos para el mismo código).
 
 Es idempotente: cada paso revisa primero si el dato ya existe (por su
-clave natural: identificación del cliente, código del material, marca
-y modelo del inversor, un terreno o un equipo por proyecto) y no lo
-duplica ni le cambia el precio si ya lo tiene. Correrlo varias veces es
-seguro.
+clave natural: identificación del cliente, marca y modelo del
+inversor, un terreno o un equipo por proyecto) y no lo duplica.
+Correrlo varias veces es seguro.
 
 Uso (desde la carpeta backend/, con el venv activado):
+    alembic upgrade head
     python -m scripts.datos_demo
 
 Requiere haber creado antes un Gerente General con:
@@ -20,7 +26,6 @@ Requiere haber creado antes un Gerente General con:
 """
 
 import sys
-from decimal import Decimal
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -42,7 +47,7 @@ from app.schemas.proyecto import ProyectoCrear  # noqa: E402
 from app.schemas.terreno import TerrenoCrear  # noqa: E402
 from app.services.equipo import guardar_configuracion, obtener_configuracion  # noqa: E402
 from app.services.cotizacion import CODIGO_LOGISTICA  # noqa: E402
-from app.services.material import actualizar_precio, crear_material  # noqa: E402
+from app.services.material import CODIGOS_FORMULA  # noqa: E402
 from app.services.proyecto import crear_proyecto  # noqa: E402
 from app.services.terreno import crear_terreno, obtener_terreno  # noqa: E402
 
@@ -60,28 +65,18 @@ INVERSOR_DEMO = {
     "strings_por_mppt": 2,
 }
 
+# El terreno de 100 x 60 m da unos 1 764 paneles: a 400 paneles por
+# inversor (la regla que usa la pantalla del layout), hacen falta 5.
+CANTIDAD_INVERSORES_DEMO = 5
+
 # El panel de referencia más usado por los clientes de HEXtructure
 # (app/data/paneles_referencia.py, el mismo que RF-05 usa por defecto
 # cuando el proyecto todavía no tiene equipo configurado).
 PANEL_REFERENCIA = PANELES_REFERENCIA[0]
 
-# Código, nombre y precio de los materiales de las fórmulas f(L,A,B),
-# más LOG (logística: cargo fijo, sin fórmula). El precio es solo para
-# que la demo pueda cotizar de principio a fin — no es una lista de
-# precios real.
-MATERIALES_DEMO: list[tuple[str, str, Decimal]] = [
-    ("VAR1650", "Varilla 1650", Decimal("2.50")),
-    ("VAR1350", "Varilla 1350", Decimal("2.10")),
-    ("HEX_V18MM", "Varilla HEX 18mm", Decimal("1.80")),
-    ("SOP_A", "Soporte A", Decimal("3.20")),
-    ("SOP_V", "Soporte V", Decimal("3.50")),
-    ("SOP_V_E", "Soporte V extremo", Decimal("3.90")),
-    ("ANT_B", "Antivuelco B", Decimal("4.10")),
-    ("ANT_VAR", "Antivuelco varilla", Decimal("2.75")),
-    ("CLAMP_F", "Abrazadera final", Decimal("1.15")),
-    ("CLAMP_I", "Abrazadera intermedia", Decimal("0.95")),
-    (CODIGO_LOGISTICA, "Logística", Decimal("150.00")),
-]
+# Códigos de material que una cotización siempre necesita con precio
+# vigente (los crea la migración de materiales, ver el docstring).
+CODIGOS_MATERIAL_REQUERIDOS = sorted(CODIGOS_FORMULA | {CODIGO_LOGISTICA})
 
 # Terreno rectangular de 100 x 60 m: el mismo tamaño que usan las
 # pruebas del layout, de sobra para una planta de demostración.
@@ -134,20 +129,27 @@ def _inversor_catalogo_demo(db: Session) -> None:
     print(f"Listo: Inversor {INVERSOR_DEMO['marca']} {INVERSOR_DEMO['modelo']} agregado al catálogo")
 
 
-def _materiales_demo(db: Session) -> None:
-    for codigo, nombre, precio in MATERIALES_DEMO:
+def _materiales_demo(db: Session) -> bool:
+    """
+    Verifica que los materiales de las fórmulas f(L,A,B) ya tengan precio
+    vigente — los crea la migración de materiales, no este script, para
+    que haya un solo catálogo (ver el docstring del módulo). Si falta
+    alguno devuelve False en vez de crearlo con otro nombre.
+    """
+    faltantes = []
+    for codigo in CODIGOS_MATERIAL_REQUERIDOS:
         material = db.query(Material).filter(Material.codigo == codigo).one_or_none()
-        if material is None:
-            material = crear_material(db, codigo=codigo, nombre=nombre, unidad="unidad")
-            print(f"Listo: Material {codigo} creado")
+        tiene_precio_vigente = material is not None and any(p.vigente_hasta is None for p in material.precios)
+        if not tiene_precio_vigente:
+            faltantes.append(codigo)
 
-        precio_vigente = next((p for p in material.precios if p.vigente_hasta is None), None)
-        if precio_vigente is not None:
-            print(f"· Material {codigo} ya tenía precio vigente (${precio_vigente.precio})")
-            continue
+    if faltantes:
+        print(f"Error: Faltan materiales con precio vigente: {', '.join(faltantes)}")
+        print("  Corre primero:  alembic upgrade head")
+        return False
 
-        actualizar_precio(db, material.id, precio)
-        print(f"Listo: Precio de {codigo} fijado en ${precio}")
+    print("· Los materiales de las fórmulas ya tienen precio vigente (migración de materiales)")
+    return True
 
 
 def _proyecto_demo(db: Session, cliente: Cliente, gerente: Usuario) -> Proyecto:
@@ -203,10 +205,13 @@ def _equipo_demo(db: Session, proyecto: Proyecto) -> None:
                 vmp_v=PANEL_REFERENCIA["vmp_v"],
             ),
             angulo_montaje=15,
-            inversores=[InversorEquipoEsquema(**INVERSOR_DEMO)],
+            inversores=[InversorEquipoEsquema(**INVERSOR_DEMO) for _ in range(CANTIDAD_INVERSORES_DEMO)],
         ),
     )
-    print(f"Listo: Equipo configurado con el panel {PANEL_REFERENCIA['modelo']} y el inversor {INVERSOR_DEMO['modelo']}")
+    print(
+        f"Listo: Equipo configurado con el panel {PANEL_REFERENCIA['modelo']} y "
+        f"{CANTIDAD_INVERSORES_DEMO} inversores {INVERSOR_DEMO['modelo']}"
+    )
 
 
 def main() -> int:
@@ -223,9 +228,11 @@ def main() -> int:
             print("  Créalo primero con:  python -m scripts.crear_admin")
             return 1
 
+        if not _materiales_demo(db):
+            return 1
+
         cliente = _cliente_demo(db)
         _inversor_catalogo_demo(db)
-        _materiales_demo(db)
         proyecto = _proyecto_demo(db, cliente, gerente)
         _terreno_demo(db, proyecto)
         _equipo_demo(db, proyecto)
