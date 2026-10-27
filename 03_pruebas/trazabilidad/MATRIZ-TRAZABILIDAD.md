@@ -1,6 +1,6 @@
 # Matriz de trazabilidad requisitos → pruebas
 
-Historia: SQ-135 · Corte: 26 de octubre de 2026 (con el documento de la
+Historia: SQ-135 · Corte: 27 de octubre de 2026 (con el documento de la
 proforma y el módulo de validación de materiales) · Complementa la Tabla 44
 del documento de titulación (sección 7.3).
 
@@ -18,11 +18,11 @@ requisito es la corrida verde del PR indicado.
 
 | Componente | Pruebas | Cobertura de líneas | Cómo se ejecutan |
 |---|---|---|---|
-| Backend (API principal) | 468 | 96 % | `pytest` en `02_codigo_fuente/backend` |
+| Backend (API principal) | 480 | 96 % | `pytest` en `02_codigo_fuente/backend` |
 | calc-service | 32 | 100 % | `pytest` en `02_codigo_fuente/calc-service` |
 | ia-service | 52 | 94 % | `pytest` en `02_codigo_fuente/ia-service` |
 | Frontend (interfaz) | 171 | — | `npm test` en `02_codigo_fuente/frontend` |
-| **Total** | **723** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
+| **Total** | **735** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
 
 La cobertura se midió con `pytest --cov=app`. RNF-02 pide al menos 60 %
 en el backend.
