@@ -41,13 +41,13 @@ código por servicio y los huecos pendientes.
 
 ## Cobertura actual
 
-Corte del 27 de octubre de 2026: **760 pruebas automatizadas**, todas
+Corte del 27 de octubre de 2026: **766 pruebas automatizadas**, todas
 aprobadas. Detalle por requisito en la
 [matriz de trazabilidad](trazabilidad/MATRIZ-TRAZABILIDAD.md).
 
 | Componente | Pruebas | Cobertura de líneas |
 |---|---|---|
-| Backend (API principal) | 481 | 96 % |
+| Backend (API principal) | 487 | 96 % |
 | calc-service | 32 | 100 % |
 | ia-service | 76 | 94 % |
 | Frontend (interfaz) | 171 | — |
