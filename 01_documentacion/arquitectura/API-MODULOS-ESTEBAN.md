@@ -166,7 +166,7 @@ cambiarlo rompería esa referencia.
 { "precio": 4.75 }
 ```
 
-`precio` > 0, con hasta 2 decimales. El servicio cierra automáticamente el
+`precio` >= 0, con hasta 2 decimales. El servicio cierra automáticamente el
 precio anterior (`vigente_hasta = ahora`) y crea el nuevo con
 `vigente_hasta = null`; no hace falta enviar fechas.
 

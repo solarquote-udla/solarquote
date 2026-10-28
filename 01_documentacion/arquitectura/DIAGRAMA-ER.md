@@ -420,7 +420,9 @@ número negativo, que no corresponde a ningún inversor posible.
   de cotizar, aunque `PrecioMaterial` cambie después.
 - **1 a 1 por `unique=True` en la FK**, no por un modelo de herencia:
   `Terreno`, `ConfiguracionEquipo` y `Layout` son, cada uno, como mucho uno
-  por `Proyecto`.
+  por `Proyecto`; `Despacho` y `Recepcion` son, cada uno, como mucho uno
+  por `Cotizacion` (`cotizacion_id` único) — un lote por cotización, sin
+  despachos ni recepciones parciales.
 - **Un solo precio "vigente" por material:** índice único parcial en
   `precios_material` (`WHERE vigente_hasta IS NULL`), no una columna de
   precio en `Material`.

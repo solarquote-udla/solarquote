@@ -27,7 +27,7 @@ from app.core.permisos import Permiso
 from app.models.cotizacion import Cotizacion, ItemCotizacion, MaterialCotizado
 from app.models.material import Material
 from app.services import documentos
-from app.services.documentos import _moneda, settings
+from app.services.documentos import _moneda, _numero, _pluralizar, _porcentaje, settings
 from tests.fabricas import crear_usuario, perfil_personalizado
 from tests.test_varios_inversores import _cabecera, api, h  # noqa: F401
 
@@ -154,6 +154,36 @@ def test_moneda_formato_ecuador(valor, esperado) -> None:
     assert _moneda(valor) == esperado
 
 
+@pytest.mark.parametrize(
+    "valor,esperado",
+    [(Decimal("445.44"), "445,44"), (Decimal("5025.60"), "5.025,60"), (Decimal("3"), "3,00")],
+)
+def test_numero_formato_ecuador_sin_signo_de_dolar(valor, esperado) -> None:
+    assert _numero(valor) == esperado
+
+
+@pytest.mark.parametrize(
+    "valor,esperado",
+    [
+        # Mismo formato para todos: ni el addendum/IVA en dos decimales fijos
+        # ("5.00%") ni los pagos sin ninguno ("30%") — antes convivían los dos.
+        (Decimal("5.00"), "5%"),
+        (Decimal("30"), "30%"),
+        (Decimal("15.00"), "15%"),
+        (Decimal("5.50"), "5,5%"),
+        (Decimal("5.05"), "5,05%"),
+        (None, "—"),
+    ],
+)
+def test_porcentaje_un_solo_formato_sin_decimales_de_mas(valor, esperado) -> None:
+    assert _porcentaje(valor) == esperado
+
+
+@pytest.mark.parametrize("cantidad,esperado", [(1, "1 año"), (0, "0 años"), (2, "2 años")])
+def test_pluralizar_segun_la_cantidad(cantidad, esperado) -> None:
+    assert _pluralizar(cantidad, "año", "años") == esperado
+
+
 # ─── Orden de materiales (no alfabético) ──────────────────────────────
 
 
@@ -208,7 +238,7 @@ def test_word_incluye_encabezado_concepto_potencia_y_cliente(db: Session, datos_
     assert "+593 900000000" in texto and "prueba@example.com" in texto
     assert "Proforma CT-130-2026" in texto
     assert "Concepto: Estructura de soporte reusable para la instalación en piso de módulos fotovoltaicos" in texto
-    assert "Potencia: 45.20 kWp" in texto
+    assert "Potencia: 45,20 kWp" in texto
     assert "SolarAndes Instalaciones" in texto
     assert "SolarAndes S.A." in texto
     assert "Planta El Carmen" in texto
@@ -236,8 +266,8 @@ def test_word_totales_notas_condiciones_y_pagos(db: Session, datos_oferente) -> 
     filas = [[c.text for c in fila.cells] for tabla in documento.tables for fila in tabla.rows]
 
     assert "Subtotal: $ 440,00" in texto
-    assert "Addendum (5.00%): $ 22,00" in texto
-    assert "IVA (15.00%): $ 69,30" in texto
+    assert "Addendum (5%): $ 22,00" in texto
+    assert "IVA (15%): $ 69,30" in texto
     assert "Total: $ 531,30" in texto
 
     # Notas fijas + configuración del ítem debajo de la primera
@@ -247,7 +277,7 @@ def test_word_totales_notas_condiciones_y_pagos(db: Session, datos_oferente) -> 
 
     assert "Plazo de entrega: 20 días." in texto
     assert "Validez de la oferta: 90 días." in texto
-    assert "Garantía: 1 año(s)." in texto
+    assert "Garantía: 1 año." in texto
 
     assert ["Tramo", "Porcentaje", "Monto"] in filas
     assert ["Anticipo", "30%", "$ 159,39"] in filas
@@ -328,10 +358,10 @@ def test_excel_subtotales_y_totales_son_formulas(db: Session, datos_oferente) ->
     fila_subtotal = _fila_con_etiqueta(hoja, "Subtotal")
     assert hoja[f"E{fila_subtotal}"].value == f"=SUM(E{min(fila_hex, fila_var)}:E{max(fila_hex, fila_var)})"
 
-    fila_addendum = _fila_con_etiqueta(hoja, "Addendum (5.00%)")
+    fila_addendum = _fila_con_etiqueta(hoja, "Addendum (5%)")
     assert hoja[f"E{fila_addendum}"].value == f"=E{fila_subtotal}*5.00/100"
 
-    fila_iva = _fila_con_etiqueta(hoja, "IVA (15.00%)")
+    fila_iva = _fila_con_etiqueta(hoja, "IVA (15%)")
     # Sobre subtotal + addendum, no solo sobre el subtotal.
     assert hoja[f"E{fila_iva}"].value == f"=(E{fila_subtotal}+E{fila_addendum})*15.00/100"
 

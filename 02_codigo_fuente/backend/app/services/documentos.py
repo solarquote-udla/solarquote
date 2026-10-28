@@ -67,10 +67,8 @@ def _fecha(cotizacion: Cotizacion) -> str:
     return cotizacion.created_at.astimezone(ZONA_ECUADOR).strftime("%d/%m/%Y")
 
 
-def _moneda(valor: Decimal | None) -> str:
-    """Formato de Ecuador: punto de millares, coma decimal — "$ 5.025,60"."""
-    if valor is None:
-        return "—"
+def _numero(valor: Decimal) -> str:
+    """Formato de Ecuador: punto de millares, coma decimal — "5.025,60"."""
     valor = valor.quantize(Decimal("0.01"))
     negativo = valor < 0
     entero, _, decimales = f"{abs(valor):.2f}".partition(".")
@@ -80,7 +78,33 @@ def _moneda(valor: Decimal | None) -> str:
         entero = entero[:-3]
     grupos.insert(0, entero)
     signo = "-" if negativo else ""
-    return f"{signo}$ {'.'.join(grupos)},{decimales}"
+    return f"{signo}{'.'.join(grupos)},{decimales}"
+
+
+def _moneda(valor: Decimal | None) -> str:
+    """Formato de Ecuador con signo de dólar — "$ 5.025,60"."""
+    return "—" if valor is None else f"$ {_numero(valor)}"
+
+
+def _porcentaje(valor: Decimal | None) -> str:
+    """
+    Mismo formato para todos los porcentajes del documento (antes el
+    addendum y el IVA mostraban dos decimales fijos — "5.00%" — y la
+    forma de pago ninguno — "30%"): sin decimales de más, y con coma si
+    hace falta ("5%", "30%", "5,5%"), no con punto.
+    """
+    if valor is None:
+        return "—"
+    texto = f"{valor:.2f}"
+    if texto.endswith("00"):
+        texto = texto[:-3]
+    else:
+        texto = texto.rstrip("0").rstrip(".")
+    return f"{texto.replace('.', ',')}%"
+
+
+def _pluralizar(cantidad: int, singular: str, plural: str) -> str:
+    return f"{cantidad} {singular if cantidad == 1 else plural}"
 
 
 def _subtotal_material(material: MaterialCotizado) -> Decimal:
@@ -149,7 +173,7 @@ def generar_word(cotizacion: Cotizacion) -> bytes:
     documento.add_paragraph(f"Fecha: {_fecha(cotizacion)}").alignment = WD_ALIGN_PARAGRAPH.CENTER
     documento.add_paragraph(f"Concepto: {settings.PROFORMA_CONCEPTO}").alignment = WD_ALIGN_PARAGRAPH.CENTER
     if cotizacion.potencia_kwp is not None:
-        documento.add_paragraph(f"Potencia: {cotizacion.potencia_kwp} kWp").alignment = WD_ALIGN_PARAGRAPH.CENTER
+        documento.add_paragraph(f"Potencia: {_numero(cotizacion.potencia_kwp)} kWp").alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     documento.add_heading("Cliente", level=2)
     datos_cliente = [("Nombre", cotizacion.cliente_nombre)]
@@ -193,8 +217,8 @@ def generar_word(cotizacion: Cotizacion) -> bytes:
     documento.add_heading("Totales", level=2)
     filas_totales = [
         ("Subtotal", cotizacion.subtotal),
-        (f"Addendum ({cotizacion.addendum_porcentaje}%)", cotizacion.addendum_monto),
-        (f"IVA ({cotizacion.iva_porcentaje}%)" if cotizacion.iva_porcentaje is not None else "IVA", cotizacion.iva_monto),
+        (f"Addendum ({_porcentaje(cotizacion.addendum_porcentaje)})", cotizacion.addendum_monto),
+        (f"IVA ({_porcentaje(cotizacion.iva_porcentaje)})" if cotizacion.iva_porcentaje is not None else "IVA", cotizacion.iva_monto),
         ("Total", cotizacion.total),
     ]
     for etiqueta, monto in filas_totales:
@@ -207,7 +231,7 @@ def generar_word(cotizacion: Cotizacion) -> bytes:
     documento.add_heading("Condiciones", level=2)
     documento.add_paragraph(f"Plazo de entrega: {settings.PROFORMA_PLAZO_DIAS} días.")
     documento.add_paragraph(f"Validez de la oferta: {settings.PROFORMA_VALIDEZ_DIAS} días.")
-    documento.add_paragraph(f"Garantía: {settings.PROFORMA_GARANTIA_ANIOS} año(s).")
+    documento.add_paragraph(f"Garantía: {_pluralizar(settings.PROFORMA_GARANTIA_ANIOS, 'año', 'años')}.")
 
     documento.add_heading("Forma de pago", level=2)
     tabla_pagos = documento.add_table(rows=1, cols=3)
@@ -219,7 +243,7 @@ def generar_word(cotizacion: Cotizacion) -> bytes:
                 corrida.bold = True
     for etiqueta, pct, monto in _pagos(cotizacion.total):
         fila = tabla_pagos.add_row().cells
-        for celda, texto in zip(fila, [etiqueta, f"{pct}%", _moneda(monto)]):
+        for celda, texto in zip(fila, [etiqueta, _porcentaje(pct), _moneda(monto)]):
             celda.text = texto
 
     if settings.HEXTRUCTURE_BANCO:
@@ -282,7 +306,7 @@ def generar_excel(cotizacion: Cotizacion) -> bytes:
     hoja.cell(row=fila, column=1, value=f"Concepto: {settings.PROFORMA_CONCEPTO}")
     fila += 1
     if cotizacion.potencia_kwp is not None:
-        hoja.cell(row=fila, column=1, value=f"Potencia: {cotizacion.potencia_kwp} kWp")
+        hoja.cell(row=fila, column=1, value=f"Potencia: {_numero(cotizacion.potencia_kwp)} kWp")
         fila += 1
 
     fila += 1
@@ -329,7 +353,7 @@ def generar_excel(cotizacion: Cotizacion) -> bytes:
     fila += 1
 
     fila_addendum = fila
-    hoja.cell(row=fila, column=4, value=f"Addendum ({cotizacion.addendum_porcentaje}%)").alignment = Alignment(horizontal="right")
+    hoja.cell(row=fila, column=4, value=f"Addendum ({_porcentaje(cotizacion.addendum_porcentaje)})").alignment = Alignment(horizontal="right")
     celda_addendum = hoja.cell(
         row=fila, column=5, value=f"=E{fila_subtotal}*{cotizacion.addendum_porcentaje}/100"
     )
@@ -337,7 +361,7 @@ def generar_excel(cotizacion: Cotizacion) -> bytes:
     fila += 1
 
     fila_iva = fila
-    etiqueta_iva = f"IVA ({cotizacion.iva_porcentaje}%)" if cotizacion.iva_porcentaje is not None else "IVA"
+    etiqueta_iva = f"IVA ({_porcentaje(cotizacion.iva_porcentaje)})" if cotizacion.iva_porcentaje is not None else "IVA"
     hoja.cell(row=fila, column=4, value=etiqueta_iva).alignment = Alignment(horizontal="right")
     # Sobre el subtotal más el addendum, no solo el subtotal.
     celda_iva = hoja.cell(
@@ -368,7 +392,7 @@ def generar_excel(cotizacion: Cotizacion) -> bytes:
     fila += 1
     hoja.cell(row=fila, column=1, value=f"Validez de la oferta: {settings.PROFORMA_VALIDEZ_DIAS} días.")
     fila += 1
-    hoja.cell(row=fila, column=1, value=f"Garantía: {settings.PROFORMA_GARANTIA_ANIOS} año(s).")
+    hoja.cell(row=fila, column=1, value=f"Garantía: {_pluralizar(settings.PROFORMA_GARANTIA_ANIOS, 'año', 'años')}.")
     fila += 2
 
     hoja.cell(row=fila, column=1, value="Forma de pago").font = negrita
@@ -378,7 +402,7 @@ def generar_excel(cotizacion: Cotizacion) -> bytes:
     fila += 1
     for etiqueta, pct, _ in _pagos(cotizacion.total):
         hoja.cell(row=fila, column=1, value=etiqueta)
-        hoja.cell(row=fila, column=2, value=f"{pct}%")
+        hoja.cell(row=fila, column=2, value=_porcentaje(pct))
         # También fórmula, sobre la celda del total: cambia si cambia una cantidad.
         celda_pago = hoja.cell(row=fila, column=3, value=f"=E{fila_total}*{pct}/100")
         celda_pago.number_format = FORMATO_MONEDA_EXCEL
