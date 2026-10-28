@@ -4,9 +4,26 @@
 `alembic upgrade head`), no una propuesta.
 
 Reemplaza el diagrama ASCII informal que había al final de
-[MODELOS-COMPARTIDOS.md](MODELOS-COMPARTIDOS.md): este cubre las 17 tablas
-del sistema completo (Módulo 1 de Joseph + Cotización/Materiales/Inversores/
-Clientes de Esteban), no solo los modelos compartidos.
+[MODELOS-COMPARTIDOS.md](MODELOS-COMPARTIDOS.md): este cubre las 24 tablas
+del sistema completo (Módulo 1 y 2 de Joseph + Cotización/Materiales/
+Inversores/Clientes/Proforma de Esteban + Validación de materiales), no
+solo los modelos compartidos.
+
+**El bloque `erDiagram` de abajo se genera, no se escribe a mano.**
+Un diagrama hecho a mano se desactualiza en silencio — llegó a decir 17
+tablas cuando ya había 24. `scripts/generar_diagrama_er.py` lee
+`Base.metadata` (lo mismo que usa Alembic) y produce las entidades,
+columnas, tipos, llaves y relaciones directo del esquema real:
+
+```bash
+cd 02_codigo_fuente/backend
+python -m scripts.generar_diagrama_er
+```
+
+Y se reemplaza el bloque completo con la salida. Las notas de las dos
+secciones siguientes (relaciones que no son FK, patrones del esquema) no
+se generan — son lectura del esquema, no el esquema mismo — y se quedan
+a mano.
 
 ---
 
@@ -14,71 +31,41 @@ Clientes de Esteban), no solo los modelos compartidos.
 
 ```mermaid
 erDiagram
-    PERFILES {
+    BLOQUES_BOCETO {
         int id PK
-        string nombre UK
-        string descripcion
-        string clave UK "null en perfiles personalizados"
-        boolean acceso_total
-        datetime created_at
-        datetime updated_at
+        int boceto_id FK
+        int orden
+        string etiqueta "nullable"
+        int paneles_largo
+        int paneles_ancho
+        int repeticiones
+        string orientacion
+        float confianza "nullable"
     }
 
-    PERFIL_PERMISOS {
-        int perfil_id PK, FK
-        string codigo PK
+    BLOQUES_LAYOUT {
+        int id PK
+        int layout_id FK
+        int orden
+        jsonb vertices
+        int paneles_largo
+        int paneles_ancho
+        float proporcion
+        boolean en_proporcion
+        int inversor
     }
 
-    USUARIOS {
+    BOCETOS {
         int id PK
-        string nombre
-        string email UK
-        string password_hash
-        int perfil_id FK
-        boolean activo "baja lógica"
-        boolean debe_cambiar_password
-        datetime ultimo_acceso
-        int intentos_fallidos
-        datetime bloqueado_hasta
-        int version_token "invalida JWT emitidos antes"
-        datetime created_at
-        datetime updated_at
-    }
-
-    CLIENTES {
-        int id PK
-        string nombre
-        string tipo_identificacion "cedula | ruc | pasaporte"
-        string identificacion UK
-        string empresa
-        string email
-        string telefono
-        string direccion
-        boolean activo "baja lógica"
-        datetime created_at
-        datetime updated_at
-    }
-
-    PROYECTOS {
-        int id PK
-        string nombre
-        int cliente_id FK
-        int usuario_id FK "quién lo creó"
-        string ubicacion
-        decimal latitud
-        decimal longitud
-        string estado "borrador→en_diseno→disenado→cotizado"
-        string notas
-        datetime created_at
-        datetime updated_at
-    }
-
-    TERRENOS {
-        int id PK
-        int proyecto_id FK, UK "1 a 1 con Proyecto"
-        jsonb vertices "polígono, metros"
-        float orientacion_norte
-        string notas
+        int proyecto_id FK, UK
+        int usuario_id FK
+        string nombre_archivo
+        string formato
+        int tamano_bytes
+        bytes contenido
+        string metodo
+        jsonb advertencias
+        int ediciones_manuales
         datetime created_at
         datetime updated_at
     }
@@ -86,15 +73,29 @@ erDiagram
     CAMINOS {
         int id PK
         int terreno_id FK
-        string nombre
-        string tipo "acceso | interno | mantenimiento"
+        string nombre "nullable"
+        string tipo
         jsonb vertices
         datetime created_at
     }
 
+    CLIENTES {
+        int id PK
+        string nombre
+        string tipo_identificacion
+        string identificacion UK
+        string empresa "nullable"
+        string email "nullable"
+        string telefono "nullable"
+        string direccion "nullable"
+        boolean activo
+        datetime created_at
+        datetime updated_at
+    }
+
     CONFIGURACIONES_EQUIPO {
         int id PK
-        int proyecto_id FK, UK "1 a 1 con Proyecto"
+        int proyecto_id FK, UK
         string panel_marca
         string panel_modelo
         float panel_potencia_wp
@@ -103,115 +104,145 @@ erDiagram
         float panel_voc_v
         float panel_vmp_v
         float angulo_montaje
-        float potencia_objetivo_kwp "opcional"
+        float potencia_objetivo_kwp "nullable"
         datetime created_at
         datetime updated_at
-    }
-
-    INVERSORES_EQUIPO {
-        int id PK
-        int configuracion_id FK
-        int orden "0 = Inversor 1; UK con configuracion_id"
-        string marca
-        string modelo
-        float potencia_kw
-        float vmax_v
-        float vmin_v
-        int mppts
-        int strings_por_mppt
-    }
-
-    LAYOUTS {
-        int id PK
-        int proyecto_id FK, UK "1 a 1 con Proyecto"
-        int paneles_largo
-        float pasillo_m
-        float tolerancia_proporcion
-        float capacidad_deseada_kwp
-        int total_paneles
-        float potencia_kwp
-        jsonb resumen "foto del momento de generar"
-        string huella "SHA-256 de las entradas del algoritmo"
-        datetime created_at
-        datetime updated_at
-    }
-
-    BLOQUES_LAYOUT {
-        int id PK
-        int layout_id FK
-        int orden
-        jsonb vertices "4 esquinas, metros"
-        int paneles_largo
-        int paneles_ancho
-        float proporcion
-        boolean en_proporcion
-        int inversor "orden de InversorEquipo; NO es FK real; CHECK >= 0"
-    }
-
-    INVERSORES {
-        int id PK
-        string marca
-        string modelo "UK junto con marca"
-        float potencia_kw
-        float vmax_v
-        float vmin_v
-        int mppts
-        int strings_por_mppt
-        boolean activo "baja lógica"
-        datetime created_at
-        datetime updated_at
-    }
-
-    MATERIALES {
-        int id PK
-        string codigo UK "usado por f(L,A,B)"
-        string nombre
-        string unidad
-        boolean activo "baja lógica"
-        datetime created_at
-        datetime updated_at
-    }
-
-    PRECIOS_MATERIAL {
-        int id PK
-        int material_id FK
-        decimal precio
-        datetime vigente_desde
-        datetime vigente_hasta "null = precio vigente; único por material"
-        datetime created_at
     }
 
     COTIZACIONES {
         int id PK
-        string numero_proforma UK "null en borrador"
+        string numero_proforma UK "nullable"
         int usuario_id FK
         int cliente_id FK "nullable"
         int proyecto_id FK "nullable"
-        string cliente_nombre "snapshot"
-        string cliente_empresa "snapshot"
-        string cliente_email "snapshot"
-        string cliente_telefono "snapshot"
-        string proyecto_nombre "snapshot"
+        string cliente_nombre
+        string cliente_empresa "nullable"
+        string cliente_email "nullable"
+        string cliente_telefono "nullable"
+        string proyecto_nombre "nullable"
         decimal addendum_porcentaje
         decimal subtotal "nullable"
         decimal addendum_monto "nullable"
         decimal iva_porcentaje "nullable"
         decimal iva_monto "nullable"
         decimal total "nullable"
-        decimal potencia_kwp "nullable; solo si viene de un layout (RF-05)"
-        int total_paneles "nullable; idem"
-        string estado "cotizada→despachada→recibida→instalada"
+        decimal potencia_kwp "nullable"
+        int total_paneles "nullable"
+        string estado
+        datetime instalada_at "nullable"
+        int instalada_por_id FK "nullable"
         datetime created_at
         datetime updated_at
+    }
+
+    DESPACHOS {
+        int id PK
+        int cotizacion_id FK, UK
+        int usuario_id FK
+        string fabricado_por
+        string soldado_por
+        string contado_por
+        string despachado_por
+        string destino
+        string justificacion "nullable"
+        datetime created_at
+    }
+
+    FOTOS_VALIDACION {
+        int id PK
+        int despacho_id FK "nullable"
+        int recepcion_id FK "nullable"
+        int material_id FK "nullable"
+        string nombre_archivo
+        string formato
+        int tamano_bytes
+        bytes contenido
+        int conteo_ia "nullable"
+        datetime created_at
+    }
+
+    INVERSORES {
+        int id PK
+        string marca "UK con (marca, modelo)"
+        string modelo "UK con (marca, modelo)"
+        float potencia_kw
+        float vmax_v "nullable"
+        float vmin_v "nullable"
+        int mppts "nullable"
+        int strings_por_mppt "nullable"
+        boolean activo
+        datetime created_at
+        datetime updated_at
+    }
+
+    INVERSORES_EQUIPO {
+        int id PK
+        int configuracion_id FK "UK con (configuracion_id, orden)"
+        int orden "UK con (configuracion_id, orden)"
+        string marca
+        string modelo
+        float potencia_kw
+        float vmax_v "nullable"
+        float vmin_v "nullable"
+        int mppts "nullable"
+        int strings_por_mppt "nullable"
     }
 
     ITEMS_COTIZACION {
         int id PK
         int cotizacion_id FK
-        string descripcion
-        int paneles_largo "L"
-        int paneles_ancho "A"
-        int bloques "B"
+        string descripcion "nullable"
+        int paneles_largo
+        int paneles_ancho
+        int bloques
+        datetime created_at
+        datetime updated_at
+    }
+
+    ITEMS_DESPACHO {
+        int id PK
+        int despacho_id FK "UK con (despacho_id, material_id)"
+        int material_id FK "UK con (despacho_id, material_id)"
+        string codigo
+        string nombre
+        int cantidad_cotizada
+        int cantidad_despachada
+        int conteo_ia "nullable"
+    }
+
+    ITEMS_RECEPCION {
+        int id PK
+        int recepcion_id FK "UK con (recepcion_id, material_id)"
+        int material_id FK "UK con (recepcion_id, material_id)"
+        string codigo
+        string nombre
+        int cantidad_esperada
+        int cantidad_recibida "nullable"
+        string estado
+        string observacion "nullable"
+    }
+
+    LAYOUTS {
+        int id PK
+        int proyecto_id FK, UK
+        int paneles_largo
+        float pasillo_m
+        float tolerancia_proporcion
+        float capacidad_deseada_kwp "nullable"
+        int total_paneles
+        float potencia_kwp
+        jsonb resumen
+        string huella
+        datetime created_at
+        datetime updated_at
+    }
+
+    MATERIALES {
+        int id PK
+        string codigo UK
+        string nombre
+        string unidad
+        boolean activo
         datetime created_at
         datetime updated_at
     }
@@ -221,27 +252,115 @@ erDiagram
         int cotizacion_id FK
         int material_id FK
         int cantidad
-        decimal precio_unitario "snapshot del precio al emitir"
+        decimal precio_unitario
         datetime created_at
     }
 
-    PERFILES ||--o{ PERFIL_PERMISOS : tiene
-    PERFILES ||--o{ USUARIOS : "asignado a"
-    USUARIOS ||--o{ PROYECTOS : crea
-    USUARIOS ||--o{ COTIZACIONES : crea
-    CLIENTES ||--o{ PROYECTOS : tiene
-    CLIENTES o|--o{ COTIZACIONES : "tiene (opcional)"
-    PROYECTOS ||--o| TERRENOS : "1 a 1"
-    PROYECTOS ||--o| CONFIGURACIONES_EQUIPO : "1 a 1"
-    PROYECTOS ||--o| LAYOUTS : "1 a 1"
-    PROYECTOS o|--o{ COTIZACIONES : "tiene (opcional)"
-    TERRENOS ||--o{ CAMINOS : tiene
-    CONFIGURACIONES_EQUIPO ||--o{ INVERSORES_EQUIPO : tiene
-    LAYOUTS ||--o{ BLOQUES_LAYOUT : tiene
-    COTIZACIONES ||--o{ ITEMS_COTIZACION : tiene
-    COTIZACIONES ||--o{ MATERIALES_COTIZADOS : tiene
-    MATERIALES ||--o{ PRECIOS_MATERIAL : tiene
-    MATERIALES ||--o{ MATERIALES_COTIZADOS : "aparece en"
+    PERFIL_PERMISOS {
+        int perfil_id PK, FK
+        string codigo PK
+    }
+
+    PERFILES {
+        int id PK
+        string nombre UK
+        string descripcion "nullable"
+        string clave UK "nullable"
+        boolean acceso_total
+        datetime created_at
+        datetime updated_at
+    }
+
+    PRECIOS_MATERIAL {
+        int id PK
+        int material_id FK
+        decimal precio
+        datetime vigente_desde
+        datetime vigente_hasta "nullable"
+        datetime created_at
+    }
+
+    PROYECTOS {
+        int id PK
+        string nombre
+        int cliente_id FK
+        int usuario_id FK
+        string ubicacion "nullable"
+        decimal latitud "nullable"
+        decimal longitud "nullable"
+        string estado
+        string notas "nullable"
+        datetime created_at
+        datetime updated_at
+    }
+
+    RECEPCIONES {
+        int id PK
+        int cotizacion_id FK, UK
+        int usuario_id FK
+        string recibido_por
+        string observaciones "nullable"
+        datetime created_at
+    }
+
+    TERRENOS {
+        int id PK
+        int proyecto_id FK, UK
+        jsonb vertices
+        float orientacion_norte "nullable"
+        string notas "nullable"
+        datetime created_at
+        datetime updated_at
+    }
+
+    USUARIOS {
+        int id PK
+        string nombre
+        string email UK
+        string password_hash
+        int perfil_id FK
+        boolean activo
+        boolean debe_cambiar_password
+        datetime ultimo_acceso "nullable"
+        int intentos_fallidos
+        datetime bloqueado_hasta "nullable"
+        int version_token
+        datetime created_at
+        datetime updated_at
+    }
+
+    BOCETOS ||--o{ BLOQUES_BOCETO : boceto
+    CLIENTES o|--o{ COTIZACIONES : cliente
+    CLIENTES ||--o{ PROYECTOS : cliente
+    CONFIGURACIONES_EQUIPO ||--o{ INVERSORES_EQUIPO : configuracion
+    COTIZACIONES ||--o{ ITEMS_COTIZACION : cotizacion
+    COTIZACIONES ||--o{ MATERIALES_COTIZADOS : cotizacion
+    COTIZACIONES ||--o| DESPACHOS : cotizacion
+    COTIZACIONES ||--o| RECEPCIONES : cotizacion
+    DESPACHOS o|--o{ FOTOS_VALIDACION : despacho
+    DESPACHOS ||--o{ ITEMS_DESPACHO : despacho
+    LAYOUTS ||--o{ BLOQUES_LAYOUT : layout
+    MATERIALES o|--o{ FOTOS_VALIDACION : material
+    MATERIALES ||--o{ ITEMS_DESPACHO : material
+    MATERIALES ||--o{ ITEMS_RECEPCION : material
+    MATERIALES ||--o{ MATERIALES_COTIZADOS : material
+    MATERIALES ||--o{ PRECIOS_MATERIAL : material
+    PERFILES ||--o{ PERFIL_PERMISOS : perfil
+    PERFILES ||--o{ USUARIOS : perfil
+    PROYECTOS o|--o{ COTIZACIONES : proyecto
+    PROYECTOS ||--o| BOCETOS : proyecto
+    PROYECTOS ||--o| CONFIGURACIONES_EQUIPO : proyecto
+    PROYECTOS ||--o| LAYOUTS : proyecto
+    PROYECTOS ||--o| TERRENOS : proyecto
+    RECEPCIONES o|--o{ FOTOS_VALIDACION : recepcion
+    RECEPCIONES ||--o{ ITEMS_RECEPCION : recepcion
+    TERRENOS ||--o{ CAMINOS : terreno
+    USUARIOS o|--o{ COTIZACIONES : instalada por
+    USUARIOS ||--o{ BOCETOS : usuario
+    USUARIOS ||--o{ COTIZACIONES : usuario
+    USUARIOS ||--o{ DESPACHOS : usuario
+    USUARIOS ||--o{ PROYECTOS : usuario
+    USUARIOS ||--o{ RECEPCIONES : usuario
 ```
 
 ---

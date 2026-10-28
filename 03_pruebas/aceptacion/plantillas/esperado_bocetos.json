@@ -1,0 +1,12 @@
+{
+  "bocetos": [
+    {
+      "archivo": "ejemplo_boceto.pdf",
+      "fuente": "Proforma CT-000-2026, notas L= A= BLOQUES=",
+      "bloques": [
+        {"L": 4, "A": 24, "B": 8, "orientacion": "vertical"},
+        {"L": 4, "A": 12, "B": 2, "orientacion": "vertical"}
+      ]
+    }
+  ]
+}
