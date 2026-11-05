@@ -40,9 +40,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import httpx  # noqa: E402
 
 from app.services.conteo import contar_varillas  # noqa: E402
-from app.services.dxf import interpretar_dxf  # noqa: E402
 from app.services.formato import detectar_formato  # noqa: E402
-from app.services.ia import interpretar_con_ia  # noqa: E402
+from app.services.lectura import interpretar_boceto  # noqa: E402
 
 # Criterios de la especificación (sección 2.1.3 del documento)
 META_DETECCION = 0.90  # RNF-01: detección correcta de bloques >= 90 %
@@ -248,7 +247,7 @@ def evaluar_bocetos(carpeta: Path, repeticiones: int) -> list[dict]:
             with _MedidorDeTokens() as tokens:
                 inicio = time.perf_counter()
                 try:
-                    resultado = interpretar_dxf(contenido) if formato == "dxf" else interpretar_con_ia(contenido, formato)
+                    resultado = interpretar_boceto(contenido, formato)
                     error = None
                 except Exception as exc:  # noqa: BLE001 — un caso fallido se registra y se sigue
                     resultado, error = None, f"{type(exc).__name__}: {exc}"

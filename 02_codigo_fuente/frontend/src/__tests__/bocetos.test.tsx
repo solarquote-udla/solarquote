@@ -186,6 +186,17 @@ describe("Confirmación del boceto", () => {
     expect(screen.getByText("Revisar")).toBeTruthy();
   });
 
+  it("dice con qué se leyó el boceto: IA, DXF o geometría del PDF", async () => {
+    await abrirConfirmacion();
+    expect(screen.getByText(/leído con IA/)).toBeTruthy();
+    cleanup();
+    await abrirConfirmacion({ metodo: "pdf" });
+    expect(screen.getByText(/leído de la geometría del PDF/)).toBeTruthy();
+    cleanup();
+    await abrirConfirmacion({ metodo: "dxf", formato: "dxf" });
+    expect(screen.getByText(/leído del DXF/)).toBeTruthy();
+  });
+
   it("valida las correcciones en vivo y exige guardarlas antes de confirmar", async () => {
     vi.mocked(bocetos.guardarBloquesBoceto).mockResolvedValue(
       BOCETO({ bloques: [bloque(4, 24, 30, "A", true), bloque(4, 24, 2, "B", true, null)], ediciones_manuales: 1 }) as never,

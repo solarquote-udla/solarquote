@@ -156,6 +156,15 @@ def test_un_boceto_nuevo_reemplaza_al_anterior(api, db, h, pid, ia):
     assert db.query(Boceto).filter(Boceto.proyecto_id == pid).count() == 1
 
 
+def test_pdf_leido_por_geometria_se_guarda_con_su_metodo(api, db, h, pid, ia):
+    """El servicio de IA lee los PDF de CAD por geometría, sin IA (metodo "pdf")."""
+    ia["respuesta"] = httpx.Response(200, json={**LECTURA, "metodo": "pdf"})
+    r = subir(api, h, pid)
+    assert r.status_code == 201
+    assert r.json()["metodo"] == "pdf"
+    assert db.query(Boceto).filter(Boceto.proyecto_id == pid).one().metodo == "pdf"
+
+
 @pytest.mark.parametrize(
     ("status", "detalle"),
     [

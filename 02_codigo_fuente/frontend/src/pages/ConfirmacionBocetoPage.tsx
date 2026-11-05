@@ -41,6 +41,12 @@ const CELDA =
 const BOTON_SECUNDARIO =
   "rounded-lg border border-acero-300 px-4 py-2 text-center text-sm text-acero-700 hover:bg-acero-100 disabled:cursor-not-allowed disabled:opacity-50";
 
+const METODO_LECTURA: Record<Boceto["metodo"], string> = {
+  dxf: "leído del DXF",
+  pdf: "leído de la geometría del PDF",
+  ia: "leído con IA",
+};
+
 function filasDe(boceto: Boceto | null): FilaBoceto[] {
   return (boceto?.bloques ?? []).map((b, i) => ({
     clave: i,
@@ -100,7 +106,7 @@ function VistaOriginal({ proyectoId, boceto }: { proyectoId: number; boceto: Boc
           <h2 className="text-xs font-semibold tracking-wider text-acero-400">BOCETO ORIGINAL</h2>
           <p className="mt-1 text-sm text-acero-700">
             {boceto.nombre_archivo} · {tamanoLegible(boceto.tamano_bytes)} ·{" "}
-            {boceto.metodo === "dxf" ? "leído del DXF" : "leído con IA"}
+            {METODO_LECTURA[boceto.metodo]}
           </p>
         </div>
         <button type="button" onClick={() => void descargar()} className={BOTON_SECUNDARIO}>

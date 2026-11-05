@@ -13,7 +13,6 @@ de lado). La cantidad que vale es la que él confirma.
 
 import base64
 
-import httpx
 from pydantic import ValidationError
 
 from app.core.config import settings
