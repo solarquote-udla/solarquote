@@ -38,6 +38,11 @@ período y, por cada caída, cuándo empezó y cuándo se recuperó — las dos
 cifras que pide RNF-06 (99 % y 5 minutos), sin depender de revisar logs
 de Railway a mano.
 
+UptimeRobot decide arriba/caído por el **código HTTP** de la respuesta,
+no por su contenido — por eso `/health/db` y `/health/servicios`
+responden **503** (no 200) cuando algo falla; el JSON del cuerpo es solo
+para que una revisión manual vea el detalle.
+
 **Configuración** (una cuenta free de [uptimerobot.com](https://uptimerobot.com)):
 
 1. Crear un monitor tipo "HTTP(s)" por cada URL de la tabla, intervalo de
@@ -58,13 +63,14 @@ Por eso el backend expone `GET /health/servicios`
 (`app/routers/health.py`): internamente llama al `/health` de
 calc-service y de ia-service por la red interna de Railway
 (`CALC_SERVICE_URL`, `IA_SERVICE_URL`) y responde con el estado de cada
-uno, sin exponer nada más:
+uno, sin exponer nada más. Si ambos responden, **200**:
 
 ```json
 {"calc_service": "ok", "ia_service": "ok"}
 ```
 
-o, si alguno no respondió o respondió distinto de 200:
+Si alguno no respondió o respondió distinto de 200, **503** (para que
+UptimeRobot lo detecte por el código, no solo por el cuerpo):
 
 ```json
 {"calc_service": "ok", "ia_service": "caído"}
@@ -73,7 +79,14 @@ o, si alguno no respondió o respondió distinto de 200:
 Así el único monitor de UptimeRobot contra `/health/servicios` cubre
 también la disponibilidad de los dos servicios sin dominio público. La
 prueba del endpoint está en `tests/test_health.py` (mockeando `httpx.get`
-para los dos casos: ambos arriba, y cada uno caído por separado).
+para los dos casos — ambos arriba, y cada uno caído por separado — y
+verificando el código HTTP de cada uno).
+
+`/health/db` sigue el mismo contrato: 200 con `{"status": "ok",
+"database": "conectada"}`, o 503 con `{"status": "error", "database":
+"sin conexión"}` si la conexión falla. El detalle de la excepción (que
+podría exponer datos de la conexión a Neon) solo va al log del backend,
+nunca a la respuesta pública.
 
 ### 3. Anthropic (solo para ia-service)
 
