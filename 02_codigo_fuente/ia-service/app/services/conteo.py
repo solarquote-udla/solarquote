@@ -18,7 +18,7 @@ from pydantic import ValidationError
 
 from app.core.config import settings
 from app.schemas.conteo import MAXIMO_VARILLAS, ResultadoConteo
-from app.services.ia import VERSION_API, IaError, IaNoConfigurada
+from app.services.ia import IaError, IaNoConfigurada, pedir_herramienta
 
 MAX_TOKENS = 1024
 TIPOS_MEDIO = {"png": "image/png", "jpg": "image/jpeg"}
@@ -72,43 +72,30 @@ def contar_varillas(contenido: bytes, formato: str) -> ResultadoConteo:
         "max_tokens": MAX_TOKENS,
         "system": INSTRUCCIONES,
         "tools": [HERRAMIENTA],
-        "tool_choice": {"type": "tool", "name": "registrar_conteo"},
+        "tool_choice": {"type": "auto"},
         "messages": [
-            {"role": "user", "content": [imagen, {"type": "text", "text": "Cuenta los extremos de varilla de esta foto."}]}
+            {
+                "role": "user",
+                "content": [
+                    imagen,
+                    {"type": "text", "text": "Cuenta los extremos de varilla de esta foto y regístralo con la herramienta registrar_conteo."},
+                ],
+            }
         ],
     }
+    entrada = pedir_herramienta(
+        cuerpo,
+        "registrar_conteo",
+        tardo="El conteo con IA tardó demasiado. Intenta de nuevo con otra foto.",
+        ilegible="La IA devolvió un conteo que no se pudo interpretar. Intenta de nuevo.",
+    )
     try:
-        respuesta = httpx.post(
-            settings.ANTHROPIC_URL,
-            json=cuerpo,
-            headers={
-                "x-api-key": settings.ANTHROPIC_API_KEY,
-                "anthropic-version": VERSION_API,
-                "content-type": "application/json",
-            },
-            timeout=settings.ANTHROPIC_TIMEOUT_SEGUNDOS,
-        )
-    except httpx.TimeoutException as exc:
-        raise IaError("El conteo con IA tardó demasiado. Intenta de nuevo con otra foto.") from exc
-    except httpx.RequestError as exc:
-        raise IaError("No se pudo conectar con el servicio de IA.") from exc
-
-    if respuesta.status_code != 200:
-        # El detalle de Anthropic puede incluir datos de la cuenta: no se reenvía
-        raise IaError(f"El servicio de IA respondió con un error ({respuesta.status_code}).")
-
-    try:
-        entrada = next(
-            parte["input"]
-            for parte in respuesta.json().get("content", [])
-            if parte.get("type") == "tool_use" and parte.get("name") == "registrar_conteo"
-        )
         resultado = ResultadoConteo(
             cantidad=entrada["cantidad"],
             confianza=entrada["confianza"],
             advertencias=[str(a) for a in entrada.get("advertencias", [])],
         )
-    except (StopIteration, KeyError, ValueError, TypeError, AttributeError, ValidationError) as exc:
+    except (KeyError, ValueError, TypeError, AttributeError, ValidationError) as exc:
         raise IaError("La IA devolvió un conteo que no se pudo interpretar. Intenta de nuevo.") from exc
 
     if resultado.cantidad == 0 and not resultado.advertencias:
