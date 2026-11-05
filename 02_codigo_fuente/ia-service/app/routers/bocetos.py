@@ -4,7 +4,8 @@ Endpoint de interpretación de bocetos — RF-04.
   POST /api/bocetos/interpretar   (multipart, campo "archivo")
 
 Solo lo llama la API principal, con el secreto compartido. Los DXF se
-leen directamente con ezdxf; los PDF e imágenes, con la API de Claude.
+leen directamente con ezdxf; los PDF, por su geometría si vienen de CAD
+y si no con la API de Claude; las imágenes, con la API de Claude.
 
 Errores:
   401  falta el secreto compartido
@@ -20,9 +21,10 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from app.core.config import settings
 from app.core.dependencies import requiere_secreto_compartido
 from app.schemas.boceto import ResultadoInterpretacion
-from app.services.dxf import DxfIlegible, interpretar_dxf
+from app.services.dxf import DxfIlegible
 from app.services.formato import FormatoNoAdmitido, detectar_formato
-from app.services.ia import IaError, IaNoConfigurada, interpretar_con_ia
+from app.services.ia import IaError, IaNoConfigurada
+from app.services.lectura import interpretar_boceto
 
 router = APIRouter(
     prefix="/api/bocetos",
@@ -46,9 +48,7 @@ def interpretar(archivo: UploadFile = File(...)) -> ResultadoInterpretacion:
         raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, str(exc)) from exc
 
     try:
-        if formato == "dxf":
-            return interpretar_dxf(contenido)
-        return interpretar_con_ia(contenido, formato)
+        return interpretar_boceto(contenido, formato)
     except DxfIlegible as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
     except IaNoConfigurada as exc:

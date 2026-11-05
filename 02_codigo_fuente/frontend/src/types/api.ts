@@ -727,8 +727,8 @@ export interface Boceto {
   nombre_archivo: string;
   formato: FormatoBoceto;
   tamano_bytes: number;
-  /** "dxf": lectura directa de la geometría; "ia": Claude */
-  metodo: "dxf" | "ia";
+  /** "dxf" y "pdf": lectura directa de la geometría (DXF o PDF de CAD); "ia": Claude */
+  metodo: "dxf" | "pdf" | "ia";
   advertencias: string[];
   bloques: BloqueBoceto[];
   total_paneles: number;

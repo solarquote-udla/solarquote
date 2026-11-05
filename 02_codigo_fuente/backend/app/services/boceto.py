@@ -64,7 +64,7 @@ class _BloqueRecibido(BaseModel):
 
 class _ResultadoRecibido(BaseModel):
     formato: str = Field(pattern="^(pdf|png|jpg|dxf)$")
-    metodo: str = Field(pattern="^(dxf|ia)$")
+    metodo: str = Field(pattern="^(dxf|pdf|ia)$")
     bloques: list[_BloqueRecibido]
     advertencias: list[str] = []
 
