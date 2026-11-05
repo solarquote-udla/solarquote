@@ -47,7 +47,8 @@ def llamadas(monkeypatch, con_clave):
     return registro
 
 
-def test_pdf_se_envia_como_documento_con_herramienta_obligatoria(llamadas):
+def test_pdf_que_no_se_puede_renderizar_va_como_documento(llamadas):
+    """Un PDF que pypdfium2 no abre (aquí, uno falso) se envía como documento, como antes del mosaico."""
     r = interpretar_con_ia(PDF, "pdf")
     assert r.metodo == "ia" and r.formato == "pdf"
     assert [(b.paneles_largo, b.paneles_ancho, b.repeticiones) for b in r.bloques] == [(4, 24, 30), (4, 10, 2)]
@@ -202,3 +203,21 @@ def test_un_error_de_anthropic_queda_en_el_log_sin_la_clave(monkeypatch, con_cla
         interpretar_con_ia(PDF, "pdf")
     assert "tool_choice no admitido" in caplog.text
     assert "sk-ant-prueba" not in caplog.text
+
+
+def test_pdf_real_se_envia_como_mosaico_de_imagenes(llamadas):
+    """Un PDF que se puede renderizar va como imágenes, no como documento (el modelo no veía la grilla)."""
+    import io
+
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (842, 1191), "white").save(buffer, format="PDF")
+    r = interpretar_con_ia(buffer.getvalue(), "pdf")
+    assert r.metodo == "ia"
+    contenido = llamadas[0]["json"]["messages"][0]["content"]
+    tipos = [parte["type"] for parte in contenido]
+    assert "document" not in tipos
+    assert tipos.count("image") == 5
+    assert contenido[-1]["text"].endswith("registrar_bloques.")
+
