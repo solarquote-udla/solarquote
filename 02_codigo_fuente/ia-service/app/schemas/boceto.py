@@ -11,7 +11,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 
 Formato = Literal["pdf", "png", "jpg", "dxf"]
-Metodo = Literal["dxf", "ia"]
+Metodo = Literal["dxf", "pdf", "ia"]  # pdf: geometría del PDF, sin IA
 Orientacion = Literal["vertical", "horizontal"]
 
 # Mismo largo que bloques_boceto.etiqueta en la API principal (revisión del PR #44)

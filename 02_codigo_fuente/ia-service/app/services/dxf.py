@@ -178,27 +178,19 @@ def _letra(indice: int) -> str:
     return letras
 
 
-def interpretar_dxf(contenido: bytes) -> ResultadoInterpretacion:
-    ruta = None
-    try:
-        with tempfile.NamedTemporaryFile(suffix=".dxf", delete=False) as tmp:
-            tmp.write(contenido)
-            ruta = tmp.name
-        documento, _auditor = recover.readfile(ruta)
-    except (DXFStructureError, OSError, UnicodeDecodeError) as exc:
-        raise DxfIlegible("No se pudo leer el archivo DXF. Vuelve a exportarlo desde AutoCAD.") from exc
-    finally:
-        if ruta and os.path.exists(ruta):
-            os.remove(ruta)
+class SinPaneles(ValueError):
+    """En los rectángulos no hay paneles, o solo hay paneles sueltos (args[0]: "sin paneles" o "solo sueltos")."""
 
-    rects: list[_Rect] = []
-    _recolectar(documento.modelspace(), rects)
+
+def bloques_desde_rectangulos(rects: list[_Rect]) -> tuple[list[BloqueDetectado], list[str]]:
+    """
+    Pasos 2 a 5 del módulo: del conjunto de rectángulos del dibujo a los
+    tipos de bloque (L, A, B) con sus advertencias. Lo usan el DXF y la
+    lectura por geometría del PDF (pdf_vectorial.py).
+    """
     rects = [r for r in rects if r.largo / r.corto > 1.05]  # un panel nunca es cuadrado
     if not rects:
-        raise DxfIlegible(
-            "No se encontraron paneles en el DXF. Cada panel debe estar dibujado como una polilínea "
-            "cerrada o como un bloque insertado."
-        )
+        raise SinPaneles("sin paneles")
 
     tamano, _ = Counter(_clave_tamano(r) for r in rects).most_common(1)[0]
     base = next(r for r in rects if _clave_tamano(r) == tamano)
@@ -242,7 +234,7 @@ def interpretar_dxf(contenido: bytes) -> ResultadoInterpretacion:
         tipos[(L, A)] += 1
 
     if not tipos:
-        raise DxfIlegible("Se encontraron paneles sueltos, pero ningún bloque de dos o más paneles.")
+        raise SinPaneles("solo sueltos")
 
     orden = sorted(tipos.items(), key=lambda item: (-item[1], -item[0][1], -item[0][0]))
     bloques = [
@@ -280,4 +272,31 @@ def interpretar_dxf(contenido: bytes) -> ResultadoInterpretacion:
             f"de a dos. Corrígelos en la confirmación."
         )
 
+    return bloques, advertencias
+
+
+def interpretar_dxf(contenido: bytes) -> ResultadoInterpretacion:
+    ruta = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".dxf", delete=False) as tmp:
+            tmp.write(contenido)
+            ruta = tmp.name
+        documento, _auditor = recover.readfile(ruta)
+    except (DXFStructureError, OSError, UnicodeDecodeError) as exc:
+        raise DxfIlegible("No se pudo leer el archivo DXF. Vuelve a exportarlo desde AutoCAD.") from exc
+    finally:
+        if ruta and os.path.exists(ruta):
+            os.remove(ruta)
+
+    rects: list[_Rect] = []
+    _recolectar(documento.modelspace(), rects)
+    try:
+        bloques, advertencias = bloques_desde_rectangulos(rects)
+    except SinPaneles as exc:
+        if exc.args[0] == "solo sueltos":
+            raise DxfIlegible("Se encontraron paneles sueltos, pero ningún bloque de dos o más paneles.") from exc
+        raise DxfIlegible(
+            "No se encontraron paneles en el DXF. Cada panel debe estar dibujado como una polilínea "
+            "cerrada o como un bloque insertado."
+        ) from exc
     return ResultadoInterpretacion(formato="dxf", metodo="dxf", bloques=bloques, advertencias=advertencias)

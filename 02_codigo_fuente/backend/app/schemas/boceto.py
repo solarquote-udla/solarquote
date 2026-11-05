@@ -70,7 +70,7 @@ class BocetoLeer(BaseModel):
     nombre_archivo: str
     formato: Literal["pdf", "png", "jpg", "dxf"]
     tamano_bytes: int
-    metodo: Literal["dxf", "ia"]
+    metodo: Literal["dxf", "pdf", "ia"]  # pdf: geometría del PDF de CAD, sin IA
     advertencias: list[str]
     bloques: list[BloqueBocetoLeer]
     total_paneles: int
