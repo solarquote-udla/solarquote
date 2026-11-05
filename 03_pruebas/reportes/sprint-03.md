@@ -52,7 +52,7 @@ y de la documentación por cada PR).
 
 | Archivo | Pruebas | Qué verifica |
 |---|---|---|
-| `test_boceto_despacho.py` / `test_validacion_*.py` (#50) | 30 | Despacho, recepción, locking `FOR UPDATE`, CHECKs de la base (RF-14 a RF-16) |
+| `test_validacion.py` (#50) | 30 | Despacho, recepción, locking `FOR UPDATE`, CHECKs de la base (RF-14 a RF-16) |
 | `ia: test_conteo.py` (#50) | 14 | Conteo de varillas por IA |
 | `test_proforma_documentos.py` (#52, #54) | 23 | Generación de Word/Excel, formato institucional, `_numero`/`_porcentaje`/`_pluralizar` |
 | `test_generar_diagrama_er.py` (#53) | 7 | El diagrama generado tiene 24 tablas y la cardinalidad correcta |
@@ -83,19 +83,19 @@ y de la documentación por cada PR).
 raíz — un comportamiento real de producción (la API de Anthropic) o de un
 caso real (un boceto de HEXtructure) que ninguna prueba simulada puede
 ejercitar, porque las pruebas simuladas devuelven exactamente lo que se les
-programa. Los dos se encontraron probando contra la API real antes de
-integrar (#57) o midiendo con `scripts/evaluar_ia.py` contra un boceto real
-(#60, #58), no con la suite automatizada. El resto de los defectos — todos
+programa. El primero se encontró en producción, al activar la clave real
+de Anthropic en Railway (#57); el segundo, midiendo con
+`scripts/evaluar_ia.py` contra un boceto real (#60, #58) — ninguno de los
+dos lo detectó la suite automatizada. El resto de los defectos — todos
 medios y bajos — salieron de revisión de código, igual que en el Sprint 2.
 
 **Nota aparte, sin severidad de código:** durante este corte se encontraron
 y corrigieron dos discrepancias de proceso, no de software: tickets de
 Jira marcados "Finalizada" antes de que el código existiera (RF-07) y
 otros "Tareas por hacer" ya completamente implementados (RF-10, RF-11,
-RF-13); y un caso en el que datos reales de HEXtructure (RUC, cuenta
-bancaria) quedaron por error en un archivo de pruebas versionado, antes de
-llegar a commitearse — lo bloqueó el clasificador de seguridad del entorno
-de desarrollo.
+RF-13); y un caso en el que datos reales de HEXtructure quedaron por error
+en un archivo de pruebas versionado, detectado antes de llegar a
+commitearse — esos datos van en variables de entorno, nunca en el código.
 
 ---
 
