@@ -25,6 +25,7 @@ encontrados por severidad y correcciones aplicadas.
 - [Estrategia de pruebas](estrategia/ESTRATEGIA-PRUEBAS.md)
 - [Matriz de trazabilidad requisitos → pruebas](trazabilidad/MATRIZ-TRAZABILIDAD.md)
 - [Protocolo de pruebas de aceptación](aceptacion/PROTOCOLO-ACEPTACION.md)
+- [Procedimiento de disponibilidad (RNF-06)](fiabilidad/RNF-06-DISPONIBILIDAD.md)
 - [Reporte del Sprint 2](reportes/sprint-02.md)
 
 ### `aceptacion/`
@@ -33,6 +34,12 @@ Protocolo de las pruebas de aceptación con HEXtructure (casos, mediciones
 de RNF-01 y RNF-03, tiempo por cotización y cuestionario SUS) y el
 registro que se llena en cada sesión. Los casos reales (bocetos, proformas
 y fotos) no se suben: la carpeta `casos/` está excluida de git.
+
+### `fiabilidad/`
+
+Procedimiento para medir la disponibilidad (RNF-06) con las métricas de
+Railway y los `/health` de los tres servicios, y el registro de cada
+revisión.
 
 ### `trazabilidad/`
 
