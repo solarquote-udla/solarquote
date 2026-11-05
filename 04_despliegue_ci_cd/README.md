@@ -9,6 +9,7 @@ Configuración y documentación del despliegue del sistema.
 | Documento | Descripción |
 |---|---|
 | `DESPLIEGUE.md` | Procedimiento completo de publicación en Railway, Vercel y Neon, incluyendo variables de entorno, separación de bases de datos y resolución de problemas frecuentes. |
+| `DATOS-DE-PRUEBA.md` | Cómo identificar clientes y proyectos de prueba que hayan quedado en producción, y la propuesta para darlos de baja antes de la aceptación con HEXtructure. |
 
 ### `configuracion/`
 

@@ -18,11 +18,11 @@ requisito es la corrida verde del PR indicado.
 
 | Componente | Pruebas | Cobertura de líneas | Cómo se ejecutan |
 |---|---|---|---|
-| Backend (API principal) | 500 | 96 % | `pytest` en `02_codigo_fuente/backend` |
+| Backend (API principal) | 503 | 96 % | `pytest` en `02_codigo_fuente/backend` |
 | calc-service | 32 | 100 % | `pytest` en `02_codigo_fuente/calc-service` |
 | ia-service | 96 | 94 % | `pytest` en `02_codigo_fuente/ia-service` |
 | Frontend (interfaz) | 172 | — | `npm test` en `02_codigo_fuente/frontend` |
-| **Total** | **800** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
+| **Total** | **803** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
 
 La cobertura se midió con `pytest --cov=app`. RNF-02 pide al menos 60 %
 en el backend.
