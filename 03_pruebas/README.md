@@ -27,6 +27,7 @@ encontrados por severidad y correcciones aplicadas.
 - [Protocolo de pruebas de aceptación](aceptacion/PROTOCOLO-ACEPTACION.md)
 - [Checklist de compatibilidad (RNF-05)](compatibilidad/CHECKLIST-RNF-05.md)
 - [Reporte del Sprint 2](reportes/sprint-02.md)
+- [Reporte del Sprint 3](reportes/sprint-03.md)
 
 ### `aceptacion/`
 
