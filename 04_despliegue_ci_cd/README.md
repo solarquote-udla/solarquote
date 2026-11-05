@@ -30,9 +30,13 @@ plataformas los leen desde ubicaciones fijas:
 | Servicio | Plataforma | Plan | Costo aproximado |
 |---|---|---|---|
 | Frontend | Vercel | Hobby | Sin costo |
-| Backend principal | Railway | Hobby | 5 USD/mes |
-| Microservicio de cálculo | Railway | Hobby | 5 USD/mes |
-| Base de datos | Neon | Free | Sin costo |
+| Backend principal, microservicio de cálculo y microservicio de IA (tres servicios, un solo proyecto) | Railway | Hobby | 5 USD/mes, con 5 USD de uso incluidos; el excedente se cobra aparte |
+| Base de datos | Neon | Free | Sin costo — ver la nota de abajo sobre el límite de almacenamiento |
+| API de Claude (Anthropic), usada por el microservicio de IA | Anthropic | Prepago | Según uso; se define un límite de gasto mensual en la consola |
+
+Los bocetos y las fotos de validación se guardan en la base (no en un
+almacenamiento aparte), así que cuentan contra el límite de Neon Free.
+Conviene vigilarlo según crece el uso real.
 
 ## Separación de entornos
 
@@ -48,8 +52,8 @@ siguiente despliegue fallaría al no encontrar el archivo correspondiente.
 ## Despliegue continuo
 
 ```
-merge a main → Railway redespliega backend y microservicios
-             → Vercel redespliega el frontend
+merge a develop → Railway redespliega backend, calc-service e ia-service
+                → Vercel redespliega el frontend
 ```
 
 Cada pull request genera además una previsualización en Vercel con URL
