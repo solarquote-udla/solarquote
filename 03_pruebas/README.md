@@ -37,8 +37,10 @@ y fotos) no se suben: la carpeta `casos/` está excluida de git.
 
 ### `fiabilidad/`
 
-Procedimiento para medir la disponibilidad (RNF-06) con las métricas de
-Railway y los `/health` de los tres servicios, y el registro de cada
+Procedimiento para medir la disponibilidad (RNF-06) con un monitor
+externo (UptimeRobot) sobre los `/health` del backend, incluido
+`/health/servicios` (que cubre a calc-service e ia-service por la red
+interna de Railway, sin dominio público), y el registro de cada
 revisión.
 
 ### `trazabilidad/`
@@ -48,13 +50,13 @@ código por servicio y los huecos pendientes.
 
 ## Cobertura actual
 
-Corte del 27 de octubre de 2026: **800 pruebas automatizadas**, todas
+Corte del 5 de noviembre de 2026: **804 pruebas automatizadas**, todas
 aprobadas. Detalle por requisito en la
 [matriz de trazabilidad](trazabilidad/MATRIZ-TRAZABILIDAD.md).
 
 | Componente | Pruebas | Cobertura de líneas |
 |---|---|---|
-| Backend (API principal) | 500 | 96 % |
+| Backend (API principal) | 504 | 96 % |
 | calc-service | 32 | 100 % |
 | ia-service | 96 | 94 % |
 | Frontend (interfaz) | 172 | — |
