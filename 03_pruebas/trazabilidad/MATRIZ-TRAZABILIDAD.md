@@ -31,7 +31,7 @@ en el backend.
 |---|---|
 | Cubiertos por pruebas automatizadas | RF-01 a RF-16; RNF-01 (layout), RNF-02, RNF-03, RNF-04 |
 | Implementación pendiente | Ninguna |
-| Requieren verificación fuera del CI | RNF-01 (precisión con bocetos reales y del conteo de varillas con fotos reales) y RNF-03 (boceto con IA), con el [protocolo de aceptación](../aceptacion/PROTOCOLO-ACEPTACION.md); RNF-05, RNF-06 |
+| Requieren verificación fuera del CI | RNF-01 (precisión con bocetos reales y del conteo de varillas con fotos reales) y RNF-03 (boceto con IA), con el [protocolo de aceptación](../aceptacion/PROTOCOLO-ACEPTACION.md); RNF-05, con la [checklist de compatibilidad](../compatibilidad/CHECKLIST-RNF-05.md); RNF-06 |
 
 **Convenciones.** Los archivos `test_*.py` son del backend salvo que se
 indique otro servicio. Los nombres terminados en `.test.tsx` son pruebas de
@@ -273,7 +273,7 @@ Evidencia: PR #40 y #43.
 | **RNF-04** Seguridad | 100 % de las funcionalidades autenticadas | `test_seguridad`: `test_ningun_endpoint_queda_abierto` | Cumple |
 | | bcrypt con factor ≥ 10 | `test_rnf`: `test_rnf04_bcrypt_con_factor_de_al_menos_10` (factor 12) | Cumple |
 | | Expiración tras 30 minutos de inactividad | `inactividad.test.tsx` | Cumple desde este corte |
-| **RNF-05** Compatibilidad | Chrome, Firefox, Safari y Edge recientes | Revisión manual en cada navegador (etapa de pruebas de sistema) | Pendiente |
+| **RNF-05** Compatibilidad | Chrome, Firefox, Safari y Edge recientes | Revisión manual en cada navegador, con la [checklist de compatibilidad](../compatibilidad/CHECKLIST-RNF-05.md) | Pendiente de medición |
 | **RNF-06** Fiabilidad | Disponibilidad ≥ 99 %, recuperación ≤ 5 min | Endpoints `/health` probados (`calc: test_health`, `test_cors`); medición con el monitoreo de Railway | Pendiente de medición |
 
 ---
