@@ -34,6 +34,22 @@ def _crear_material_con_precio(db: Session, codigo: str, precio: Decimal = Decim
     return material
 
 
+def test_tablas_migradas_true_si_ya_existen(db: Session) -> None:
+    assert datos_demo._tablas_migradas(db) is True
+
+
+def test_main_avisa_correr_alembic_en_vez_del_error_crudo_de_sql(monkeypatch, capsys) -> None:
+    """Sin migraciones, la primera consulta del script revienta con el error
+    crudo de Postgres si no se revisa antes (ver el docstring de
+    _tablas_migradas)."""
+    monkeypatch.setattr(datos_demo, "_tablas_migradas", lambda db: False)
+
+    assert datos_demo.main() == 1
+
+    salida = capsys.readouterr().out
+    assert "alembic upgrade head" in salida
+
+
 def test_gerente_activo_encuentra_al_unico_usuario_con_acceso_total(db: Session) -> None:
     assert datos_demo._gerente_activo(db) is None
 

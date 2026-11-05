@@ -30,6 +30,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from sqlalchemy import inspect  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
 from app.core.config import settings  # noqa: E402
@@ -81,6 +82,15 @@ CODIGOS_MATERIAL_REQUERIDOS = sorted(CODIGOS_FORMULA | {CODIGO_LOGISTICA})
 # Terreno rectangular de 100 x 60 m: el mismo tamaño que usan las
 # pruebas del layout, de sobra para una planta de demostración.
 TERRENO_DEMO = [[0, 0], [100, 0], [100, 60], [0, 60]]
+
+
+def _tablas_migradas(db: Session) -> bool:
+    """
+    Si no se corrieron las migraciones, la primera consulta del script
+    revienta con el error crudo de Postgres ("relation 'usuarios' does
+    not exist"). Se revisa antes, para dar el aviso correcto.
+    """
+    return inspect(db.get_bind()).has_table("usuarios")
 
 
 def _gerente_activo(db: Session) -> Usuario | None:
@@ -222,6 +232,11 @@ def main() -> int:
 
     db = SessionLocal()
     try:
+        if not _tablas_migradas(db):
+            print("Error: La base no tiene las tablas del sistema.")
+            print("  Corre primero:  alembic upgrade head")
+            return 1
+
         gerente = _gerente_activo(db)
         if gerente is None:
             print("Error: No hay un Gerente General activo.")
