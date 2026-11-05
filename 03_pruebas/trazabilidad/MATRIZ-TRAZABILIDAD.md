@@ -1,8 +1,8 @@
 # Matriz de trazabilidad requisitos → pruebas
 
-Historia: SQ-135 · Corte: 27 de octubre de 2026 (con el documento de la
-proforma y el módulo de validación de materiales) · Complementa la Tabla 44
-del documento de titulación (sección 7.3).
+Historia: SQ-135 · Corte: 5 de noviembre de 2026 (con el endpoint
+`/health/servicios` del RNF-06) · Complementa la Tabla 44 del documento
+de titulación (sección 7.3).
 
 Esta matriz conecta cada requisito de la especificación (secciones 2.1.3 y
 2.1.4 del documento: RF-01 a RF-16 y RNF-01 a RNF-06) con las pruebas
@@ -18,11 +18,11 @@ requisito es la corrida verde del PR indicado.
 
 | Componente | Pruebas | Cobertura de líneas | Cómo se ejecutan |
 |---|---|---|---|
-| Backend (API principal) | 502 | 96 % | `pytest` en `02_codigo_fuente/backend` |
+| Backend (API principal) | 506 | 96 % | `pytest` en `02_codigo_fuente/backend` |
 | calc-service | 32 | 100 % | `pytest` en `02_codigo_fuente/calc-service` |
 | ia-service | 96 | 94 % | `pytest` en `02_codigo_fuente/ia-service` |
 | Frontend (interfaz) | 172 | — | `npm test` en `02_codigo_fuente/frontend` |
-| **Total** | **802** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
+| **Total** | **806** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
 
 La cobertura se midió con `pytest --cov=app`. RNF-02 pide al menos 60 %
 en el backend.
@@ -31,7 +31,7 @@ en el backend.
 |---|---|
 | Cubiertos por pruebas automatizadas | RF-01 a RF-16; RNF-01 (layout), RNF-02, RNF-03, RNF-04 |
 | Implementación pendiente | Ninguna |
-| Requieren verificación fuera del CI | RNF-01 (precisión con bocetos reales y del conteo de varillas con fotos reales) y RNF-03 (boceto con IA), con el [protocolo de aceptación](../aceptacion/PROTOCOLO-ACEPTACION.md); RNF-05, con la [checklist de compatibilidad](../compatibilidad/CHECKLIST-RNF-05.md); RNF-06 |
+| Requieren verificación fuera del CI | RNF-01 (precisión con bocetos reales y del conteo de varillas con fotos reales) y RNF-03 (boceto con IA), con el [protocolo de aceptación](../aceptacion/PROTOCOLO-ACEPTACION.md); RNF-05, con la [checklist de compatibilidad](../compatibilidad/CHECKLIST-RNF-05.md); RNF-06, con el [procedimiento de disponibilidad](../fiabilidad/RNF-06-DISPONIBILIDAD.md) |
 
 **Convenciones.** Los archivos `test_*.py` son del backend salvo que se
 indique otro servicio. Los nombres terminados en `.test.tsx` son pruebas de
@@ -274,7 +274,7 @@ Evidencia: PR #40 y #43.
 | | bcrypt con factor ≥ 10 | `test_rnf`: `test_rnf04_bcrypt_con_factor_de_al_menos_10` (factor 12) | Cumple |
 | | Expiración tras 30 minutos de inactividad | `inactividad.test.tsx` | Cumple desde este corte |
 | **RNF-05** Compatibilidad | Chrome, Firefox, Safari y Edge recientes | Revisión manual en cada navegador, con la [checklist de compatibilidad](../compatibilidad/CHECKLIST-RNF-05.md) | Pendiente de medición |
-| **RNF-06** Fiabilidad | Disponibilidad ≥ 99 %, recuperación ≤ 5 min | Endpoints `/health` probados (`calc: test_health`, `test_cors`); medición con el monitoreo de Railway | Pendiente de medición |
+| **RNF-06** Fiabilidad | Disponibilidad ≥ 99 %, recuperación ≤ 5 min | Endpoints `/health` probados (`calc: test_health`, `test_cors`, `test_health`: `/health/servicios`); medición con el [procedimiento de disponibilidad](../fiabilidad/RNF-06-DISPONIBILIDAD.md) (UptimeRobot) | Pendiente de medición |
 
 ---
 

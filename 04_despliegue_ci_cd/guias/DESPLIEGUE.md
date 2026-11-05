@@ -163,7 +163,7 @@ Tenerlos en el mismo proyecto permite que se comuniquen por red interna.
 > haya salido bien. Actívalo en los tres servicios (backend, calc-service
 > e ia-service).
 
-Renómbralo a `solarquote-calc`.
+Renómbralo a `calc-service`.
 
 Variables:
 
@@ -180,7 +180,7 @@ Railway expone variables internas entre servicios del mismo proyecto.
 En el servicio **backend**, agrega:
 
 ```
-CALC_SERVICE_URL=http://solarquote-calc.railway.internal:8080
+CALC_SERVICE_URL=http://calc-service.railway.internal:8080
 ```
 
 > La red interna no sale a internet: es más rápida y no consume ancho de
