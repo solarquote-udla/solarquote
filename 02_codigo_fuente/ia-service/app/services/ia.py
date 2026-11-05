@@ -14,6 +14,7 @@ servicio de cálculo en la API principal.
 """
 
 import base64
+import logging
 
 import httpx
 from pydantic import ValidationError
@@ -23,6 +24,13 @@ from app.schemas.boceto import MAXIMO_ETIQUETA, BloqueDetectado, ResultadoInterp
 
 VERSION_API = "2023-06-01"
 MAX_TOKENS = 4096
+
+# Los modelos actuales no admiten forzar la herramienta (tool_choice "tool"
+# o "any": la API responde 400). Se pide en modo "auto" y, si el modelo
+# contesta sin usar la herramienta, se repite una vez antes de rendirse.
+INTENTOS = 2
+
+log = logging.getLogger(__name__)
 
 TIPOS_MEDIO = {"pdf": "application/pdf", "png": "image/png", "jpg": "image/jpeg"}
 
@@ -99,6 +107,52 @@ def _contenido(formato: str, datos: bytes) -> dict:
     return {"type": "document" if formato == "pdf" else "image", "source": fuente}
 
 
+def pedir_herramienta(cuerpo: dict, herramienta: str, *, tardo: str, ilegible: str) -> dict:
+    """
+    Llama a la API de Claude y devuelve la entrada con la que el modelo usó
+    la herramienta. Si el modelo responde sin usarla, lo intenta una vez más.
+    El detalle de un error de Anthropic va al log del servicio (no incluye la
+    clave), nunca al usuario.
+    """
+    for intento in range(1, INTENTOS + 1):
+        try:
+            respuesta = httpx.post(
+                settings.ANTHROPIC_URL,
+                json=cuerpo,
+                headers={
+                    "x-api-key": settings.ANTHROPIC_API_KEY,
+                    "anthropic-version": VERSION_API,
+                    "content-type": "application/json",
+                },
+                timeout=settings.ANTHROPIC_TIMEOUT_SEGUNDOS,
+            )
+        except httpx.TimeoutException as exc:
+            raise IaError(tardo) from exc
+        except httpx.RequestError as exc:
+            raise IaError("No se pudo conectar con el servicio de IA.") from exc
+
+        if respuesta.status_code != 200:
+            try:
+                detalle = respuesta.json().get("error", {})
+            except ValueError:
+                detalle = {}
+            log.warning("Anthropic respondió %s: %s", respuesta.status_code, detalle)
+            raise IaError(f"El servicio de IA respondió con un error ({respuesta.status_code}).")
+
+        try:
+            partes = respuesta.json().get("content", [])
+            return next(
+                parte["input"]
+                for parte in partes
+                if parte.get("type") == "tool_use" and parte.get("name") == herramienta
+            )
+        except StopIteration:
+            log.warning("La IA respondió sin usar %s (intento %s de %s)", herramienta, intento, INTENTOS)
+        except (KeyError, ValueError, TypeError, AttributeError) as exc:
+            raise IaError(ilegible) from exc
+    raise IaError(ilegible)
+
+
 def interpretar_con_ia(contenido: bytes, formato: str) -> ResultadoInterpretacion:
     if not settings.ANTHROPIC_API_KEY:
         raise IaNoConfigurada(
@@ -111,46 +165,30 @@ def interpretar_con_ia(contenido: bytes, formato: str) -> ResultadoInterpretacio
         "max_tokens": MAX_TOKENS,
         "system": INSTRUCCIONES,
         "tools": [HERRAMIENTA],
-        "tool_choice": {"type": "tool", "name": "registrar_bloques"},
+        "tool_choice": {"type": "auto"},
         "messages": [
             {
                 "role": "user",
                 "content": [
                     _contenido(formato, contenido),
-                    {"type": "text", "text": "Identifica los bloques de paneles de este boceto."},
+                    {
+                        "type": "text",
+                        "text": "Identifica los bloques de paneles de este boceto y regístralos con la herramienta registrar_bloques.",
+                    },
                 ],
             }
         ],
     }
+    entrada = pedir_herramienta(
+        cuerpo,
+        "registrar_bloques",
+        tardo="El análisis con IA tardó demasiado. Intenta de nuevo o carga un archivo más liviano.",
+        ilegible="La IA devolvió un resultado que no se pudo interpretar. Intenta de nuevo.",
+    )
     try:
-        respuesta = httpx.post(
-            settings.ANTHROPIC_URL,
-            json=cuerpo,
-            headers={
-                "x-api-key": settings.ANTHROPIC_API_KEY,
-                "anthropic-version": VERSION_API,
-                "content-type": "application/json",
-            },
-            timeout=settings.ANTHROPIC_TIMEOUT_SEGUNDOS,
-        )
-    except httpx.TimeoutException as exc:
-        raise IaError("El análisis con IA tardó demasiado. Intenta de nuevo o carga un archivo más liviano.") from exc
-    except httpx.RequestError as exc:
-        raise IaError("No se pudo conectar con el servicio de IA.") from exc
-
-    if respuesta.status_code != 200:
-        # El detalle de Anthropic puede incluir datos de la cuenta: no se reenvía al usuario
-        raise IaError(f"El servicio de IA respondió con un error ({respuesta.status_code}).")
-
-    try:
-        bloques_crudos = next(
-            parte["input"]
-            for parte in respuesta.json().get("content", [])
-            if parte.get("type") == "tool_use" and parte.get("name") == "registrar_bloques"
-        )
-        bloques = [BloqueDetectado(**b) for b in bloques_crudos.get("bloques", [])]
-        advertencias = [str(a) for a in bloques_crudos.get("advertencias", [])]
-    except (StopIteration, ValueError, TypeError, AttributeError, ValidationError) as exc:
+        bloques = [BloqueDetectado(**b) for b in entrada.get("bloques", [])]
+        advertencias = [str(a) for a in entrada.get("advertencias", [])]
+    except (ValueError, TypeError, AttributeError, ValidationError) as exc:
         raise IaError("La IA devolvió un resultado que no se pudo interpretar. Intenta de nuevo.") from exc
 
     if not bloques:

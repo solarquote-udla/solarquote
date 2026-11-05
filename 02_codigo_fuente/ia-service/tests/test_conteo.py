@@ -58,7 +58,8 @@ def test_la_foto_se_envia_como_imagen_con_herramienta_obligatoria(llamadas):
     (llamada,) = llamadas
     cuerpo = llamada["json"]
     assert cuerpo["model"] == settings.ANTHROPIC_MODEL
-    assert cuerpo["tool_choice"] == {"type": "tool", "name": "registrar_conteo"}
+    assert cuerpo["tool_choice"] == {"type": "auto"}
+    assert cuerpo["tools"][0]["name"] == "registrar_conteo"
     imagen = cuerpo["messages"][0]["content"][0]
     assert imagen["type"] == "image" and imagen["source"]["media_type"] == "image/jpeg"
     assert base64.b64decode(imagen["source"]["data"]) == JPG
@@ -147,3 +148,15 @@ def test_endpoint_sin_clave_responde_503(monkeypatch):
 def test_endpoint_traduce_fallas_de_la_ia_a_502(monkeypatch, con_clave):
     monkeypatch.setattr(conteo.httpx, "post", lambda *a, **k: respuesta(500, json={}))
     assert enviar(PNG).status_code == 502
+
+
+def test_conteo_reintenta_si_responde_sin_la_herramienta(monkeypatch, con_clave):
+    """Igual que en los bocetos: modo auto y un segundo intento si el modelo no usa la herramienta."""
+    sin_herramienta = {"content": [{"type": "text", "text": "Veo un atado de varillas."}]}
+    respuestas = [respuesta(json=sin_herramienta), respuesta()]
+    monkeypatch.setattr(conteo.httpx, "post", lambda *a, **k: respuestas.pop(0))
+    from app.services.conteo import contar_varillas
+
+    r = contar_varillas(b"\xff\xd8\xff\xe0" + b"0" * 100, "jpg")
+    assert r.cantidad == 352
+    assert respuestas == []

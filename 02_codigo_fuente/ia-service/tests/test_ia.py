@@ -58,7 +58,8 @@ def test_pdf_se_envia_como_documento_con_herramienta_obligatoria(llamadas):
     assert llamada["headers"]["anthropic-version"] == ia.VERSION_API
     cuerpo = llamada["json"]
     assert cuerpo["model"] == settings.ANTHROPIC_MODEL
-    assert cuerpo["tool_choice"] == {"type": "tool", "name": "registrar_bloques"}
+    assert cuerpo["tool_choice"] == {"type": "auto"}  # los modelos actuales no admiten forzar la herramienta
+    assert cuerpo["tools"][0]["name"] == "registrar_bloques"
     adjunto = cuerpo["messages"][0]["content"][0]
     assert adjunto["type"] == "document"
     assert adjunto["source"]["media_type"] == "application/pdf"
@@ -159,3 +160,45 @@ def test_la_herramienta_pide_etiquetas_cortas(llamadas):
     interpretar_con_ia(PDF, "pdf")
     esquema = llamadas[0]["json"]["tools"][0]["input_schema"]
     assert esquema["properties"]["bloques"]["items"]["properties"]["etiqueta"]["maxLength"] == 20
+
+
+# ─── Herramienta en modo auto (los modelos actuales no admiten forzarla) ─
+
+
+SIN_HERRAMIENTA = {"content": [{"type": "text", "text": "Veo varios bloques de paneles."}]}
+
+
+def test_si_responde_sin_la_herramienta_lo_intenta_otra_vez(monkeypatch, con_clave):
+    respuestas = [respuesta(200, SIN_HERRAMIENTA), respuesta()]
+    llamadas = []
+
+    def falso_post(url, **kwargs):
+        llamadas.append(kwargs)
+        return respuestas.pop(0)
+
+    monkeypatch.setattr(ia.httpx, "post", falso_post)
+    r = interpretar_con_ia(PDF, "pdf")
+    assert len(llamadas) == 2
+    assert [(b.paneles_largo, b.paneles_ancho, b.repeticiones) for b in r.bloques] == [(4, 24, 30), (4, 10, 2)]
+
+
+def test_sin_la_herramienta_dos_veces_se_rinde(monkeypatch, con_clave):
+    llamadas = []
+
+    def falso_post(url, **kwargs):
+        llamadas.append(kwargs)
+        return respuesta(200, SIN_HERRAMIENTA)
+
+    monkeypatch.setattr(ia.httpx, "post", falso_post)
+    with pytest.raises(IaError, match="no se pudo interpretar"):
+        interpretar_con_ia(PDF, "pdf")
+    assert len(llamadas) == ia.INTENTOS
+
+
+def test_un_error_de_anthropic_queda_en_el_log_sin_la_clave(monkeypatch, con_clave, caplog):
+    error = {"type": "error", "error": {"type": "invalid_request_error", "message": "tool_choice no admitido"}}
+    monkeypatch.setattr(ia.httpx, "post", lambda *a, **k: respuesta(400, error))
+    with pytest.raises(IaError, match=r"error \(400\)"):
+        interpretar_con_ia(PDF, "pdf")
+    assert "tool_choice no admitido" in caplog.text
+    assert "sk-ant-prueba" not in caplog.text
