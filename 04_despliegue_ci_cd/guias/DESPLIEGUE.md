@@ -6,12 +6,18 @@ Guía para dejar SolarQuote corriendo en línea.
 |---|---|---|---|
 | Frontend | Vercel | `02_codigo_fuente/frontend` | Desplegado |
 | Backend principal | Railway | `02_codigo_fuente/backend` | Desplegado |
-| Microservicio de cálculo | Railway | `02_codigo_fuente/calc-service` | Pendiente (ver Parte 2) |
-| Microservicio de bocetos (IA) | Railway | `02_codigo_fuente/ia-service` | Pendiente (ver Parte 2B) |
+| Microservicio de cálculo | Railway | `02_codigo_fuente/calc-service` | Desplegado (ver Parte 2) |
+| Microservicio de bocetos (IA) | Railway | `02_codigo_fuente/ia-service` | Desplegado (ver Parte 2B) |
 | Base de datos | Neon | — | Desplegado |
 
 > **Orden importante:** primero el backend, después el frontend. El frontend
 > necesita conocer la URL del backend para construirse.
+
+> **Regla: los secretos de producción nunca son los mismos que los de
+> desarrollo.** `SECRET_KEY`, `CALC_SERVICE_SECRET`, `IA_SERVICE_SECRET` y
+> `ANTHROPIC_API_KEY` se generan o se cargan aparte para Railway — nunca se
+> copia el valor del `.env` local. Si un `.env` local se filtra alguna vez,
+> producción no se ve afectada.
 
 ---
 
@@ -69,12 +75,13 @@ En el servicio recién creado: **Settings** → **Source**
 | Root Directory | `02_codigo_fuente/backend` |
 | Branch | `develop` |
 
-> **Durante el Sprint 2 se despliega desde `develop`**, para poder iterar
-> sobre la configuración sin ceremonia.
+> **Se despliega desde `develop`** mientras el proyecto sigue en
+> desarrollo activo, para poder iterar sin la ceremonia de un merge a
+> `main` en cada sprint.
 >
-> **Al cerrar el sprint**: se mergea `develop` → `main` y se cambia esta
-> rama a `main`. De ahí en adelante, producción sale de `main` y solo se
-> actualiza al cerrar cada sprint.
+> **Al cerrar el proyecto** (entrega final): se mergea `develop` → `main`
+> y se cambia esta rama a `main`. De ahí en adelante, producción sale
+> solo de `main`.
 
 Renombra el servicio a `solarquote-backend` en **Settings → General**.
 
@@ -92,6 +99,11 @@ Renombra el servicio a `solarquote-backend` en **Settings → General**.
 | `DEBUG` | `False` |
 | `CORS_ORIGINS` | Se llena en el paso 3.4 |
 | `CALC_SERVICE_URL` | Se llena en el paso 2.3 |
+| `CALC_SERVICE_SECRET` | Se llena en el paso 2.3 (DS-05) |
+| `IA_SERVICE_URL` | Se llena en el paso 2B.3 |
+| `IA_SERVICE_SECRET` | Se llena en el paso 2B.3 (DS-05) |
+| `HEXTRUCTURE_RAZON_SOCIAL`, `HEXTRUCTURE_TELEFONO`, `HEXTRUCTURE_CORREO`, `HEXTRUCTURE_DIRECCION`, `HEXTRUCTURE_REPRESENTANTE`, `HEXTRUCTURE_CARGO_REPRESENTANTE` | Datos de la empresa para la proforma (RF-07) — ver `.env.example` para la lista completa |
+| `HEXTRUCTURE_RUC`, `HEXTRUCTURE_BANCO_*` | **Pendientes a propósito** (ver RF-07): el documento los omite mientras no estén listos para publicarse |
 
 Para la `SECRET_KEY` de producción:
 
@@ -126,15 +138,8 @@ Los tres deben responder. `/health/db` confirma que Railway alcanza a Neon.
 
 ## Parte 2 — calc-service en Railway
 
-> **Todavía no se despliega**, a propósito:
->
-> - El backend aún no lo llama: falta el endpoint de orquestación de RF-06.
-> - DS-05 (autenticación entre servicios) sigue abierto.
-> - Un segundo servicio consume el crédito de Railway sin aportar nada
->   mientras nadie lo invoque.
->
-> Se despliega cuando se integre RF-06 y se cierre DS-05. Los pasos quedan
-> documentados para ese momento.
+Desplegado en el mismo proyecto de Railway que el backend, con DS-05
+(autenticación entre servicios) ya cerrado.
 
 ### 2.1 Segundo servicio, mismo proyecto
 
@@ -150,6 +155,13 @@ Tenerlos en el mismo proyecto permite que se comuniquen por red interna.
 |---|---|
 | Root Directory | `02_codigo_fuente/calc-service` |
 | Branch | `develop` |
+| Wait for CI | Activado |
+
+> **Wait for CI** hace que Railway espere a que los checks de GitHub
+> Actions terminen en verde antes de desplegar — así un commit que rompe
+> las pruebas no llega a producción solo porque el build de Railway en sí
+> haya salido bien. Actívalo en los tres servicios (backend, calc-service
+> e ia-service).
 
 Renómbralo a `solarquote-calc`.
 
@@ -160,7 +172,7 @@ Variables:
 | `ENVIRONMENT` | `production` |
 | `DEBUG` | `False` |
 | `CORS_ORIGINS` | La URL del backend |
-| `SERVICIO_SECRETO` | El secreto compartido (ver DS-05) |
+| `CALC_SERVICE_SECRET` | El secreto compartido (ver DS-05); mismo valor que en el backend |
 
 ### 2.3 Conectar backend → calc-service
 
@@ -174,18 +186,21 @@ CALC_SERVICE_URL=http://solarquote-calc.railway.internal:8080
 > La red interna no sale a internet: es más rápida y no consume ancho de
 > banda facturable.
 
-**Atención:** antes de generar un dominio público para calc-service, cierra DS-05
-(autenticación entre servicios). Si solo se comunica internamente, no
-generes dominio — así queda inaccesible desde fuera.
+**calc-service no tiene dominio público** — solo se comunica con el
+backend por la red interna, protegido además por `CALC_SERVICE_SECRET`
+(DS-05). Así queda inaccesible desde fuera del proyecto de Railway.
 
 ---
 
 ## Parte 2B — ia-service en Railway (RF-04)
 
 Lee los bocetos del cliente. Los DXF se procesan directo de la geometría,
-sin IA; los PDF e imágenes se envían a la API de Claude (Anthropic).
-Sin clave de Anthropic el servicio arranca igual: los DXF funcionan y los
-PDF e imágenes responden 503 con un mensaje claro.
+sin IA. Los PDF se intentan igual, por geometría (`pdf_vectorial.py`);
+solo si el PDF no trae los paneles dibujados como vectores (escaneo,
+plano girado) se envía a la API de Claude (Anthropic), igual que las
+imágenes (PNG/JPG), que siempre van por ahí. Sin clave de Anthropic el
+servicio arranca igual: los DXF y los PDF con geometría funcionan; los
+PDF sin geometría y las imágenes responden 503 con un mensaje claro.
 
 ### 2B.1 Tercer servicio, mismo proyecto
 
@@ -195,6 +210,7 @@ PDF e imágenes responden 503 con un mensaje claro.
 |---|---|
 | Root Directory | `02_codigo_fuente/ia-service` |
 | Branch | `develop` |
+| Wait for CI | Activado (ver la nota en la Parte 2) |
 
 ### 2B.2 Variables de ia-service
 
@@ -202,9 +218,14 @@ PDF e imágenes responden 503 con un mensaje claro.
 |---|---|
 | `ENVIRONMENT` | `production` |
 | `DEBUG` | `False` |
+| `PORT` | `8080` — fijo, no lo deja al valor que Railway asigna solo. La URL interna (`solarquote-ia.railway.internal:8080`, paso 2B.3) necesita un puerto estable para apuntar a él |
 | `IA_SERVICE_SECRET` | Secreto aleatorio largo (`python -c "import secrets; print(secrets.token_urlsafe(32))"`) |
 | `ANTHROPIC_API_KEY` | La clave de la API de Anthropic. Solo aquí: nunca en el repositorio ni en un chat |
-| `ANTHROPIC_MODEL` | Opcional. Por defecto el del `.env.example` |
+| `ANTHROPIC_MODEL` | `claude-sonnet-5-5` — se fija explícito en vez de dejarlo en el valor por defecto del código, para que un cambio futuro de ese default no mueva producción sin que alguien lo decida |
+
+No se le genera dominio público: solo lo llama el backend por la red
+interna (`solarquote-ia.railway.internal`). Así nadie de fuera puede
+gastar el crédito de la API de Anthropic.
 
 ### 2B.3 Conectar backend → ia-service
 
@@ -215,9 +236,6 @@ IA_SERVICE_URL=http://solarquote-ia.railway.internal:8080
 IA_SERVICE_SECRET=<el mismo valor que en ia-service>
 ```
 
-No generes dominio público para ia-service: solo lo llama el backend por
-la red interna. Así nadie de fuera puede gastar el crédito de la API.
-
 ### 2B.4 Verificar
 
 Desde el backend, `GET /health` de ia-service debe responder
@@ -226,9 +244,18 @@ clave). En la aplicación, carga un DXF y luego un PDF en **Cargar boceto**.
 
 ### 2B.5 Costo
 
-Cada PDF o imagen es una llamada a la API de Claude, que se cobra por uso.
-Define un límite de gasto mensual en la consola de Anthropic antes de
-cargar la clave en Railway. Los DXF no consumen crédito.
+Cada PDF o imagen que termina llamando a la API de Claude se cobra por
+uso (ver la tabla de costos en `04_despliegue_ci_cd/README.md`). Define
+un límite de gasto mensual en la consola de Anthropic antes de cargar la
+clave en Railway. Los DXF no consumen crédito — se leen por geometría,
+sin llamar a la API. Los PDF exportados de AutoCAD tampoco: si traen los
+paneles dibujados como vectores, también se leen por geometría
+(`pdf_vectorial.py`) y solo caen a la IA cuando el PDF no trae esa
+geometría (escaneo, plano girado).
+
+Railway en sí no cobra aparte por tener tres servicios: backend,
+calc-service e ia-service comparten el mismo proyecto y el mismo plan
+Hobby (ver el costo en el README).
 
 ---
 
@@ -337,8 +364,8 @@ merge a la rama configurada → Railway redespliega backend, calc-service e ia-s
                             → Vercel redespliega frontend
 ```
 
-Durante el Sprint 2 esa rama es `develop`; a partir del cierre del sprint,
-`main`.
+Esa rama es `develop` mientras el proyecto sigue en desarrollo activo; a
+partir del cierre (entrega final), `main`.
 
 Cada PR hacia `develop` genera además una previsualización en Vercel con URL
 propia, que pasa el CORS gracias a `CORS_ORIGIN_REGEX` (ver 3.5 y sus
@@ -364,6 +391,8 @@ puede disparar builds en la cuenta.
 - [ ] Tras iniciar sesión se ve el shell con la barra lateral
 - [ ] Recargar la página en `/validacion` no da 404 (lo resuelve `vercel.json`)
 - [ ] La consola del navegador no muestra errores de CORS
+- [ ] Cargar un boceto en PDF o imagen no responde 503 ni 502 (confirma que ia-service está arriba y `IA_SERVICE_SECRET` coincide en los dos servicios)
+- [ ] Una cotización calcula materiales sin error (confirma calc-service y `CALC_SERVICE_SECRET`)
 
 ---
 
@@ -397,3 +426,28 @@ al final al pegarla.
 **Las migraciones no se aplican**
 Revisa los logs del despliegue. `alembic upgrade head` corre antes de
 uvicorn; si falla, el servicio no arranca.
+
+**Cargar un boceto responde "falta IA_SERVICE_SECRET"**
+Es el backend, no ia-service: `IA_SERVICE_SECRET` no está puesto en el
+servicio **backend** (es opcional ahí — sin él, cargar bocetos responde
+503 en vez de romper el resto de la API). Revisa que tenga el mismo valor
+que en ia-service.
+
+**"No se pudo conectar con el servicio de bocetos / de IA"**
+El backend no alcanza a ia-service. Revisa `IA_SERVICE_URL` en el
+backend: debe ser `http://solarquote-ia.railway.internal:8080` — el
+nombre del servicio tal como quedó renombrado en Railway, y el mismo
+puerto que `PORT` en ia-service (paso 2B.2). Un nombre de servicio mal
+escrito o un `PORT` que no coincide dan este error, no un 404 ni un 502.
+
+**ia-service responde con un error (404)**
+`ANTHROPIC_MODEL` apunta a un nombre de modelo que no existe o ya no está
+disponible en la cuenta de Anthropic. Revisa el valor contra la lista de
+modelos vigentes en la documentación de Anthropic.
+
+**ia-service responde con un error (400)**
+Mensaje de Anthropic del tipo `tool_choice: type "tool" ... not supported
+for this model` — pasó en producción al activar la clave la primera vez
+(ver `fix/ia-tool-choice-auto`, PR #57): algunos modelos no admiten forzar
+la herramienta. Si vuelve a aparecer con un modelo nuevo, revisar si ese
+modelo tiene la misma limitación.
