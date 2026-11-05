@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from app.core.config import settings
 from app.main import app
-from app.services import conteo
+from app.services import conteo, ia  # la llamada HTTP vive en ia.pedir_herramienta
 from app.services.ia import IaError, IaNoConfigurada
 
 client = TestClient(app)
@@ -40,7 +40,7 @@ def llamadas(monkeypatch, con_clave):
         registro.append({"url": url, **kwargs})
         return respuesta()
 
-    monkeypatch.setattr(conteo.httpx, "post", falso_post)
+    monkeypatch.setattr(ia.httpx, "post", falso_post)
     return registro
 
 
@@ -75,7 +75,7 @@ def test_las_instrucciones_explican_que_contar(llamadas):
 
 def test_sin_clave_no_llama_a_la_api(monkeypatch):
     monkeypatch.setattr(settings, "ANTHROPIC_API_KEY", None)
-    monkeypatch.setattr(conteo.httpx, "post", lambda *a, **k: pytest.fail("no debía llamar"))
+    monkeypatch.setattr(ia.httpx, "post", lambda *a, **k: pytest.fail("no debía llamar"))
     with pytest.raises(IaNoConfigurada):
         conteo.contar_varillas(PNG, "png")
 
@@ -90,7 +90,7 @@ def test_sin_clave_no_llama_a_la_api(monkeypatch):
     ],
 )
 def test_respuestas_invalidas_dan_error_sin_filtrar_detalles(monkeypatch, con_clave, falla):
-    monkeypatch.setattr(conteo.httpx, "post", lambda *a, **k: falla())
+    monkeypatch.setattr(ia.httpx, "post", lambda *a, **k: falla())
     with pytest.raises(IaError) as exc:
         conteo.contar_varillas(PNG, "png")
     assert "sk-ant" not in str(exc.value)
@@ -100,20 +100,20 @@ def test_tiempo_agotado_y_sin_red(monkeypatch, con_clave):
     def lento(*a, **k):
         raise httpx.ReadTimeout("lento")
 
-    monkeypatch.setattr(conteo.httpx, "post", lento)
+    monkeypatch.setattr(ia.httpx, "post", lento)
     with pytest.raises(IaError, match="tardó"):
         conteo.contar_varillas(PNG, "png")
 
     def sin_red(*a, **k):
         raise httpx.ConnectError("sin red")
 
-    monkeypatch.setattr(conteo.httpx, "post", sin_red)
+    monkeypatch.setattr(ia.httpx, "post", sin_red)
     with pytest.raises(IaError, match="conectar"):
         conteo.contar_varillas(PNG, "png")
 
 
 def test_conteo_cero_explica_por_que(monkeypatch, con_clave):
-    monkeypatch.setattr(conteo.httpx, "post", lambda *a, **k: respuesta(entrada={"cantidad": 0, "confianza": 0, "advertencias": []}))
+    monkeypatch.setattr(ia.httpx, "post", lambda *a, **k: respuesta(entrada={"cantidad": 0, "confianza": 0, "advertencias": []}))
     r = conteo.contar_varillas(PNG, "png")
     assert r.cantidad == 0 and r.advertencias
 
@@ -146,7 +146,7 @@ def test_endpoint_sin_clave_responde_503(monkeypatch):
 
 
 def test_endpoint_traduce_fallas_de_la_ia_a_502(monkeypatch, con_clave):
-    monkeypatch.setattr(conteo.httpx, "post", lambda *a, **k: respuesta(500, json={}))
+    monkeypatch.setattr(ia.httpx, "post", lambda *a, **k: respuesta(500, json={}))
     assert enviar(PNG).status_code == 502
 
 
@@ -154,7 +154,7 @@ def test_conteo_reintenta_si_responde_sin_la_herramienta(monkeypatch, con_clave)
     """Igual que en los bocetos: modo auto y un segundo intento si el modelo no usa la herramienta."""
     sin_herramienta = {"content": [{"type": "text", "text": "Veo un atado de varillas."}]}
     respuestas = [respuesta(json=sin_herramienta), respuesta()]
-    monkeypatch.setattr(conteo.httpx, "post", lambda *a, **k: respuestas.pop(0))
+    monkeypatch.setattr(ia.httpx, "post", lambda *a, **k: respuestas.pop(0))
     from app.services.conteo import contar_varillas
 
     r = contar_varillas(b"\xff\xd8\xff\xe0" + b"0" * 100, "jpg")
