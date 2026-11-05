@@ -195,9 +195,12 @@ backend por la red interna, protegido además por `CALC_SERVICE_SECRET`
 ## Parte 2B — ia-service en Railway (RF-04)
 
 Lee los bocetos del cliente. Los DXF se procesan directo de la geometría,
-sin IA; los PDF e imágenes se envían a la API de Claude (Anthropic).
-Sin clave de Anthropic el servicio arranca igual: los DXF funcionan y los
-PDF e imágenes responden 503 con un mensaje claro.
+sin IA. Los PDF se intentan igual, por geometría (`pdf_vectorial.py`);
+solo si el PDF no trae los paneles dibujados como vectores (escaneo,
+plano girado) se envía a la API de Claude (Anthropic), igual que las
+imágenes (PNG/JPG), que siempre van por ahí. Sin clave de Anthropic el
+servicio arranca igual: los DXF y los PDF con geometría funcionan; los
+PDF sin geometría y las imágenes responden 503 con un mensaje claro.
 
 ### 2B.1 Tercer servicio, mismo proyecto
 
@@ -241,11 +244,14 @@ clave). En la aplicación, carga un DXF y luego un PDF en **Cargar boceto**.
 
 ### 2B.5 Costo
 
-Cada PDF o imagen es una llamada a la API de Claude, que se cobra por uso
-(ver la tabla de costos en `04_despliegue_ci_cd/README.md`). Define un
-límite de gasto mensual en la consola de Anthropic antes de cargar la
+Cada PDF o imagen que termina llamando a la API de Claude se cobra por
+uso (ver la tabla de costos en `04_despliegue_ci_cd/README.md`). Define
+un límite de gasto mensual en la consola de Anthropic antes de cargar la
 clave en Railway. Los DXF no consumen crédito — se leen por geometría,
-sin llamar a la API.
+sin llamar a la API. Los PDF exportados de AutoCAD tampoco: si traen los
+paneles dibujados como vectores, también se leen por geometría
+(`pdf_vectorial.py`) y solo caen a la IA cuando el PDF no trae esa
+geometría (escaneo, plano girado).
 
 Railway en sí no cobra aparte por tener tres servicios: backend,
 calc-service e ia-service comparten el mismo proyecto y el mismo plan

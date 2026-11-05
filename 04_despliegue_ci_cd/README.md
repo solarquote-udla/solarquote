@@ -52,8 +52,8 @@ siguiente despliegue fallaría al no encontrar el archivo correspondiente.
 ## Despliegue continuo
 
 ```
-merge a main → Railway redespliega backend, calc-service e ia-service
-             → Vercel redespliega el frontend
+merge a develop → Railway redespliega backend, calc-service e ia-service
+                → Vercel redespliega el frontend
 ```
 
 Cada pull request genera además una previsualización en Vercel con URL
