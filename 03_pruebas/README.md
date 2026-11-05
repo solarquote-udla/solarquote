@@ -26,6 +26,7 @@ encontrados por severidad y correcciones aplicadas.
 - [Matriz de trazabilidad requisitos → pruebas](trazabilidad/MATRIZ-TRAZABILIDAD.md)
 - [Protocolo de pruebas de aceptación](aceptacion/PROTOCOLO-ACEPTACION.md)
 - [Reporte del Sprint 2](reportes/sprint-02.md)
+- [Reporte del Sprint 3](reportes/sprint-03.md)
 
 ### `aceptacion/`
 
