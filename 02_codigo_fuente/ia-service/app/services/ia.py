@@ -21,6 +21,7 @@ from pydantic import ValidationError
 
 from app.core.config import settings
 from app.schemas.boceto import MAXIMO_ETIQUETA, BloqueDetectado, ResultadoInterpretacion
+from app.services.mosaico import pdf_como_mosaico
 
 VERSION_API = "2023-06-01"
 MAX_TOKENS = 4096
@@ -160,6 +161,16 @@ def interpretar_con_ia(contenido: bytes, formato: str) -> ResultadoInterpretacio
             "Mientras tanto se pueden cargar bocetos en DXF."
         )
 
+    # Un PDF de CAD enviado como documento le llega al modelo casi solo como
+    # texto: se envía convertido en imágenes (ver mosaico.py). Si no se puede
+    # renderizar, va como documento, como antes.
+    avisos: list[str] = []
+    mosaico = pdf_como_mosaico(contenido) if formato == "pdf" else None
+    if mosaico is not None:
+        adjuntos, avisos = mosaico
+    else:
+        adjuntos = [_contenido(formato, contenido)]
+
     cuerpo = {
         "model": settings.ANTHROPIC_MODEL,
         "max_tokens": MAX_TOKENS,
@@ -170,7 +181,7 @@ def interpretar_con_ia(contenido: bytes, formato: str) -> ResultadoInterpretacio
             {
                 "role": "user",
                 "content": [
-                    _contenido(formato, contenido),
+                    *adjuntos,
                     {
                         "type": "text",
                         "text": "Identifica los bloques de paneles de este boceto y regístralos con la herramienta registrar_bloques.",
@@ -187,7 +198,7 @@ def interpretar_con_ia(contenido: bytes, formato: str) -> ResultadoInterpretacio
     )
     try:
         bloques = [BloqueDetectado(**b) for b in entrada.get("bloques", [])]
-        advertencias = [str(a) for a in entrada.get("advertencias", [])]
+        advertencias = avisos + [str(a) for a in entrada.get("advertencias", [])]
     except (ValueError, TypeError, AttributeError, ValidationError) as exc:
         raise IaError("La IA devolvió un resultado que no se pudo interpretar. Intenta de nuevo.") from exc
 

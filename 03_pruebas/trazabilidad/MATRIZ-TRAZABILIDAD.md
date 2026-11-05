@@ -20,9 +20,9 @@ requisito es la corrida verde del PR indicado.
 |---|---|---|---|
 | Backend (API principal) | 499 | 96 % | `pytest` en `02_codigo_fuente/backend` |
 | calc-service | 32 | 100 % | `pytest` en `02_codigo_fuente/calc-service` |
-| ia-service | 80 | 94 % | `pytest` en `02_codigo_fuente/ia-service` |
+| ia-service | 87 | 94 % | `pytest` en `02_codigo_fuente/ia-service` |
 | Frontend (interfaz) | 171 | — | `npm test` en `02_codigo_fuente/frontend` |
-| **Total** | **782** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
+| **Total** | **789** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
 
 La cobertura se midió con `pytest --cov=app`. RNF-02 pide al menos 60 %
 en el backend.
@@ -90,12 +90,13 @@ Evidencia: PR #14, #27, #34 y #38.
 | Formatos PDF, JPG, PNG y DXF, detectados por contenido | `ia: test_endpoint_bocetos`: `test_el_formato_se_detecta_por_contenido_y_no_por_extension`, `test_formato_desconocido` |
 | Tamaño máximo 10 MB; archivo vacío | `ia: test_endpoint_bocetos`: `test_archivo_demasiado_grande`, `test_archivo_vacio`; `test_boceto`: `test_archivo_vacio_o_demasiado_grande`; `bocetos.test.tsx` |
 | DXF por geometría (ezdxf): L, A, B y orientación | `ia: test_dxf` (10 pruebas: rotación, bloques insertados, incompletos, L impar) |
-| PDF e imagen con IA, respuesta validada | `ia: test_ia` (15 pruebas, API simulada) |
+| PDF e imagen con IA, respuesta validada | `ia: test_ia` (API simulada: herramienta en modo auto con un reintento, errores de Anthropic al log sin la clave) |
+| PDF enviado como imágenes para que el modelo vea la grilla (página completa + 4 ampliaciones) | `ia: test_mosaico` (PDF reales generados en la prueba: tamaños, rótulos, límite de páginas, JPEG para escaneos pesados); `ia: test_ia`: `test_pdf_real_se_envia_como_mosaico_de_imagenes`, `test_pdf_que_no_se_puede_renderizar_va_como_documento` |
 | Mensaje claro si no se puede procesar | `test_boceto`: `test_errores_de_ia_service_se_reenvian_con_su_mensaje`, `test_error_interno_de_ia_service_no_se_reenvia` |
 | Resultado disponible para RF-05; reemplazo del anterior | `test_boceto`: `test_cargar_guarda_el_archivo_y_los_bloques`, `test_un_boceto_nuevo_reemplaza_al_anterior`, `test_dos_cargas_simultaneas_se_ordenan_y_gana_la_ultima` |
 | Solo con permiso | `test_boceto`: `test_requiere_permiso_de_cargar_boceto` |
 
-Evidencia: PR #44.
+Evidencia: PR #44, `fix/ia-tool-choice-auto` y `feat/ia-pdf-mosaico`.
 
 ### RF-05 Confirmación y edición del diseño
 
