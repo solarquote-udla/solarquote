@@ -5,8 +5,10 @@ Sirven para verificar que la API está viva y que la conexión a la base de
 datos funciona. Railway los usa como health check del despliegue.
 """
 
+import logging
+
 import httpx
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -14,6 +16,7 @@ from app.core.config import settings
 from app.core.database import get_db
 
 router = APIRouter(tags=["Diagnóstico"])
+logger = logging.getLogger(__name__)
 
 TIMEOUT_SEGUNDOS_SERVICIOS = 5.0
 
@@ -30,13 +33,20 @@ def health_check() -> dict:
 
 
 @router.get("/health/db")
-def database_health_check(db: Session = Depends(get_db)) -> dict:
-    """Verifica que la conexión a PostgreSQL funciona."""
+def database_health_check(response: Response, db: Session = Depends(get_db)) -> dict:
+    """Verifica que la conexión a PostgreSQL funciona.
+
+    503 si falla, para que un monitor externo (UptimeRobot, RNF-06) lo
+    detecte por el código HTTP. El detalle de la excepción solo va al
+    log — en la respuesta pública podría exponer datos de la conexión.
+    """
     try:
         db.execute(text("SELECT 1"))
         return {"status": "ok", "database": "conectada"}
-    except Exception as exc:
-        return {"status": "error", "database": "sin conexión", "detalle": str(exc)}
+    except Exception:
+        logger.exception("Health check de la base de datos falló")
+        response.status_code = 503
+        return {"status": "error", "database": "sin conexión"}
 
 
 def _estado_servicio(url: str) -> str:
@@ -49,13 +59,19 @@ def _estado_servicio(url: str) -> str:
 
 
 @router.get("/health/servicios")
-def servicios_health_check() -> dict:
+def servicios_health_check(response: Response) -> dict:
     """Verifica calc-service e ia-service, que no tienen dominio público.
 
     Permite que un monitor externo (solo ve al backend) cubra también a
     los otros dos servicios, consultándolos aquí por la red interna.
+    503 si alguno está caído, para que el monitor lo detecte por el
+    código HTTP (lo que hoy viaja en el cuerpo ya lo sería, pero
+    UptimeRobot decide por código, no por contenido).
     """
-    return {
+    estado = {
         "calc_service": _estado_servicio(settings.CALC_SERVICE_URL),
         "ia_service": _estado_servicio(settings.IA_SERVICE_URL),
     }
+    if "caído" in estado.values():
+        response.status_code = 503
+    return estado
