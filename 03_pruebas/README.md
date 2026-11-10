@@ -29,6 +29,7 @@ encontrados por severidad y correcciones aplicadas.
 - [Procedimiento de disponibilidad (RNF-06)](fiabilidad/RNF-06-DISPONIBILIDAD.md)
 - [Reporte del Sprint 2](reportes/sprint-02.md)
 - [Reporte del Sprint 3](reportes/sprint-03.md)
+- [Reporte del Sprint 4](reportes/sprint-04.md)
 
 ### `aceptacion/`
 
@@ -58,7 +59,7 @@ código por servicio y los huecos pendientes.
 
 ## Cobertura actual
 
-Corte del 5 de noviembre de 2026: **811 pruebas automatizadas**, todas
+Corte del 6 de noviembre de 2026: **811 pruebas automatizadas**, todas
 aprobadas. Detalle por requisito en la
 [matriz de trazabilidad](trazabilidad/MATRIZ-TRAZABILIDAD.md).
 

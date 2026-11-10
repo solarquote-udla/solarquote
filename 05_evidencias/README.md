@@ -16,6 +16,8 @@ metodología se **ejecutó**, no solo que se declaró.
 │   ├── velocidad.png            Gráfico de velocidad
 │   └── retrospectiva.md         Acuerdos de la retrospectiva
 ├── sprint-02/
+├── sprint-03/
+├── sprint-04/
 └── capturas/                    Capturas del sistema en funcionamiento
 ```
 
