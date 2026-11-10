@@ -16,12 +16,19 @@ from app.core.config import settings
 from app.core.database import get_db
 
 router = APIRouter(tags=["Diagnóstico"])
+
+# Cada endpoint acepta también HEAD: UptimeRobot consulta con HEAD en el
+# plan gratuito y FastAPI no lo agrega solo a las rutas GET. Sin eso
+# respondían 405 y el monitor marcaba la API como caída aunque estuviera
+# funcionando (RNF-06). HEAD queda fuera de /docs para no duplicar cada
+# endpoint en la documentación.
 logger = logging.getLogger(__name__)
 
 TIMEOUT_SEGUNDOS_SERVICIOS = 5.0
 
 
 @router.get("/health")
+@router.head("/health", include_in_schema=False)
 def health_check() -> dict:
     """Verifica que la API responde."""
     return {
@@ -33,6 +40,7 @@ def health_check() -> dict:
 
 
 @router.get("/health/db")
+@router.head("/health/db", include_in_schema=False)
 def database_health_check(response: Response, db: Session = Depends(get_db)) -> dict:
     """Verifica que la conexión a PostgreSQL funciona.
 
@@ -59,6 +67,7 @@ def _estado_servicio(url: str) -> str:
 
 
 @router.get("/health/servicios")
+@router.head("/health/servicios", include_in_schema=False)
 def servicios_health_check(response: Response) -> dict:
     """Verifica calc-service e ia-service, que no tienen dominio público.
 
