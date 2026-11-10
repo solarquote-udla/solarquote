@@ -33,6 +33,12 @@ Un monitor HTTP(S) cada 5 minutos contra:
 | Backend — base de datos | `GET /health/db` del backend, dominio público | La conexión a Neon funciona |
 | Backend — calc-service e ia-service | `GET /health/servicios` del backend, dominio público | Ver sección 2 |
 
+Los tres endpoints aceptan `GET` y `HEAD`: el plan gratuito de
+UptimeRobot consulta con `HEAD`, y FastAPI no lo agrega solo a las rutas
+`GET`. Sin eso respondían 405 y el monitor marcaba la API como caída
+aunque funcionara (se detectó el 10 de noviembre de 2026, al crear los
+monitores).
+
 UptimeRobot registra, por cada monitor: el porcentaje de uptime del
 período y, por cada caída, cuándo empezó y cuándo se recuperó — las dos
 cifras que pide RNF-06 (99 % y 5 minutos), sin depender de revisar logs
