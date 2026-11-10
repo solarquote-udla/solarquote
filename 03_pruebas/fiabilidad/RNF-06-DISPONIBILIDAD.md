@@ -58,6 +58,10 @@ para que una revisión manual vea el detalle.
 3. El dashboard público de cada monitor (o un export) es lo que se
    adjunta al registro al cierre del período.
 
+La configuración está activa desde el 10 de noviembre de 2026. Página de
+estado pública: https://stats.uptimerobot.com/C1cLVxJvdV (los datos de
+la puesta en marcha están en [REGISTRO-RNF-06.md](REGISTRO-RNF-06.md)).
+
 ### 2. `GET /health/servicios` del backend
 
 calc-service e ia-service **no tienen dominio público** a propósito (ver
