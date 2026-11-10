@@ -1,8 +1,9 @@
-"""Pruebas de /health/db y /health/servicios (RNF-06).
+"""Pruebas de /health, /health/db y /health/servicios (RNF-06).
 
 Corren contra la API real (TestClient) para verificar también el código
 HTTP: un monitor externo (UptimeRobot) decide arriba/caído por el código
-de la respuesta, no por su contenido.
+de la respuesta, no por su contenido. UptimeRobot consulta con HEAD, por
+eso cada caso verifica GET y HEAD.
 """
 
 import httpx
@@ -29,6 +30,7 @@ def test_health_db_ok_responde_200(api: TestClient) -> None:
 
     assert respuesta.status_code == 200
     assert respuesta.json() == {"status": "ok", "database": "conectada"}
+    assert api.head("/health/db").status_code == 200
 
 
 def test_health_db_caido_responde_503_sin_exponer_el_detalle(caplog: pytest.LogCaptureFixture) -> None:
@@ -47,6 +49,12 @@ def test_health_db_caido_responde_503_sin_exponer_el_detalle(caplog: pytest.LogC
     assert "solarquote_app_secreto" not in respuesta.text
     assert "solarquote_app_secreto" in caplog.text
 
+    app.dependency_overrides[get_db] = lambda: _SesionRota()
+    try:
+        assert TestClient(app).head("/health/db").status_code == 503
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
 
 def test_servicios_ok_responde_200(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(httpx, "get", lambda url, *, timeout: httpx.Response(200, json={"status": "ok"}))
@@ -55,6 +63,8 @@ def test_servicios_ok_responde_200(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert respuesta.status_code == 200
     assert respuesta.json() == {"calc_service": "ok", "ia_service": "ok"}
+    assert TestClient(app).head("/health/servicios").status_code == 200
+    assert TestClient(app).head("/health").status_code == 200
 
 
 def test_servicios_caido_si_no_hay_conexion_responde_503(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -67,6 +77,7 @@ def test_servicios_caido_si_no_hay_conexion_responde_503(monkeypatch: pytest.Mon
 
     assert respuesta.status_code == 503
     assert respuesta.json() == {"calc_service": "caído", "ia_service": "caído"}
+    assert TestClient(app).head("/health/servicios").status_code == 503
 
 
 def test_servicios_caido_si_responde_con_error_responde_503(monkeypatch: pytest.MonkeyPatch) -> None:
