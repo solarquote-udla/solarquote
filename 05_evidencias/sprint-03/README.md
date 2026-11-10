@@ -92,8 +92,18 @@ dentro del Sprint 2 — ya está en su informe de cierre, no se repite aquí.
 | `ci.png` | GitHub → Actions, una corrida en verde de este período | Esteban |
 | `retrospectiva.md` | Acuerdos de la retrospectiva | En esta carpeta |
 
-Capturas del sistema en funcionamiento → `05_evidencias/capturas/sprint-03/`
-(datos de demo únicamente — nunca el boceto de San Pablo ni datos reales
-de clientes, porque el repo es público): seguridad y usuarios, catálogos
-(materiales e inversores), historial, tablero, confirmación del layout,
-carga del boceto, tema claro/oscuro.
+Capturas del sistema en funcionamiento, en `05_evidencias/capturas/sprint-03/`
+(tomadas en producción el 9 de noviembre de 2026; los proyectos y clientes
+que se ven son datos de prueba):
+
+| Archivo | Qué muestra | RF |
+|---|---|---|
+| `01-perfiles.png` | Perfil Personal de Producción con sus permisos por opción de menú | RF-11 |
+| `02-menu-operario.png` | Sesión de un usuario de producción: el menú solo muestra despacho y recepción | RF-11 |
+| `03-inversores.png` | Catálogo de inversores | RF-08 |
+| `04-confirmacion-layout.png` | Confirmación del layout, con un bloque fuera de proporción aceptado bajo responsabilidad | RF-03, RF-05 |
+| `05-carga-boceto.png` | Carga del boceto con los datos del proyecto | RF-04 |
+| `06-procesando-boceto.png` | Pasos del procesamiento del boceto | RF-04 |
+| `07-historial.png` | Historial: proyectos en curso para retomarlos | RF-10 |
+| `08-tablero.png` | Dashboard con los indicadores | RF-13 |
+| `09-tema-claro.png` | El mismo Dashboard en modo claro | valor agregado |

@@ -109,6 +109,16 @@ traía.
 | `ci.png` | GitHub → Actions, una corrida en verde de este período | Esteban |
 | `retrospectiva.md` | Acuerdos de la retrospectiva | En esta carpeta |
 
-Capturas del sistema en funcionamiento → `05_evidencias/capturas/sprint-04/`
-(datos de demo únicamente): proforma Word/Excel, despacho, recepción y
-seguimiento, lectura del boceto.
+Capturas del sistema en funcionamiento, en `05_evidencias/capturas/sprint-04/`
+(tomadas en producción el 9 de noviembre de 2026; los proyectos y clientes
+que se ven son datos de prueba). En `01-confirmacion-boceto.png` la vista
+previa del plano está difuminada a propósito: es un plano real de
+HEXtructure y el repositorio es público.
+
+| Archivo | Qué muestra | RF |
+|---|---|---|
+| `01-confirmacion-boceto.png` | Confirmación del boceto leído de la geometría del PDF: 32 bloques, 4.704 paneles, aviso de proporción | RF-04, RF-05 |
+| `02-cotizacion-y-estado.png` | Detalle de la cotización con el estado de la propuesta (cotizada → despachada → recibida → instalada) | RF-06, RF-16 |
+| `03-proforma-word.png` | Proforma institucional en Word | RF-07 |
+| `04-proforma-excel.png` | La misma proforma en Excel | RF-07 |
+| `05-despacho.png` | Despacho en planta: cotizaciones pendientes de validar | RF-14 |
