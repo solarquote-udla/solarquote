@@ -34,7 +34,7 @@ const PALETA: ColorInversor[] = [
   { relleno: "fill-teal-600/80", borde: "stroke-teal-300", muestra: "bg-teal-600", tarjeta: "border-teal-600", texto: "text-teal-400 claro:text-teal-700" },
   { relleno: "fill-indigo-500/80", borde: "stroke-indigo-300", muestra: "bg-indigo-500", tarjeta: "border-indigo-500", texto: "text-indigo-400 claro:text-indigo-700" },
   { relleno: "fill-fuchsia-600/80", borde: "stroke-fuchsia-300", muestra: "bg-fuchsia-600", tarjeta: "border-fuchsia-600", texto: "text-fuchsia-400 claro:text-fuchsia-700" },
-  { relleno: "fill-cyan-700/80", borde: "stroke-cyan-300", muestra: "bg-cyan-700", tarjeta: "border-cyan-700", texto: "text-cyan-400 claro:text-cyan-700" },
+  { relleno: "fill-cyan-700/80", borde: "stroke-cyan-300", muestra: "bg-cyan-700", tarjeta: "border-cyan-700", texto: "text-cyan-400 claro:text-cyan-800" },
 ];
 
 /** Color del inversor `indice` (0 = Inversor 1). Con más de 8, los colores se repiten. */

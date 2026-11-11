@@ -102,7 +102,7 @@ const CAMPO =
   "w-full rounded-lg border border-acero-300 px-3 py-2 text-sm focus:border-solar-500 focus:outline-none focus:ring-1 focus:ring-solar-500";
 
 // Mismos valores por defecto que el backend (schemas/layout.py)
-const PARAMETROS_DEFECTO = { L: "4", pasillo: "2", tolerancia: "20", kwp: "" };
+const PARAMETROS_DEFECTO = { L: "4", pasillo: "2", tolerancia: "20", kwp: "", aMinimo: "1" };
 type Parametros = typeof PARAMETROS_DEFECTO;
 
 const OPCIONES_L = [2, 4, 6, 8, 10, 12];
@@ -188,6 +188,7 @@ function desdeLayout(l: Layout | null, objetivoKwp: number | null = null): Param
     pasillo: String(l.parametros.pasillo_m),
     tolerancia: String(Math.round(l.parametros.tolerancia_proporcion * 100)),
     kwp: l.parametros.capacidad_deseada_kwp == null ? "" : String(l.parametros.capacidad_deseada_kwp),
+    aMinimo: String(l.parametros.paneles_ancho_minimo ?? 1),
   };
 }
 
@@ -203,10 +204,13 @@ function aPeticion(p: Parametros): { datos: LayoutGenerar } | { error: string } 
   const pasillo = aNumero(p.pasillo);
   const tolerancia = aNumero(p.tolerancia);
   const kwp = aNumero(p.kwp);
+  const aMinimo = aNumero(p.aMinimo);
 
   if (pasillo === null || Number.isNaN(pasillo)) return { error: "Revisa el pasillo: debe ser un número en metros." };
   if (tolerancia === null || Number.isNaN(tolerancia)) return { error: "Revisa la tolerancia: debe ser un porcentaje." };
   if (kwp !== null && Number.isNaN(kwp)) return { error: "Revisa la capacidad deseada: debe ser un número en kWp." };
+  if (aMinimo === null || !Number.isInteger(aMinimo) || aMinimo < 1)
+    return { error: "Revisa el A mínimo: debe ser un número entero desde 1." };
 
   return {
     datos: {
@@ -214,6 +218,7 @@ function aPeticion(p: Parametros): { datos: LayoutGenerar } | { error: string } 
       pasillo_m: pasillo,
       tolerancia_proporcion: tolerancia / 100,
       capacidad_deseada_kwp: kwp,
+      paneles_ancho_minimo: aMinimo,
     },
   };
 }
@@ -706,7 +711,7 @@ export function LayoutPage() {
             }}
             className="rounded-xl border border-acero-200 bg-superficie p-5"
           >
-            <div className="grid gap-4 sm:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-3 xl:grid-cols-5">
               <Entrada etiqueta="Paneles en el largo (L)" ayuda="Par: soportes en A y V">
                 <select className={CAMPO} value={parametros.L} onChange={(e) => actualizar("L", e.target.value)}>
                   {OPCIONES_L.map((l) => (
@@ -724,6 +729,9 @@ export function LayoutPage() {
               </Entrada>
               <Entrada etiqueta="Capacidad deseada (kWp)" ayuda="Opcional. Vacío = máximo">
                 <input className={CAMPO} inputMode="decimal" placeholder="Máxima" value={parametros.kwp} onChange={(e) => actualizar("kwp", e.target.value)} />
+              </Entrada>
+              <Entrada etiqueta="A mínimo" ayuda="Bloques más cortos no se generan">
+                <input className={CAMPO} inputMode="numeric" aria-label="A mínimo" value={parametros.aMinimo} onChange={(e) => actualizar("aMinimo", e.target.value)} />
               </Entrada>
             </div>
             {confirmarRegenerar ? (

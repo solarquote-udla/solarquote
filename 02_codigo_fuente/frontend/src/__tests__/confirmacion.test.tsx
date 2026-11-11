@@ -57,7 +57,7 @@ const inv = (numero: number, paneles: number) => ({
 
 const LAYOUT = (cambios: Record<string, unknown> = {}) => ({
   proyecto_id: 5,
-  parametros: { paneles_largo: 4, pasillo_m: 2, tolerancia_proporcion: 0.2, capacidad_deseada_kwp: null },
+  parametros: { paneles_largo: 4, pasillo_m: 2, tolerancia_proporcion: 0.2, capacidad_deseada_kwp: null, paneles_ancho_minimo: 1 },
   bloques: [bloque(0, 24, 0, "A", true), bloque(12, 24, 1, "A", true), bloque(24, 16, 1, "B", false)],
   tipos: [
     { tipo: "A", paneles_largo: 4, paneles_ancho: 24, repeticiones: 2, paneles: 192, proporcion: 2.99, en_proporcion: true },

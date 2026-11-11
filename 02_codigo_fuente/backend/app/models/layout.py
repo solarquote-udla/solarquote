@@ -51,6 +51,8 @@ class Layout(Base):
     pasillo_m: Mapped[float] = mapped_column(nullable=False)
     tolerancia_proporcion: Mapped[float] = mapped_column(nullable=False)
     capacidad_deseada_kwp: Mapped[float | None] = mapped_column(nullable=True)
+    # A mínimo de los bloques cortos (SQ-170); 1 = sin mínimo
+    paneles_ancho_minimo: Mapped[int] = mapped_column(nullable=False, server_default="1", default=1)
 
     # ─── Resultados ─────────────────────────────────────────────
     # Columnas propias para lo que el tablero (RF-13) va a consultar;
