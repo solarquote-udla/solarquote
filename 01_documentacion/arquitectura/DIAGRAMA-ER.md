@@ -229,6 +229,7 @@ erDiagram
         float pasillo_m
         float tolerancia_proporcion
         float capacidad_deseada_kwp "nullable"
+        int paneles_ancho_minimo
         int total_paneles
         float potencia_kwp
         jsonb resumen

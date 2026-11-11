@@ -97,6 +97,53 @@ def test_rectangulo_100_por_60():
     assert r.tipos[0].tipo == "A"  # el más repetido
 
 
+# ─── A mínimo de los bloques cortos (SQ-170) ────────────────────────
+
+
+def test_a_minimo_descarta_los_bloques_de_una_fila():
+    """
+    Mismo terreno de 100 × 60 que arriba: sin mínimo quedan 9 bloques de
+    4 × 1. Con A mínimo 2 no se generan y quedan solo los 18 completos.
+    """
+    r = generar_layout(
+        rectangulo(100, 60), [], PANEL_PLANO, ParametrosLayout(paneles_ancho_minimo=2), orientacion_norte=0
+    )
+    assert r.total_paneles == 1764 - 9 * 4
+    assert {(t.paneles_ancho, t.repeticiones) for t in r.tipos} == {(24, 18)}
+    assert all(t.en_proporcion for t in r.tipos)
+
+
+def test_a_minimo_conserva_los_bloques_cortos_que_lo_alcanzan():
+    """
+    60 × 40: 5 columnas; en cada una un bloque de 24 y, con lo que sobra
+    (40 − 27,216 − 2 = 10,784 m), uno de floor(10,784 / 1,134) = 9.
+    Con A mínimo 9 se quedan; con 10 ya no.
+    """
+    params = dict(orientacion_norte=0)
+    con_9 = generar_layout(rectangulo(60, 40), [], PANEL_PLANO, ParametrosLayout(paneles_ancho_minimo=9), **params)
+    con_10 = generar_layout(rectangulo(60, 40), [], PANEL_PLANO, ParametrosLayout(paneles_ancho_minimo=10), **params)
+    sin_minimo = generar_layout(rectangulo(60, 40), [], PANEL_PLANO, ParametrosLayout(), **params)
+
+    assert {(t.paneles_ancho, t.repeticiones) for t in con_9.tipos} == {(24, 5), (9, 5)}
+    assert con_9.total_paneles == sin_minimo.total_paneles == 5 * 4 * (24 + 9)
+    assert {(t.paneles_ancho, t.repeticiones) for t in con_10.tipos} == {(24, 5)}
+    assert con_10.total_paneles == 5 * 4 * 24
+
+
+def test_a_minimo_mayor_que_el_bloque_ideal_se_rechaza():
+    with pytest.raises(LayoutImposible, match="A mínimo"):
+        generar_layout(
+            rectangulo(100, 60), [], PANEL_PLANO, ParametrosLayout(paneles_ancho_minimo=25), orientacion_norte=0
+        )
+
+
+def test_a_minimo_igual_al_ideal_solo_deja_bloques_completos():
+    r = generar_layout(
+        rectangulo(60, 40), [], PANEL_PLANO, ParametrosLayout(paneles_ancho_minimo=24), orientacion_norte=0
+    )
+    assert {t.paneles_ancho for t in r.tipos} == {24}
+
+
 def test_cumple_rnf01_frente_al_optimo_teorico():
     """
     RNF-01: variación ≤ 5 % respecto al óptimo calculado manualmente.
@@ -226,6 +273,25 @@ def test_capacidad_que_cabe_recorta_el_layout():
     assert c.maxima_kwp == pytest.approx(1764 * 0.58, abs=0.01)
     assert c.instalada_kwp == pytest.approx(r.total_paneles * 0.58, abs=0.01)
     assert c.remanente_kwp == pytest.approx(c.maxima_kwp - c.instalada_kwp, abs=0.01)
+
+
+def test_capacidad_con_a_minimo_no_deja_un_bloque_chico_al_final():
+    """
+    518 paneles: 5 bloques completos (480) y faltan 38 → el último se
+    acortaría a ceil(38 / 4) = 10 filas. Con A mínimo 12 queda en 12:
+    se instalan 528 paneles, unos más, en vez de un bloque chico.
+    """
+    r = generar_layout(
+        rectangulo(100, 60),
+        [],
+        PANEL_PLANO,
+        ParametrosLayout(capacidad_deseada_kwp=300, paneles_ancho_minimo=12),
+        orientacion_norte=0,
+    )
+    assert r.capacidad.cabe
+    assert r.capacidad.paneles_necesarios == 518
+    assert r.total_paneles == 480 + 4 * 12
+    assert min(t.paneles_ancho for t in r.tipos) == 12
 
 
 def test_capacidad_que_no_cabe_devuelve_la_maxima():

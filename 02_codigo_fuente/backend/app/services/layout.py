@@ -148,6 +148,7 @@ def generar(db: Session, proyecto: Proyecto, datos: LayoutGenerar) -> Layout:
             pasillo_m=datos.pasillo_m,
             tolerancia_proporcion=datos.tolerancia_proporcion,
             capacidad_deseada_kwp=datos.capacidad_deseada_kwp,
+            paneles_ancho_minimo=datos.paneles_ancho_minimo,
         ),
         orientacion_norte=terreno.orientacion_norte,
         latitud=float(proyecto.latitud) if proyecto.latitud is not None else None,
@@ -167,6 +168,7 @@ def generar(db: Session, proyecto: Proyecto, datos: LayoutGenerar) -> Layout:
     layout.pasillo_m = datos.pasillo_m
     layout.tolerancia_proporcion = datos.tolerancia_proporcion
     layout.capacidad_deseada_kwp = datos.capacidad_deseada_kwp
+    layout.paneles_ancho_minimo = datos.paneles_ancho_minimo
     layout.total_paneles = resultado.total_paneles
     layout.potencia_kwp = resultado.potencia_kwp
     layout.resumen = {
@@ -497,6 +499,7 @@ def a_respuesta(layout: Layout, huella: str, equipo: ConfiguracionEquipo | None)
             pasillo_m=layout.pasillo_m,
             tolerancia_proporcion=layout.tolerancia_proporcion,
             capacidad_deseada_kwp=layout.capacidad_deseada_kwp,
+            paneles_ancho_minimo=layout.paneles_ancho_minimo,
         ),
         bloques=[
             BloqueLeer(
