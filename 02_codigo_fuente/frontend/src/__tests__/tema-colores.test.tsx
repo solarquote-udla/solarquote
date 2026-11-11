@@ -10,7 +10,16 @@ import { colorInversor } from "@/utils/inversores";
 describe("Colores de inversor", () => {
   it("cada color de texto tiene su variante para el tema claro", () => {
     for (let i = 0; i < 8; i++) {
-      expect(colorInversor(i).texto).toMatch(/^text-[a-z]+-400 claro:text-[a-z]+-700$/);
+      expect(colorInversor(i).texto).toMatch(/^text-[a-z]+-400 claro:text-[a-z]+-(700|800)$/);
+    }
+  });
+
+  it("en el tema claro el texto no repite el tono del borde de su tarjeta (SQ-171)", () => {
+    for (let i = 0; i < 8; i++) {
+      const { texto, tarjeta } = colorInversor(i);
+      const tonoTexto = texto.split("claro:text-")[1];
+      const tonoBorde = tarjeta.replace("border-", "");
+      expect(tonoTexto).not.toBe(tonoBorde);
     }
   });
 
