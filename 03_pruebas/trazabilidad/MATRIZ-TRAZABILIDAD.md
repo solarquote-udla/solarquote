@@ -18,11 +18,11 @@ requisito es la corrida verde del PR indicado.
 
 | Componente | Pruebas | Cobertura de líneas | Cómo se ejecutan |
 |---|---|---|---|
-| Backend (API principal) | 511 | 96 % | `pytest` en `02_codigo_fuente/backend` |
+| Backend (API principal) | 520 | 96 % | `pytest` en `02_codigo_fuente/backend` |
 | calc-service | 32 | 100 % | `pytest` en `02_codigo_fuente/calc-service` |
 | ia-service | 96 | 94 % | `pytest` en `02_codigo_fuente/ia-service` |
-| Frontend (interfaz) | 172 | — | `npm test` en `02_codigo_fuente/frontend` |
-| **Total** | **811** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
+| Frontend (interfaz) | 178 | — | `npm test` en `02_codigo_fuente/frontend` |
+| **Total** | **826** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
 
 La cobertura se midió con `pytest --cov=app`. RNF-02 pide al menos 60 %
 en el backend.
@@ -79,9 +79,10 @@ Evidencia: PR #2 y #38.
 | Validación eléctrica: strings y strings por MPPT | `test_layout`: `test_electrica_inversor_*` (6 pruebas) |
 | Reparto de bloques entre inversores | `test_layout`: `test_dos_inversores_iguales_se_reparten_mitad_y_mitad`, `test_cada_inversor_recibe_un_sector_seguido`; `test_varios_inversores` |
 | L par | `test_layout`: `test_l_impar_o_cero_se_rechaza` |
+| A mínimo de los bloques cortos (SQ-170): sin él se aprovecha todo; con él no se generan bloques más cortos, tampoco al recortar por capacidad | `test_layout`: `test_a_minimo_*` (4 pruebas), `test_capacidad_con_a_minimo_no_deja_un_bloque_chico_al_final`; `test_api_layout_a_minimo` (4 pruebas); `layoutAMinimo.test.tsx` |
 | Edición manual (SQ-64) | `test_layout_edicion` (23 pruebas), paridad con `utils/edicionLayout.ts`; `asistentePasos2y3.test.tsx` |
 
-Evidencia: PR #14, #27, #34 y #38.
+Evidencia: PR #14, #27, #34, #38 y el de SQ-170.
 
 ### RF-04 Carga y procesamiento del boceto
 
