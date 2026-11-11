@@ -45,7 +45,10 @@ Algoritmo
 5. Cada tramo se llena desde abajo con bloques completos separados por
    el pasillo norte-sur. Lo que sobra al final del tramo se aprovecha
    con un bloque más corto (menos paneles en A), que suele quedar fuera
-   de proporción y por eso sale en ámbar.
+   de proporción y por eso sale en ámbar. Si ese bloque corto tendría
+   menos paneles en A que el "A mínimo" del Gerente, no se genera: así
+   no quedan bloques de una o dos filas que luego hay que borrar a mano
+   (SQ-170).
 6. Como el resultado depende de dónde arranca la primera franja, se
    prueban varios desfases y se queda el que ubica más paneles.
 
@@ -82,6 +85,10 @@ RELACION_OBJETIVO = 3.0
 TOLERANCIA_DEFECTO = 0.20
 PASILLO_DEFECTO_M = 2.0
 PANELES_LARGO_DEFECTO = 4
+# A mínimo de los bloques cortos. 1 = sin mínimo (todo lo que entra se
+# aprovecha), igual que antes de SQ-170. El valor que usará HEXtructure
+# por defecto está pendiente de confirmar con el Gerente General.
+PANELES_ANCHO_MINIMO_DEFECTO = 1
 
 # Cuántos puntos de arranque se prueban para la primera franja. 24 deja el
 # error de discretización por debajo del 5 % del paso horizontal, que es
@@ -129,6 +136,7 @@ class ParametrosLayout:
     pasillo_m: float = PASILLO_DEFECTO_M
     tolerancia_proporcion: float = TOLERANCIA_DEFECTO
     capacidad_deseada_kwp: float | None = None
+    paneles_ancho_minimo: int = PANELES_ANCHO_MINIMO_DEFECTO
 
 
 # ─── Salidas ────────────────────────────────────────────────────────
@@ -326,12 +334,13 @@ def _llenar_tramo(
     lado_menor_m: float,
     separacion: float,
     paneles_ancho: int,
+    paneles_ancho_minimo: int = 1,
 ) -> list[tuple[float, float, int]]:
     """
     Bloques que entran en un tramo vertical: (y_inicio, y_fin, A).
 
-    Completos primero; con lo que sobra, uno más corto si entra al
-    menos un panel.
+    Completos primero; con lo que sobra, uno más corto si entran al
+    menos `paneles_ancho_minimo` paneles en A.
     """
     resultado = []
     y = inicio
@@ -341,7 +350,7 @@ def _llenar_tramo(
 
     sobrante = fin - y
     a_corto = math.floor(sobrante / lado_menor_m + _EPS)
-    if a_corto >= 1:
+    if a_corto >= max(1, paneles_ancho_minimo):
         resultado.append((y, y + a_corto * lado_menor_m, a_corto))
     return resultado
 
@@ -355,6 +364,7 @@ def _distribuir(
     lado_menor_m: float,
     separacion_y: float,
     paneles_ancho: int,
+    paneles_ancho_minimo: int = 1,
 ) -> list[_BloqueLocal]:
     minx, miny, maxx, maxy = util.bounds
     bloques: list[_BloqueLocal] = []
@@ -363,7 +373,7 @@ def _distribuir(
     while x + ancho_franja <= maxx + _EPS:
         for inicio, fin in _tramos_libres(util, x, x + ancho_franja, miny, maxy):
             for y0, y1, a in _llenar_tramo(
-                inicio, fin, alto_bloque, lado_menor_m, separacion_y, paneles_ancho
+                inicio, fin, alto_bloque, lado_menor_m, separacion_y, paneles_ancho, paneles_ancho_minimo
             ):
                 bloques.append(_BloqueLocal(x, y0, x + ancho_franja, y1, a))
         x += paso_x
@@ -379,12 +389,15 @@ def _recortar_a_capacidad(
     paneles_necesarios: int,
     paneles_largo: int,
     lado_menor_m: float,
+    paneles_ancho_minimo: int = 1,
 ) -> list[_BloqueLocal]:
     """
     Se queda con los bloques justos para la capacidad pedida.
 
     Recorre en orden de franja y altura, que mantiene la planta compacta.
-    El último bloque se acorta para no pasarse más de una fila de L.
+    El último bloque se acorta para no pasarse más de una fila de L, pero
+    nunca por debajo del A mínimo: en ese caso se instalan unos paneles
+    de más antes que dejar un bloque que habría que borrar a mano.
     """
     resultado = []
     faltan = paneles_necesarios
@@ -396,7 +409,7 @@ def _recortar_a_capacidad(
             resultado.append(b)
             faltan -= paneles
         else:
-            a = math.ceil(faltan / paneles_largo)
+            a = min(b.paneles_ancho, max(math.ceil(faltan / paneles_largo), paneles_ancho_minimo))
             resultado.append(_BloqueLocal(b.x0, b.y0, b.x1, b.y0 + a * lado_menor_m, a))
             faltan = 0
     return resultado
@@ -606,6 +619,8 @@ def generar_layout(
 ) -> ResultadoLayout:
     if parametros.paneles_largo < 2 or parametros.paneles_largo % 2:
         raise LayoutImposible("L debe ser un número par mayor o igual a 2.")
+    if parametros.paneles_ancho_minimo < 1:
+        raise LayoutImposible("El A mínimo debe ser al menos 1.")
 
     advertencias: list[str] = []
 
@@ -616,6 +631,12 @@ def generar_layout(
 
     # ─── Dimensiones del bloque ideal ────────────────────────────
     a_ideal = paneles_ancho_ideal(L, lado_mayor, lado_menor)
+    if parametros.paneles_ancho_minimo > a_ideal:
+        raise LayoutImposible(
+            f"El A mínimo ({parametros.paneles_ancho_minimo}) supera el A del bloque ideal "
+            f"({a_ideal} con L = {L}): no se generaría ningún bloque. Usa un A mínimo de "
+            f"{a_ideal} o menos."
+        )
     largo_nominal = L * lado_mayor
     ancho_bloque = a_ideal * lado_menor
     # En planta, la pendiente acorta el largo: es lo que ocupa en el suelo.
@@ -670,6 +691,7 @@ def generar_layout(
             lado_menor_m=lado_menor,
             separacion_y=separacion_ns,
             paneles_ancho=a_ideal,
+            paneles_ancho_minimo=parametros.paneles_ancho_minimo,
         )
         paneles = sum(L * b.paneles_ancho for b in candidatos)
         cortos = sum(1 for b in candidatos if b.paneles_ancho != a_ideal)
@@ -693,7 +715,7 @@ def generar_layout(
         necesarios = math.ceil(parametros.capacidad_deseada_kwp * 1000 / panel.potencia_wp - _EPS)
         cabe = necesarios <= total_maximo
         if cabe:
-            mejor = _recortar_a_capacidad(mejor, necesarios, L, lado_menor)
+            mejor = _recortar_a_capacidad(mejor, necesarios, L, lado_menor, parametros.paneles_ancho_minimo)
         else:
             advertencias.append(
                 f"La capacidad deseada ({parametros.capacidad_deseada_kwp:g} kWp) no cabe. "

@@ -459,6 +459,8 @@ export interface LayoutGenerar {
   /** 0.2 = ±20 % respecto a ancho = 3 × largo */
   tolerancia_proporcion: number;
   capacidad_deseada_kwp: number | null;
+  /** A mínimo de los bloques cortos (SQ-170). 1 = sin mínimo. */
+  paneles_ancho_minimo: number;
 }
 
 /** Espejo de `BloqueLeer`. Vértices en metros, coordenadas del terreno. */

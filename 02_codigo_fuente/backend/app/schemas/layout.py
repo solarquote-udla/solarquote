@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.equipo import MAX_INVERSORES
 from app.services.calculo_layout import (
+    PANELES_ANCHO_MINIMO_DEFECTO,
     PANELES_LARGO_DEFECTO,
     PASILLO_DEFECTO_M,
     TOLERANCIA_DEFECTO,
@@ -41,6 +42,15 @@ class LayoutGenerar(BaseModel):
         gt=0,
         le=1_000_000,
         description="Opcional. Sin valor, el layout maximiza los paneles.",
+    )
+    paneles_ancho_minimo: int = Field(
+        default=PANELES_ANCHO_MINIMO_DEFECTO,
+        ge=1,
+        le=500,
+        description=(
+            "A mínimo: los bloques cortos con menos paneles en A no se generan "
+            "(SQ-170). 1 = se aprovecha todo lo que entra."
+        ),
     )
 
     @field_validator("paneles_largo")
