@@ -18,15 +18,14 @@ requisito es la corrida verde del PR indicado.
 
 | Componente | Pruebas | Cobertura de líneas | Cómo se ejecutan |
 |---|---|---|---|
-| Backend (API principal) | 521 | 96 % | `pytest` en `02_codigo_fuente/backend` |
+| Backend (API principal) | 553 | 96 % | `pytest` en `02_codigo_fuente/backend` |
 | calc-service | 32 | 100 % | `pytest` en `02_codigo_fuente/calc-service` |
 | ia-service | 96 | 94 % | `pytest` en `02_codigo_fuente/ia-service` |
 | Frontend (interfaz) | 195 | — | `npm test` en `02_codigo_fuente/frontend` |
-| **Total** | **844** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
+| **Total** | **876** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
 
 La cobertura se midió con `pytest --cov=app`. RNF-02 pide al menos 60 %
 en el backend.
-
 | Estado de los requisitos | Cantidad |
 |---|---|
 | Cubiertos por pruebas automatizadas | RF-01 a RF-16; RNF-01 (layout), RNF-02, RNF-03, RNF-04 |
@@ -66,8 +65,9 @@ Evidencia: PR #1, #20, #34 y el PR de SQ-135.
 | Ángulo entre 0 y 90; Voc mayor que Vmp | `test_calculo_equipo`: `test_angulo_fuera_de_rango`, `test_voc_debe_superar_vmp` |
 | Presets de paneles comunes | `test_calculo_equipo`: `test_cada_preset_pasa_las_validaciones`, `test_claves_unicas` |
 | Varios inversores por proyecto | `test_varios_inversores` (17 pruebas); `inversores.test.tsx` |
+| Catálogo de paneles administrable, con búsqueda por marca, modelo y potencia (la búsqueda libre también compara contra la potencia cuando el texto es un número) | `test_panel_administracion` (25 pruebas); `test_api_administracion`: `test_panel_ciclo_completo_y_errores`, `test_panel_busqueda_y_filtros`, `test_panel_busqueda_libre_tambien_encuentra_por_potencia`, `test_paneles_por_permiso`; `test_seguridad`: `test_generar_layout_puede_leer_paneles_pero_no_administrarlos`, `test_sin_ningun_permiso_relacionado_no_lee_paneles` |
 
-Evidencia: PR #2 y #38.
+Evidencia: PR #2, #38 y el del catálogo de paneles.
 
 ### RF-03 Generación del layout
 

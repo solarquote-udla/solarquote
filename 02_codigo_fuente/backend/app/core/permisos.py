@@ -29,6 +29,7 @@ class Permiso(str, Enum):
     CLIENTES = "clientes"
     # CONFIGURACIÓN
     INVERSORES = "inversores"
+    PANELES = "paneles"
     MATERIALES = "materiales"
     PRECIOS = "precios"
     PERFILES = "perfiles"
@@ -58,6 +59,8 @@ CATALOGO: tuple[DefinicionPermiso, ...] = (
                       "Registrar, editar y dar de baja clientes"),
     DefinicionPermiso(Permiso.INVERSORES, "Inversores", "CONFIGURACIÓN",
                       "Administrar el catálogo de inversores"),
+    DefinicionPermiso(Permiso.PANELES, "Paneles", "CONFIGURACIÓN",
+                      "Administrar el catálogo de paneles"),
     DefinicionPermiso(Permiso.MATERIALES, "Materiales", "CONFIGURACIÓN",
                       "Administrar el catálogo de materiales"),
     DefinicionPermiso(Permiso.PRECIOS, "Precios unitarios", "CONFIGURACIÓN",

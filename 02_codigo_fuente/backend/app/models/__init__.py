@@ -13,6 +13,7 @@ from app.models.proyecto import EstadoProyecto, Proyecto
 from app.models.cotizacion import Cotizacion, EstadoCotizacion, ItemCotizacion, MaterialCotizado
 from app.models.material import Material, PrecioMaterial
 from app.models.inversor import Inversor
+from app.models.panel import PanelCatalogo
 from app.models.equipo import ConfiguracionEquipo, InversorEquipo
 from app.models.layout import BloqueLayout, Layout
 from app.models.boceto import BloqueBoceto, Boceto
@@ -52,6 +53,8 @@ __all__ = [
     "PrecioMaterial",
     # Inversores
     "Inversor",
+    # Paneles
+    "PanelCatalogo",
     # Validación de materiales (RF-14 a RF-16)
     "Despacho",
     "ItemDespacho",
