@@ -65,6 +65,7 @@ export const MENU: GrupoMenu[] = [
       {
         titulo: "Parametrización",
         opciones: [
+          { ruta: "/configuracion/paneles", etiqueta: "Paneles", permiso: Permiso.PANELES },
           { ruta: "/configuracion/inversores", etiqueta: "Inversores", permiso: Permiso.INVERSORES },
           { ruta: "/configuracion/materiales", etiqueta: "Materiales", permiso: Permiso.MATERIALES },
           { ruta: "/configuracion/precios", etiqueta: "Precios unitarios", permiso: Permiso.PRECIOS },

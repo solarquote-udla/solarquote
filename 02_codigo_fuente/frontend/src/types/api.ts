@@ -17,6 +17,7 @@ export const Permiso = {
   RECEPCION: "recepcion",
   CLIENTES: "clientes",
   INVERSORES: "inversores",
+  PANELES: "paneles",
   MATERIALES: "materiales",
   PRECIOS: "precios",
   PERFILES: "perfiles",
@@ -224,6 +225,19 @@ export interface InversorCatalogo {
   vmin_v: number | null;
   mppts: number | null;
   strings_por_mppt: number | null;
+  activo: boolean;
+}
+
+/** Espejo de `PanelCatalogoLeer` (backend/app/schemas/panel_catalogo.py) */
+export interface PanelCatalogo {
+  id: number;
+  marca: string;
+  modelo: string;
+  potencia_wp: number;
+  largo_mm: number;
+  ancho_mm: number;
+  voc_v: number;
+  vmp_v: number;
   activo: boolean;
 }
 

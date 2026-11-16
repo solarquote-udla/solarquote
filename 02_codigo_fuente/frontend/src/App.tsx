@@ -34,6 +34,7 @@ import { EquipoPage } from "@/pages/EquipoPage";
 import { HistorialPage } from "@/pages/HistorialPage";
 import { InicioPage } from "@/pages/InicioPage";
 import { InversoresPage } from "@/pages/InversoresPage";
+import { PanelesPage } from "@/pages/PanelesPage";
 import { LayoutPage } from "@/pages/LayoutPage";
 import { LoginPage } from "@/pages/LoginPage";
 import { MaterialesPage } from "@/pages/MaterialesPage";
@@ -149,6 +150,7 @@ const router = createBrowserRouter(
           {conPermiso(Permiso.CLIENTES, <Route path="clientes" element={<ClientesPage />} />)}
 
           {/* ─── CONFIGURACIÓN ──────────────────────── */}
+          {conPermiso(Permiso.PANELES, <Route path="configuracion/paneles" element={<PanelesPage />} />)}
           {conPermiso(Permiso.INVERSORES, <Route path="configuracion/inversores" element={<InversoresPage />} />)}
           {conPermiso(Permiso.MATERIALES, <Route path="configuracion/materiales" element={<MaterialesPage />} />)}
           {conPermiso(Permiso.PRECIOS, <Route path="configuracion/precios" element={<PreciosPage />} />)}
