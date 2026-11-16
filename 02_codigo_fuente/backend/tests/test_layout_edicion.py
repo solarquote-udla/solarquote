@@ -295,3 +295,21 @@ def test_regenerar_reinicia_el_contador_de_ediciones(db, proyecto):
     regenerado = servicio.generar(db, proyecto, LayoutGenerar())
     assert regenerado.resumen["ediciones_manuales"] == 0
     assert regenerado.total_paneles == 1764
+
+
+def test_cambiar_la_potencia_objetivo_desactualiza_el_layout(db, proyecto):
+    """
+    Regresión de la demo con Producción (16 nov): se cambió la potencia
+    objetivo en el Paso 2 y el Paso 3 siguió con el layout anterior.
+    """
+    from app.models.equipo import ConfiguracionEquipo
+
+    configuracion = db.query(ConfiguracionEquipo).filter(ConfiguracionEquipo.proyecto_id == proyecto.id).one()
+    layout = servicio.obtener_layout(db, proyecto.id)
+    assert layout.huella == servicio.huella_actual(db, proyecto)
+
+    configuracion.potencia_objetivo_kwp = 115
+    db.flush()
+    assert layout.huella != servicio.huella_actual(db, proyecto)
+    with pytest.raises(servicio.LayoutNoEditable, match="Vuelve a generarlo"):
+        servicio.editar_bloques(db, proyecto, _como_edicion(layout))

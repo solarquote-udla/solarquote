@@ -76,7 +76,8 @@ def calcular_huella(
 
     Los inversores no entran: no cambian dónde van los bloques, solo a
     qué inversor se conecta cada uno, y eso se reparte de nuevo sin
-    volver a generar (`reagrupar`).
+    volver a generar (`reagrupar`). La potencia objetivo sí entra: si
+    cambia en el Paso 2, el layout ya no corresponde a lo pedido.
     """
     datos = {
         "latitud": float(proyecto.latitud) if proyecto.latitud is not None else None,
@@ -98,6 +99,7 @@ def calcular_huella(
                 equipo.panel_vmp_v,
                 equipo.angulo_montaje,
             ],
+            "potencia_objetivo_kwp": equipo.potencia_objetivo_kwp,
         },
     }
     serializado = json.dumps(datos, sort_keys=True, separators=(",", ":"))
