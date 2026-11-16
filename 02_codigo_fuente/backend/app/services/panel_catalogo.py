@@ -49,12 +49,24 @@ def listar_paneles(
 
 
 def buscar_paneles(db: Session, texto: str, incluir_inactivos: bool = False) -> list[PanelCatalogo]:
-    """Búsqueda libre: coincide con marca O modelo (RF-02, catálogo con búsqueda)."""
+    """
+    Búsqueda libre: coincide con marca, modelo o potencia (RF-02, catálogo
+    con búsqueda). Si `texto` es un número (p. ej. "580"), también
+    compara contra `potencia_wp`: "580" sí encuentra un panel de 580 Wp,
+    aunque ningún panel tenga "580" en la marca o el modelo.
+    """
     query = db.query(PanelCatalogo)
     if not incluir_inactivos:
         query = query.filter(PanelCatalogo.activo.is_(True))
     comodin = f"%{texto}%"
-    query = query.filter(or_(PanelCatalogo.marca.ilike(comodin), PanelCatalogo.modelo.ilike(comodin)))
+    condiciones = [PanelCatalogo.marca.ilike(comodin), PanelCatalogo.modelo.ilike(comodin)]
+    try:
+        potencia = float(texto)
+    except ValueError:
+        pass
+    else:
+        condiciones.append(PanelCatalogo.potencia_wp == potencia)
+    query = query.filter(or_(*condiciones))
     return query.order_by(PanelCatalogo.marca.asc(), PanelCatalogo.modelo.asc()).all()
 
 

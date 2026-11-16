@@ -189,6 +189,13 @@ def test_panel_busqueda_y_filtros(api, h):
     assert len(api.get("/api/paneles", headers=h, params={"potencia_wp": 999}).json()) == 0
 
 
+def test_panel_busqueda_libre_tambien_encuentra_por_potencia(api, h):
+    """Pedido de Lenin: q=580 debe encontrar un panel de 580 Wp aunque marca y modelo no digan "580"."""
+    api.post("/api/paneles", headers=h, json={**PANEL, "marca": "Risen Energy", "modelo": "Hyper-ion"})
+
+    assert [p["modelo"] for p in api.get("/api/paneles", headers=h, params={"q": "580"}).json()] == ["Hyper-ion"]
+
+
 @pytest.mark.parametrize("permiso,puede_crear", [(Permiso.PANELES, True), (Permiso.GENERAR_LAYOUT, False)])
 def test_paneles_por_permiso(api, db, permiso, puede_crear):
     cabecera = con_permisos(db, permiso)

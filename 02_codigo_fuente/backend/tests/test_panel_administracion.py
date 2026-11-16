@@ -76,6 +76,20 @@ def test_buscar_paneles_coincide_con_marca_o_modelo(db: Session) -> None:
     assert buscar_paneles(db, "huawei") == []
 
 
+def test_buscar_paneles_tambien_compara_con_la_potencia(db: Session) -> None:
+    """
+    Pedido de Lenin: buscar "580" debe encontrar un panel de 580 Wp aunque
+    ni la marca ni el modelo tengan "580" como texto.
+    """
+    panel = PanelCatalogo(marca="Risen Energy", modelo="Hyper-ion", **_BASE)
+    db.add(panel)
+    db.flush()
+
+    assert [p.modelo for p in buscar_paneles(db, "580")] == ["Hyper-ion"]
+    assert buscar_paneles(db, "580.5") == []
+    assert buscar_paneles(db, "abc") == []
+
+
 def test_actualizar_panel_cambia_los_campos_enviados(db: Session) -> None:
     panel = _crear_panel(db, "Jinko Solar", "JKM580N")
 
