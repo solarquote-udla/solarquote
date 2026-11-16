@@ -18,15 +18,14 @@ requisito es la corrida verde del PR indicado.
 
 | Componente | Pruebas | Cobertura de líneas | Cómo se ejecutan |
 |---|---|---|---|
-| Backend (API principal) | 552 | 96 % | `pytest` en `02_codigo_fuente/backend` |
+| Backend (API principal) | 553 | 96 % | `pytest` en `02_codigo_fuente/backend` |
 | calc-service | 32 | 100 % | `pytest` en `02_codigo_fuente/calc-service` |
 | ia-service | 96 | 94 % | `pytest` en `02_codigo_fuente/ia-service` |
-| Frontend (interfaz) | 178 | — | `npm test` en `02_codigo_fuente/frontend` |
-| **Total** | **858** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
+| Frontend (interfaz) | 195 | — | `npm test` en `02_codigo_fuente/frontend` |
+| **Total** | **876** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
 
 La cobertura se midió con `pytest --cov=app`. RNF-02 pide al menos 60 %
 en el backend.
-
 | Estado de los requisitos | Cantidad |
 |---|---|
 | Cubiertos por pruebas automatizadas | RF-01 a RF-16; RNF-01 (layout), RNF-02, RNF-03, RNF-04 |
@@ -51,6 +50,7 @@ calc-service e ia-service.
 | El área de los caminos se descuenta (área neta) | `test_geometria`: `test_un_camino`, `test_caminos_que_se_cruzan_no_se_cuentan_dos_veces`, `test_camino_que_sobresale_solo_descuenta_la_parte_interior`; `test_api_terreno`: `test_terreno_y_caminos_ciclo_completo` |
 | El área neta debe alcanzar para un panel | `test_geometria`: `test_camino_que_cubre_todo_el_terreno`; `test_layout`: `test_terreno_demasiado_chico` |
 | Corregir el polígono antes de confirmar | `asistentePaso1.test.tsx` (dibujo, coordenadas y medidas) |
+| Cada error junto a su campo y en rojo; obligatorios marcados; rangos de latitud, longitud y orientación; ancho y largo mayores que cero | `validacionPaso1.test.tsx` |
 | Solo con permiso | `test_api_terreno`: `test_terreno_exige_generar_layout` |
 
 Evidencia: PR #1, #20, #34 y el PR de SQ-135.
@@ -81,6 +81,7 @@ Evidencia: PR #2, #38 y el del catálogo de paneles.
 | Reparto de bloques entre inversores | `test_layout`: `test_dos_inversores_iguales_se_reparten_mitad_y_mitad`, `test_cada_inversor_recibe_un_sector_seguido`; `test_varios_inversores` |
 | L par | `test_layout`: `test_l_impar_o_cero_se_rechaza` |
 | A mínimo de los bloques cortos (SQ-170): sin él se aprovecha todo; con él no se generan bloques más cortos, tampoco al recortar por capacidad | `test_layout`: `test_a_minimo_*` (4 pruebas), `test_capacidad_con_a_minimo_no_deja_un_bloque_chico_al_final`; `test_api_layout_a_minimo` (4 pruebas); `layoutAMinimo.test.tsx` |
+| La capacidad deseada parte de la potencia objetivo del Paso 2; si esa potencia cambia, el layout queda desactualizado | `test_layout_edicion`: `test_cambiar_la_potencia_objetivo_desactualiza_el_layout`; `potenciaObjetivo.test.tsx` |
 | Edición manual (SQ-64) | `test_layout_edicion` (23 pruebas), paridad con `utils/edicionLayout.ts`; `asistentePasos2y3.test.tsx` |
 
 Evidencia: PR #14, #27, #34, #38 y el de SQ-170.

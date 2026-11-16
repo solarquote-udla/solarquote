@@ -59,16 +59,16 @@ código por servicio y los huecos pendientes.
 
 ## Cobertura actual
 
-Corte del 16 de noviembre de 2026: **858 pruebas automatizadas**, todas
+Corte del 16 de noviembre de 2026: **876 pruebas automatizadas**, todas
 aprobadas. Detalle por requisito en la
 [matriz de trazabilidad](trazabilidad/MATRIZ-TRAZABILIDAD.md).
 
 | Componente | Pruebas | Cobertura de líneas |
 |---|---|---|
-| Backend (API principal) | 552 | 96 % |
+| Backend (API principal) | 553 | 96 % |
 | calc-service | 32 | 100 % |
 | ia-service | 96 | 94 % |
-| Frontend (interfaz) | 178 | — |
+| Frontend (interfaz) | 195 | — |
 
 Pendientes: pruebas de extremo a extremo (Sprint 7) y las mediciones de
 RNF-01 con bocetos y fotos de lotes reales, RNF-05 y RNF-06.

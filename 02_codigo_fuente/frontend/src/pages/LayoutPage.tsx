@@ -178,16 +178,23 @@ function posicionCentrada(terreno: Punto[], direccion: Direccion): string {
 }
 
 /**
- * Parámetros del formulario. Sin layout, la capacidad deseada parte de la
- * potencia objetivo del Paso 2 (prototipo: se define una sola vez).
+ * Parámetros del formulario. La capacidad deseada parte de la potencia
+ * objetivo del Paso 2 si no hay layout o si el layout quedó desactualizado
+ * (por ejemplo, porque esa potencia cambió); si no, de la del layout.
  */
 function desdeLayout(l: Layout | null, objetivoKwp: number | null = null): Parametros {
-  if (!l) return { ...PARAMETROS_DEFECTO, kwp: objetivoKwp == null ? "" : String(objetivoKwp) };
+  const objetivo = objetivoKwp == null ? "" : String(objetivoKwp);
+  if (!l) return { ...PARAMETROS_DEFECTO, kwp: objetivo };
+  const usarObjetivo = l.desactualizado && objetivoKwp != null;
   return {
     L: String(l.parametros.paneles_largo),
     pasillo: String(l.parametros.pasillo_m),
     tolerancia: String(Math.round(l.parametros.tolerancia_proporcion * 100)),
-    kwp: l.parametros.capacidad_deseada_kwp == null ? "" : String(l.parametros.capacidad_deseada_kwp),
+    kwp: usarObjetivo
+      ? objetivo
+      : l.parametros.capacidad_deseada_kwp == null
+        ? ""
+        : String(l.parametros.capacidad_deseada_kwp),
     aMinimo: String(l.parametros.paneles_ancho_minimo ?? 1),
   };
 }
