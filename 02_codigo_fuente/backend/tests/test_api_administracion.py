@@ -65,10 +65,12 @@ def test_cliente_errores_traducidos(api, h):
 def test_clientes_lectura_y_administracion_por_permiso(api, db, h):
     cid = api.post("/api/clientes", headers=h, json=CLIENTE).json()["id"]
 
-    # Quien cotiza lee los clientes para elegirlos, pero no los administra
+    # Quien cotiza lee los clientes para elegirlos y puede crear uno nuevo
+    # al vuelo desde el Paso 1 (Lenin), pero no los administra (editar/dar de baja)
     cotiza = con_permisos(db, Permiso.GENERAR_LAYOUT)
     assert api.get("/api/clientes", headers=cotiza).status_code == 200
-    assert api.post("/api/clientes", headers=cotiza, json={**CLIENTE, "identificacion": "1710034065001"}).status_code == 403
+    assert api.post("/api/clientes", headers=cotiza, json={**CLIENTE, "identificacion": "1710034065001"}).status_code == 201
+    assert api.patch(f"/api/clientes/{cid}", headers=cotiza, json={"telefono": "099 123 4567"}).status_code == 403
     assert api.delete(f"/api/clientes/{cid}", headers=cotiza).status_code == 403
 
     ajeno = con_permisos(db, Permiso.DESPACHO)
@@ -76,6 +78,23 @@ def test_clientes_lectura_y_administracion_por_permiso(api, db, h):
 
     administra = con_permisos(db, Permiso.CLIENTES)
     assert api.patch(f"/api/clientes/{cid}", headers=administra, json={"telefono": "099 123 4567"}).status_code == 200
+
+
+def test_crear_cliente_desde_el_proyecto(api, db):
+    """
+    Pedido de Lenin: en el Paso 1, si el cliente no está en el catálogo,
+    se crea ahí mismo sin ir primero a Operaciones, Clientes.
+    """
+    cotiza = con_permisos(db, Permiso.GENERAR_LAYOUT)
+    cid = api.post("/api/clientes", headers=cotiza, json=CLIENTE).json()["id"]
+
+    r = api.post(
+        "/api/proyectos",
+        headers=cotiza,
+        json={"nombre": "Planta nueva", "cliente_id": cid, "ubicacion": None, "latitud": None, "longitud": None, "notas": None},
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["cliente"]["id"] == cid
 
 
 # ─── Materiales y precios (RF-09) ───────────────────────────────────
