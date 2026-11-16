@@ -27,6 +27,7 @@ import { BarraPaso } from "@/components/BarraPaso";
 import { EditorPoligonos, type CaminoDibujo } from "@/components/EditorPoligonos";
 import { EncabezadoProyecto } from "@/components/EncabezadoProyecto";
 import { rutaPaso } from "@/components/asistente";
+import { Campo } from "@/components/Campo";
 import { useCambiosSinGuardar } from "@/hooks/useCambiosSinGuardar";
 import { useAccionUnica } from "@/hooks/useAccionUnica";
 import { mensajeDeError } from "@/services/api";
@@ -34,12 +35,14 @@ import { listarClientes } from "@/services/clientes";
 import { actualizarProyecto, crearProyecto, obtenerProyecto } from "@/services/proyectos";
 import { actualizarTerreno, crearTerreno, obtenerTerreno } from "@/services/terreno";
 import type { ClienteListado, Proyecto, ProyectoActualizar, Punto, Terreno } from "@/types/api";
+import { bordeCampo } from "@/utils/campo";
 import { formatearArea, formatearMetros, limitesDe, rectangulo } from "@/utils/geometria";
 
 const BOTON =
   "rounded-lg border border-acero-300 bg-superficie px-3 py-1.5 text-sm text-acero-700 transition hover:bg-acero-100 disabled:cursor-not-allowed disabled:opacity-40";
-const CAMPO =
-  "w-full rounded-lg border border-acero-300 bg-acero-50 px-3 py-2 text-sm text-acero-900 placeholder:text-acero-400 focus:border-solar-500 focus:outline-none focus:ring-1 focus:ring-solar-500 disabled:opacity-60";
+const CAMPO_BASE =
+  "w-full rounded-lg border bg-acero-50 px-3 py-2 text-sm text-acero-900 placeholder:text-acero-400 focus:outline-none focus:ring-1 disabled:opacity-60";
+const CAMPO = `${CAMPO_BASE} ${bordeCampo()}`;
 const ETIQUETA = "block text-xs font-medium text-acero-600";
 const TARJETA = "rounded-xl border border-acero-200 bg-superficie p-5";
 const TITULO_TARJETA = "text-xs font-semibold tracking-wider text-acero-400";
@@ -76,6 +79,60 @@ function numeroOpcional(valor: string): number | null {
   if (limpio === "") return null;
   const n = Number(limpio);
   return Number.isFinite(n) ? n : Number.NaN;
+}
+
+type CampoPaso1 = "nombre" | "cliente" | "latitud" | "longitud" | "ancho" | "largo" | "orientacion";
+type ErroresPaso1 = Partial<Record<CampoPaso1, string>>;
+
+/** Error de un número opcional dentro de un rango, o undefined si está bien. */
+function errorRango(valor: string, min: number, max: number, unidad: string): string | undefined {
+  const n = numeroOpcional(valor);
+  if (n === null) return undefined;
+  if (Number.isNaN(n)) return `Debe ser un número en ${unidad}.`;
+  if (n < min || n > max) return `Debe estar entre ${min} y ${max}.`;
+  return undefined;
+}
+
+/** Error de una dimensión del terreno: si se escribe, debe ser mayor que cero. */
+function errorDimension(valor: string): string | undefined {
+  const n = numeroOpcional(valor);
+  if (n === null) return undefined;
+  if (Number.isNaN(n)) return "Debe ser un número en metros.";
+  if (n <= 0) return "Debe ser mayor que cero.";
+  return undefined;
+}
+
+/**
+ * Errores de cada campo del Paso 1. Se calculan siempre; la pantalla los
+ * muestra cuando el usuario deja el campo o intenta avanzar.
+ */
+function erroresPaso1(
+  datos: DatosProyecto,
+  dimensiones: { ancho: string; largo: string },
+  orientacion: string,
+  { exigeCliente, hayContorno }: { exigeCliente: boolean; hayContorno: boolean },
+): ErroresPaso1 {
+  const errores: ErroresPaso1 = {};
+  const nombre = datos.nombre.trim();
+  if (nombre === "") errores.nombre = "Escribe el nombre del proyecto.";
+  else if (nombre.length < 3) errores.nombre = "Debe tener al menos 3 caracteres.";
+  if (exigeCliente && !datos.clienteId) errores.cliente = "Elige el cliente del proyecto.";
+  errores.latitud = errorRango(datos.latitud, -90, 90, "grados decimales (ej. 0.3517)");
+  errores.longitud = errorRango(datos.longitud, -180, 180, "grados decimales (ej. -78.1223)");
+  errores.ancho = errorDimension(dimensiones.ancho);
+  errores.largo = errorDimension(dimensiones.largo);
+  if (!hayContorno) {
+    if (!errores.ancho && dimensiones.ancho.trim() === "") errores.ancho = "Ingresa el ancho o dibuja el contorno.";
+    if (!errores.largo && dimensiones.largo.trim() === "") errores.largo = "Ingresa el largo o dibuja el contorno.";
+  }
+  const grados = numeroOpcional(orientacion);
+  if (grados !== null && (Number.isNaN(grados) || grados < 0 || grados >= 360)) {
+    errores.orientacion = "Debe estar entre 0 y 359,99 grados.";
+  }
+  for (const campo of Object.keys(errores) as CampoPaso1[]) {
+    if (errores[campo] === undefined) delete errores[campo];
+  }
+  return errores;
 }
 
 /** Área de un polígono simple (fórmula del área de Gauss). */
@@ -151,6 +208,10 @@ export function TerrenoPage() {
 
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Un error se muestra cuando el usuario dejó el campo o intentó avanzar:
+  // marcar en rojo mientras escribe la primera letra molesta.
+  const [tocados, setTocados] = useState<Partial<Record<CampoPaso1, boolean>>>({});
+  const [intentoAvanzar, setIntentoAvanzar] = useState(false);
 
   const cargarEnEditor = useCallback((terreno: Terreno | null) => {
     setGuardado(terreno);
@@ -211,6 +272,14 @@ export function TerrenoPage() {
   const area = vertices.length >= 3 ? areaPoligono(vertices) : null;
   const gradosOrientacion = numeroOpcional(orientacion);
 
+  const errores = erroresPaso1(datos, dimensiones, orientacion, {
+    exigeCliente: esNuevo && !proyecto,
+    hayContorno: vertices.length >= 3,
+  });
+  const visible = (campo: CampoPaso1) => (tocados[campo] || intentoAvanzar ? errores[campo] : undefined);
+  const claseCampo = (campo: CampoPaso1) => `mt-1 ${CAMPO_BASE} ${bordeCampo(visible(campo))}`;
+  const tocar = (campo: CampoPaso1) => () => setTocados((t) => ({ ...t, [campo]: true }));
+
   // ─── Geometría ───────────────────────────────────────
 
   /**
@@ -267,7 +336,10 @@ export function TerrenoPage() {
     setError(null);
     const nuevo = rectanguloEscrito();
     if (!nuevo) {
-      setError("El ancho y el largo del terreno deben ser mayores que cero.");
+      setTocados((t) => ({ ...t, ancho: true, largo: true }));
+      if (!errores.ancho && !errores.largo) {
+        setError("Ingresa el ancho y el largo del terreno para actualizar el plano.");
+      }
       return;
     }
     // Un contorno irregular no se describe con ancho y largo: reemplazarlo pierde vértices
@@ -304,14 +376,12 @@ export function TerrenoPage() {
 
   function validar():
     | { proyecto: ProyectoActualizar & { cliente_id?: number }; orientacion: number | null; vertices: Punto[] }
-    | string {
-    if (datos.nombre.trim().length < 3) return "El nombre del proyecto debe tener al menos 3 caracteres.";
-    if (esNuevo && !datos.clienteId) return "Elige el cliente del proyecto.";
+    | string
+    | null {
+    // Los errores de campo se muestran junto a cada campo, sin mensaje general
+    if (Object.keys(errores).length > 0) return null;
     const latitud = numeroOpcional(datos.latitud);
     const longitud = numeroOpcional(datos.longitud);
-    if (Number.isNaN(latitud) || Number.isNaN(longitud)) {
-      return "Latitud y longitud deben ser números en grados decimales (ej. 0.3517).";
-    }
     if (dibujando) return "Termina o cancela el dibujo del contorno.";
     // Si escribió ancho y largo sin pulsar "Actualizar plano", se aplican al guardar
     // cuando no hay nada que perder (sin contorno o con un rectángulo); si el
@@ -325,9 +395,6 @@ export function TerrenoPage() {
     }
     if (contorno.length < 3) return "Define el terreno: ingresa ancho y largo, o dibuja su contorno.";
     const grados = numeroOpcional(orientacion);
-    if (grados !== null && (Number.isNaN(grados) || grados < 0 || grados >= 360)) {
-      return "La orientación del norte debe estar entre 0 y 359,99 grados.";
-    }
     return {
       proyecto: {
         nombre: datos.nombre.trim(),
@@ -342,7 +409,9 @@ export function TerrenoPage() {
 
   async function siguiente() {
     setError(null);
+    setIntentoAvanzar(true);
     const valido = validar();
+    if (valido === null) return;
     if (typeof valido === "string") {
       setError(valido);
       return;
@@ -504,14 +573,14 @@ export function TerrenoPage() {
           <div className={TARJETA}>
             <h2 className={TITULO_TARJETA}>DATOS DEL PROYECTO</h2>
             <div className="mt-3 space-y-3">
+              <Campo etiqueta="Nombre del proyecto" obligatorio error={visible("nombre")}>
+                <input className={claseCampo("nombre")} value={datos.nombre} maxLength={150} placeholder="Ej. San Pablo de Lago 3era Etapa" onChange={(e) => setDatos((d) => ({ ...d, nombre: e.target.value }))} onBlur={tocar("nombre")} />
+              </Campo>
               <label className={ETIQUETA}>
-                Nombre del proyecto *
-                <input className={`mt-1 ${CAMPO}`} value={datos.nombre} maxLength={150} placeholder="Ej. San Pablo de Lago 3era Etapa" onChange={(e) => setDatos((d) => ({ ...d, nombre: e.target.value }))} />
-              </label>
-              <label className={ETIQUETA}>
-                Cliente *
+                Cliente
+                <span className="text-red-600" aria-hidden="true">{" *"}</span>
                 {esNuevo && !proyecto ? (
-                  <select className={`mt-1 ${CAMPO}`} value={datos.clienteId} onChange={(e) => setDatos((d) => ({ ...d, clienteId: e.target.value }))}>
+                  <select className={claseCampo("cliente")} value={datos.clienteId} onChange={(e) => setDatos((d) => ({ ...d, clienteId: e.target.value }))} onBlur={tocar("cliente")} aria-invalid={visible("cliente") ? true : undefined}>
                     <option value="">Selecciona un cliente</option>
                     {clientes.map((c) => (
                       <option key={c.id} value={c.id}>
@@ -522,33 +591,26 @@ export function TerrenoPage() {
                 ) : (
                   <input className={`mt-1 ${CAMPO}`} value={clienteActual?.nombre ?? ""} disabled title="Un proyecto conserva su cliente" />
                 )}
+                {visible("cliente") && <span className="mt-1 block font-normal text-red-600">{visible("cliente")}</span>}
                 {esNuevo && !proyecto && clientes.length === 0 && (
                   <span className="mt-1 block font-normal text-acero-500">No hay clientes activos. Regístralo primero en Operaciones, Clientes.</span>
                 )}
               </label>
-              <div className="grid grid-cols-2 gap-3">
-                <label className={ETIQUETA}>
-                  Proforma
-                  <input className={`mt-1 ${CAMPO}`} value={proyecto?.numero_proforma ?? ""} placeholder="Se asigna al confirmar el layout" disabled />
-                </label>
-                <label className={ETIQUETA}>
-                  Fecha
-                  <input className={`mt-1 ${CAMPO}`} value={fecha} disabled />
-                </label>
-              </div>
+              <label className={ETIQUETA}>
+                Fecha
+                <input className={`mt-1 ${CAMPO}`} value={fecha} disabled />
+              </label>
               <label className={ETIQUETA}>
                 Ubicación
                 <input className={`mt-1 ${CAMPO}`} value={datos.ubicacion} maxLength={255} placeholder="Provincia, cantón, referencia" onChange={(e) => setDatos((d) => ({ ...d, ubicacion: e.target.value }))} />
               </label>
               <div className="grid grid-cols-2 gap-3">
-                <label className={ETIQUETA}>
-                  Latitud
-                  <input className={`mt-1 ${CAMPO}`} inputMode="decimal" placeholder="0.3517" value={datos.latitud} onChange={(e) => setDatos((d) => ({ ...d, latitud: e.target.value }))} />
-                </label>
-                <label className={ETIQUETA}>
-                  Longitud
-                  <input className={`mt-1 ${CAMPO}`} inputMode="decimal" placeholder="-78.1223" value={datos.longitud} onChange={(e) => setDatos((d) => ({ ...d, longitud: e.target.value }))} />
-                </label>
+                <Campo etiqueta="Latitud" error={visible("latitud")}>
+                  <input className={claseCampo("latitud")} inputMode="decimal" placeholder="0.3517" value={datos.latitud} onChange={(e) => setDatos((d) => ({ ...d, latitud: e.target.value }))} onBlur={tocar("latitud")} />
+                </Campo>
+                <Campo etiqueta="Longitud" error={visible("longitud")}>
+                  <input className={claseCampo("longitud")} inputMode="decimal" placeholder="-78.1223" value={datos.longitud} onChange={(e) => setDatos((d) => ({ ...d, longitud: e.target.value }))} onBlur={tocar("longitud")} />
+                </Campo>
               </div>
               {datos.latitud.trim() === "" && (
                 <p className="text-xs text-amber-700">Sin latitud no se calcula la sombra entre filas ni entre bloques.</p>
@@ -559,14 +621,12 @@ export function TerrenoPage() {
           <div className={TARJETA}>
             <h2 className={TITULO_TARJETA}>DIMENSIONES DEL TERRENO</h2>
             <div className="mt-3 grid grid-cols-2 gap-3">
-              <label className={ETIQUETA}>
-                Ancho (m)
-                <input className={`mt-1 ${CAMPO}`} inputMode="decimal" value={dimensiones.ancho} onChange={(e) => setDimensiones((d) => ({ ...d, ancho: e.target.value }))} />
-              </label>
-              <label className={ETIQUETA}>
-                Largo (m)
-                <input className={`mt-1 ${CAMPO}`} inputMode="decimal" value={dimensiones.largo} onChange={(e) => setDimensiones((d) => ({ ...d, largo: e.target.value }))} />
-              </label>
+              <Campo etiqueta="Ancho (m)" obligatorio error={visible("ancho")}>
+                <input className={claseCampo("ancho")} inputMode="decimal" value={dimensiones.ancho} onChange={(e) => setDimensiones((d) => ({ ...d, ancho: e.target.value }))} onBlur={tocar("ancho")} />
+              </Campo>
+              <Campo etiqueta="Largo (m)" obligatorio error={visible("largo")}>
+                <input className={claseCampo("largo")} inputMode="decimal" value={dimensiones.largo} onChange={(e) => setDimensiones((d) => ({ ...d, largo: e.target.value }))} onBlur={tocar("largo")} />
+              </Campo>
             </div>
             <p className={`mt-3 ${ETIQUETA}`}>Área calculada</p>
             <p className="mt-1 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-800">
@@ -640,11 +700,14 @@ export function TerrenoPage() {
                 );
               })}
             </div>
-            <label className={`mt-3 ${ETIQUETA}`}>
-              Otro ángulo (°)
-              <input className={`mt-1 ${CAMPO}`} type="number" min={0} max={359.99} step="0.1" placeholder="Sin definir" value={orientacion} onChange={(e) => setOrientacion(e.target.value)} />
-              <span className="mt-1 block font-normal text-acero-400">Hacia dónde apunta el norte: 0 = arriba del plano, sentido horario</span>
-            </label>
+            <Campo
+              className="mt-3"
+              etiqueta="Otro ángulo (°)"
+              error={visible("orientacion")}
+              ayuda="Hacia dónde apunta el norte: 0 = arriba del plano, sentido horario"
+            >
+              <input className={claseCampo("orientacion")} inputMode="decimal" placeholder="Sin definir" value={orientacion} onChange={(e) => setOrientacion(e.target.value)} onBlur={tocar("orientacion")} />
+            </Campo>
           </div>
 
           <div className={TARJETA}>
