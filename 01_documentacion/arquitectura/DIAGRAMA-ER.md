@@ -4,10 +4,10 @@
 `alembic upgrade head`), no una propuesta.
 
 Reemplaza el diagrama ASCII informal que había al final de
-[MODELOS-COMPARTIDOS.md](MODELOS-COMPARTIDOS.md): este cubre las 24 tablas
+[MODELOS-COMPARTIDOS.md](MODELOS-COMPARTIDOS.md): este cubre las 25 tablas
 del sistema completo (Módulo 1 y 2 de Joseph + Cotización/Materiales/
-Inversores/Clientes/Proforma de Esteban + Validación de materiales), no
-solo los modelos compartidos.
+Inversores/Paneles/Clientes/Proforma de Esteban + Validación de
+materiales), no solo los modelos compartidos.
 
 **El bloque `erDiagram` de abajo se genera, no se escribe a mano.**
 Un diagrama hecho a mano se desactualiza en silencio — llegó a decir 17
@@ -257,6 +257,20 @@ erDiagram
         datetime created_at
     }
 
+    PANELES {
+        int id PK
+        string marca "UK con (marca, modelo)"
+        string modelo "UK con (marca, modelo)"
+        float potencia_wp
+        float largo_mm
+        float ancho_mm
+        float voc_v
+        float vmp_v
+        boolean activo
+        datetime created_at
+        datetime updated_at
+    }
+
     PERFIL_PERMISOS {
         int perfil_id PK, FK
         string codigo PK
@@ -394,6 +408,13 @@ el resto del esquema. La conexión con `CONFIGURACIONES_EQUIPO` /
 `INVERSORES_EQUIPO` ocurre solo en la capa de aplicación (el formulario lee
 el catálogo), nunca en la base de datos.
 
+### `PanelCatalogo` (catálogo, RF-02) tampoco tiene FK
+
+Mismo patrón que `Inversor`: `PANELES` prellena el formulario del Paso 2
+(`ConfiguracionEquipo.panel_*`), pero ese prellenado también se copia como
+snapshot, no como referencia. `PANELES` es otra entidad aislada en el ER,
+sin relación de base de datos con `CONFIGURACIONES_EQUIPO`.
+
 ### `BloqueLayout.inversor` no es una FK hacia `InversorEquipo`
 
 Cada bloque del layout queda "conectado" a uno de los inversores de la
@@ -414,7 +435,8 @@ número negativo, que no corresponde a ningún inversor posible.
 ## Patrones del esquema, vistos en el diagrama
 
 - **Baja lógica, nunca `DELETE`:** `activo` en `Usuario`, `Inversor`,
-  `Material`, `Cliente`. Ninguna de estas cuatro tablas borra filas.
+  `PanelCatalogo`, `Material`, `Cliente`. Ninguna de estas cinco tablas
+  borra filas.
 - **Snapshot al emitir un documento comercial:** `Cotizacion` congela los
   datos del cliente (`cliente_nombre`, `cliente_email`, …) y
   `MaterialCotizado.precio_unitario` congela el precio vigente al momento

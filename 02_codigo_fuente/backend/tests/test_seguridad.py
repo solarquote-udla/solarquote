@@ -281,6 +281,21 @@ def test_sin_ningun_permiso_relacionado_no_lee_inversores(api, db):
     assert api.get("/api/inversores", headers=sesion).status_code == 403
 
 
+def test_generar_layout_puede_leer_paneles_pero_no_administrarlos(api, db):
+    """Mismo caso que inversores: el Paso 2 del asistente lee este catálogo."""
+    sesion = cabecera(crear_usuario(db, perfil=perfil_personalizado(db, Permiso.GENERAR_LAYOUT)))
+
+    assert api.get("/api/paneles", headers=sesion).status_code == 200
+    datos = {"marca": "Jinko", "modelo": "X", "potencia_wp": 580, "largo_mm": 2278, "ancho_mm": 1134, "voc_v": 52, "vmp_v": 43}
+    assert api.post("/api/paneles", headers=sesion, json=datos).status_code == 403
+
+
+def test_sin_ningun_permiso_relacionado_no_lee_paneles(api, db):
+    sesion = cabecera(crear_usuario(db, perfil=perfil_personalizado(db, Permiso.CLIENTES)))
+
+    assert api.get("/api/paneles", headers=sesion).status_code == 403
+
+
 def test_historial_lo_lee_quien_tiene_historial_o_generar_layout(api, db):
     """Revisión del PR #39 (RF-10): misma regla que la ruta /historial del frontend."""
     con_historial = cabecera(crear_usuario(db, perfil=perfil_personalizado(db, Permiso.HISTORIAL)))
