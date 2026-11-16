@@ -596,16 +596,10 @@ export function TerrenoPage() {
                   <span className="mt-1 block font-normal text-acero-500">No hay clientes activos. Regístralo primero en Operaciones, Clientes.</span>
                 )}
               </label>
-              <div className="grid grid-cols-2 gap-3">
-                <label className={ETIQUETA}>
-                  Proforma
-                  <input className={`mt-1 ${CAMPO}`} value={proyecto?.numero_proforma ?? ""} placeholder="Se asigna al confirmar el layout" disabled />
-                </label>
-                <label className={ETIQUETA}>
-                  Fecha
-                  <input className={`mt-1 ${CAMPO}`} value={fecha} disabled />
-                </label>
-              </div>
+              <label className={ETIQUETA}>
+                Fecha
+                <input className={`mt-1 ${CAMPO}`} value={fecha} disabled />
+              </label>
               <label className={ETIQUETA}>
                 Ubicación
                 <input className={`mt-1 ${CAMPO}`} value={datos.ubicacion} maxLength={255} placeholder="Provincia, cantón, referencia" onChange={(e) => setDatos((d) => ({ ...d, ubicacion: e.target.value }))} />

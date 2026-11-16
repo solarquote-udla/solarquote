@@ -113,3 +113,12 @@ describe("Paso 1: errores junto al campo", () => {
     }
   });
 });
+
+describe("Paso 1: datos del proyecto", () => {
+  it("no muestra el campo Proforma: el número se asigna al confirmar el layout", async () => {
+    existente();
+    await listo();
+    expect(screen.queryByLabelText(/^Proforma/)).toBeNull();
+    expect(screen.getByLabelText(/^Fecha/)).toBeTruthy();
+  });
+});
