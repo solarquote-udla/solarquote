@@ -13,6 +13,7 @@ import { montar, PROYECTO, rect, TERRENO } from "./utilidades";
 
 vi.mock("@/services/proyectos", () => ({ obtenerProyecto: vi.fn(), crearProyecto: vi.fn(), actualizarProyecto: vi.fn() }));
 vi.mock("@/services/terreno", () => ({ obtenerTerreno: vi.fn(), crearTerreno: vi.fn(), actualizarTerreno: vi.fn() }));
+vi.mock("@/components/MapaUbicacion", async () => ({ MapaUbicacion: (await import("./mapaFalso")).MapaFalso }));
 vi.mock("@/services/clientes", () => ({
   listarClientes: vi.fn().mockResolvedValue([{ id: 9, nombre: "Cliente", identificacion: "1", activo: true }]),
 }));
@@ -62,9 +63,6 @@ describe("Paso 1: errores junto al campo", () => {
     [/^Ancho \(m\)/, "-5", "Debe ser mayor que cero."],
     [/^Ancho \(m\)/, "0", "Debe ser mayor que cero."],
     [/^Largo \(m\)/, "abc", "Debe ser un número en metros."],
-    [/^Latitud/, "95", "Debe estar entre -90 y 90."],
-    [/^Latitud/, "norte", "Debe ser un número en grados decimales (ej. 0.3517)."],
-    [/^Longitud/, "-181", "Debe estar entre -180 y 180."],
     [/^Otro ángulo/, "360", "Debe estar entre 0 y 359,99 grados."],
     [/^Otro ángulo/, "-1", "Debe estar entre 0 y 359,99 grados."],
     [/^Nombre del proyecto/, "ab", "Debe tener al menos 3 caracteres."],
@@ -82,13 +80,13 @@ describe("Paso 1: errores junto al campo", () => {
   it("el error aparece al dejar el campo, no mientras se escribe", async () => {
     existente();
     await listo();
-    const latitud = campo(/^Latitud/);
-    escribir(latitud, "200");
-    expect(errorDe(latitud)).toBeNull();
-    fireEvent.blur(latitud);
-    expect(errorDe(latitud)).toBe("Debe estar entre -90 y 90.");
-    escribir(latitud, "0,35");
-    expect(errorDe(latitud)).toBeNull();
+    const ancho = campo(/^Ancho \(m\)/);
+    escribir(ancho, "-3");
+    expect(errorDe(ancho)).toBeNull();
+    fireEvent.blur(ancho);
+    expect(errorDe(ancho)).toBe("Debe ser mayor que cero.");
+    escribir(ancho, "80,5");
+    expect(errorDe(ancho)).toBeNull();
   });
 
   it("al corregir los campos avanza", async () => {
@@ -111,6 +109,42 @@ describe("Paso 1: errores junto al campo", () => {
       const marca = campo(etiqueta).closest("label")?.querySelector(".text-red-600");
       expect(marca?.textContent?.trim()).toBe("*");
     }
+  });
+});
+
+describe("Paso 1: ubicación en el mapa", () => {
+  it("no hay campos de latitud ni longitud", async () => {
+    existente();
+    await listo();
+    expect(screen.queryByLabelText(/^Latitud/)).toBeNull();
+    expect(screen.queryByLabelText(/^Longitud/)).toBeNull();
+  });
+
+  it("el punto marcado en el mapa se guarda como latitud y longitud del proyecto", async () => {
+    vi.mocked(proyectos.actualizarProyecto).mockResolvedValue(PROYECTO as never);
+    existente();
+    await listo();
+    fireEvent.click(screen.getByText("CLIC EN EL MAPA"));
+    expect(screen.getByTestId("coordenadas").textContent).toBe("-0,2298, -78,5249");
+    await siguiente();
+    expect(await screen.findByText("PASO 2")).toBeTruthy();
+    expect(proyectos.actualizarProyecto).toHaveBeenCalledWith(5, { latitud: -0.2298, longitud: -78.5249 });
+  });
+
+  it("Quitar ubicación borra el punto y avisa que no habrá sombra", async () => {
+    vi.mocked(proyectos.obtenerProyecto).mockResolvedValue({ ...PROYECTO, latitud: 0.35, longitud: -78.12 } as never);
+    existente();
+    await listo();
+    expect(screen.getByTestId("marcador").textContent).toBe("0.35,-78.12");
+    fireEvent.click(screen.getByText("Quitar ubicación"));
+    expect(screen.getByTestId("marcador").textContent).toBe("sin marcador");
+    expect(screen.getByText(/Sin ubicación no se calcula la sombra/)).toBeTruthy();
+  });
+
+  it("un proyecto con solo latitud la conserva y pide marcar el punto", async () => {
+    existente();
+    await listo();
+    expect(screen.getByText(/Tiene latitud 0,1900 pero falta el punto en el mapa/)).toBeTruthy();
   });
 });
 

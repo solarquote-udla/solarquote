@@ -28,6 +28,7 @@ import { EditorPoligonos, type CaminoDibujo } from "@/components/EditorPoligonos
 import { EncabezadoProyecto } from "@/components/EncabezadoProyecto";
 import { rutaPaso } from "@/components/asistente";
 import { Campo } from "@/components/Campo";
+import { MapaUbicacion } from "@/components/MapaUbicacion";
 import { useCambiosSinGuardar } from "@/hooks/useCambiosSinGuardar";
 import { useAccionUnica } from "@/hooks/useAccionUnica";
 import { mensajeDeError } from "@/services/api";
@@ -81,17 +82,8 @@ function numeroOpcional(valor: string): number | null {
   return Number.isFinite(n) ? n : Number.NaN;
 }
 
-type CampoPaso1 = "nombre" | "cliente" | "latitud" | "longitud" | "ancho" | "largo" | "orientacion";
+type CampoPaso1 = "nombre" | "cliente" | "ancho" | "largo" | "orientacion";
 type ErroresPaso1 = Partial<Record<CampoPaso1, string>>;
-
-/** Error de un número opcional dentro de un rango, o undefined si está bien. */
-function errorRango(valor: string, min: number, max: number, unidad: string): string | undefined {
-  const n = numeroOpcional(valor);
-  if (n === null) return undefined;
-  if (Number.isNaN(n)) return `Debe ser un número en ${unidad}.`;
-  if (n < min || n > max) return `Debe estar entre ${min} y ${max}.`;
-  return undefined;
-}
 
 /** Error de una dimensión del terreno: si se escribe, debe ser mayor que cero. */
 function errorDimension(valor: string): string | undefined {
@@ -117,8 +109,6 @@ function erroresPaso1(
   if (nombre === "") errores.nombre = "Escribe el nombre del proyecto.";
   else if (nombre.length < 3) errores.nombre = "Debe tener al menos 3 caracteres.";
   if (exigeCliente && !datos.clienteId) errores.cliente = "Elige el cliente del proyecto.";
-  errores.latitud = errorRango(datos.latitud, -90, 90, "grados decimales (ej. 0.3517)");
-  errores.longitud = errorRango(datos.longitud, -180, 180, "grados decimales (ej. -78.1223)");
   errores.ancho = errorDimension(dimensiones.ancho);
   errores.largo = errorDimension(dimensiones.largo);
   if (!hayContorno) {
@@ -175,6 +165,8 @@ function esquinaInferior(vertices: Punto[]): Punto {
   const caja = limitesDe(vertices);
   return caja ? [caja.minX, caja.minY] : [0, 0];
 }
+
+const formatoCoordenada = new Intl.NumberFormat("es-EC", { minimumFractionDigits: 4, maximumFractionDigits: 6 });
 
 const formatoFecha = new Intl.DateTimeFormat("es-EC", { day: "2-digit", month: "2-digit", year: "numeric" });
 
@@ -271,6 +263,15 @@ export function TerrenoPage() {
 
   const area = vertices.length >= 3 ? areaPoligono(vertices) : null;
   const gradosOrientacion = numeroOpcional(orientacion);
+  const latitudNumero = numeroOpcional(datos.latitud);
+  const longitudNumero = numeroOpcional(datos.longitud);
+  const coordenadas = useMemo(
+    () =>
+      latitudNumero !== null && !Number.isNaN(latitudNumero) && longitudNumero !== null && !Number.isNaN(longitudNumero)
+        ? { latitud: latitudNumero, longitud: longitudNumero }
+        : null,
+    [latitudNumero, longitudNumero],
+  );
 
   const errores = erroresPaso1(datos, dimensiones, orientacion, {
     exigeCliente: esNuevo && !proyecto,
@@ -604,17 +605,38 @@ export function TerrenoPage() {
                 Ubicación
                 <input className={`mt-1 ${CAMPO}`} value={datos.ubicacion} maxLength={255} placeholder="Provincia, cantón, referencia" onChange={(e) => setDatos((d) => ({ ...d, ubicacion: e.target.value }))} />
               </label>
-              <div className="grid grid-cols-2 gap-3">
-                <Campo etiqueta="Latitud" error={visible("latitud")}>
-                  <input className={claseCampo("latitud")} inputMode="decimal" placeholder="0.3517" value={datos.latitud} onChange={(e) => setDatos((d) => ({ ...d, latitud: e.target.value }))} onBlur={tocar("latitud")} />
-                </Campo>
-                <Campo etiqueta="Longitud" error={visible("longitud")}>
-                  <input className={claseCampo("longitud")} inputMode="decimal" placeholder="-78.1223" value={datos.longitud} onChange={(e) => setDatos((d) => ({ ...d, longitud: e.target.value }))} onBlur={tocar("longitud")} />
-                </Campo>
+              <div>
+                <p className={ETIQUETA}>Ubicación en el mapa</p>
+                <p className="mt-0.5 text-xs text-acero-400">Haz clic sobre el terreno; el punto se puede arrastrar. El norte está arriba.</p>
+                <div className="mt-2">
+                  <MapaUbicacion
+                    valor={coordenadas}
+                    onCambio={({ latitud, longitud }) =>
+                      setDatos((d) => ({ ...d, latitud: String(latitud), longitud: String(longitud) }))
+                    }
+                  />
+                </div>
+                {coordenadas ? (
+                  <p className="mt-1 flex items-center justify-between gap-2 text-xs text-acero-500">
+                    <span data-testid="coordenadas">
+                      {formatoCoordenada.format(coordenadas.latitud)}, {formatoCoordenada.format(coordenadas.longitud)}
+                    </span>
+                    <button
+                      type="button"
+                      className="text-acero-500 hover:text-red-600"
+                      onClick={() => setDatos((d) => ({ ...d, latitud: "", longitud: "" }))}
+                    >
+                      Quitar ubicación
+                    </button>
+                  </p>
+                ) : latitudNumero !== null && !Number.isNaN(latitudNumero) ? (
+                  <p className="mt-1 text-xs text-amber-700">
+                    Tiene latitud {formatoCoordenada.format(latitudNumero)} pero falta el punto en el mapa. Márcalo para completar la ubicación.
+                  </p>
+                ) : (
+                  <p className="mt-1 text-xs text-amber-700">Sin ubicación no se calcula la sombra entre filas ni entre bloques.</p>
+                )}
               </div>
-              {datos.latitud.trim() === "" && (
-                <p className="text-xs text-amber-700">Sin latitud no se calcula la sombra entre filas ni entre bloques.</p>
-              )}
             </div>
           </div>
 
