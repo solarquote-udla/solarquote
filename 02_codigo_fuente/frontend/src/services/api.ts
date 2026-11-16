@@ -111,11 +111,9 @@ export function mensajeDeError(error: unknown, porDefecto = "Ocurrió un error i
 }
 
 /**
- * Pydantic entrega dos tipos de mensaje:
- *   - Los validadores propios del backend, ya en español, con el prefijo
- *     "Value error, " que Pydantic agrega: se quita el prefijo.
- *   - Las restricciones de campo (gt, le, min_length…), en inglés y sin
- *     decir de qué campo se trata: se antepone la ruta del campo.
+ * El manejador global de 422 del backend (app/core/errores.py) ya entrega
+ * el mensaje en español y sin el prefijo "Value error, " de Pydantic.
+ * Esto queda como respaldo por si algún 422 no pasara por ese manejador.
  */
 function traducirErrorValidacion(error: { msg: string; loc: (string | number)[] }): string {
   const propio = error.msg.replace(/^Value error, /, "");
@@ -125,4 +123,36 @@ function traducirErrorValidacion(error: { msg: string; loc: (string | number)[] 
 
   const campo = error.loc.filter((parte) => parte !== "body").join(" › ");
   return campo ? `${campo}: ${error.msg}` : error.msg;
+}
+
+/**
+ * Errores de validación (422) por campo, para ponerlos junto al campo
+ * correspondiente en vez de en un mensaje general.
+ *
+ * La clave es el `loc` del backend sin el "body" inicial, con los
+ * niveles unidos por ".": `potencia_wp`, `panel.vmp_v`,
+ * `inversores.0.vmin_v`. Cada pantalla traduce esas claves a los nombres
+ * de su propio formulario (ver `InversoresPage`/`PanelesPage`).
+ *
+ * Devuelve `{}` si el error no es una respuesta 422 con ese formato —
+ * por ejemplo, un 409 de negocio, que se muestra con `mensajeDeError`.
+ */
+export function erroresDeCampo(error: unknown): Record<string, string> {
+  if (!axios.isAxiosError(error)) {
+    return {};
+  }
+
+  const detalle = (error as AxiosError<ErrorApi>).response?.data?.detail;
+  if (!Array.isArray(detalle)) {
+    return {};
+  }
+
+  const errores: Record<string, string> = {};
+  for (const item of detalle) {
+    const campo = item.loc.filter((parte) => parte !== "body").join(".");
+    if (campo) {
+      errores[campo] = item.msg;
+    }
+  }
+  return errores;
 }
