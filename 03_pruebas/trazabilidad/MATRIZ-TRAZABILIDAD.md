@@ -21,8 +21,8 @@ requisito es la corrida verde del PR indicado.
 | Backend (API principal) | 521 | 96 % | `pytest` en `02_codigo_fuente/backend` |
 | calc-service | 32 | 100 % | `pytest` en `02_codigo_fuente/calc-service` |
 | ia-service | 96 | 94 % | `pytest` en `02_codigo_fuente/ia-service` |
-| Frontend (interfaz) | 181 | — | `npm test` en `02_codigo_fuente/frontend` |
-| **Total** | **830** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
+| Frontend (interfaz) | 195 | — | `npm test` en `02_codigo_fuente/frontend` |
+| **Total** | **844** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
 
 La cobertura se midió con `pytest --cov=app`. RNF-02 pide al menos 60 %
 en el backend.
@@ -51,6 +51,7 @@ calc-service e ia-service.
 | El área de los caminos se descuenta (área neta) | `test_geometria`: `test_un_camino`, `test_caminos_que_se_cruzan_no_se_cuentan_dos_veces`, `test_camino_que_sobresale_solo_descuenta_la_parte_interior`; `test_api_terreno`: `test_terreno_y_caminos_ciclo_completo` |
 | El área neta debe alcanzar para un panel | `test_geometria`: `test_camino_que_cubre_todo_el_terreno`; `test_layout`: `test_terreno_demasiado_chico` |
 | Corregir el polígono antes de confirmar | `asistentePaso1.test.tsx` (dibujo, coordenadas y medidas) |
+| Cada error junto a su campo y en rojo; obligatorios marcados; rangos de latitud, longitud y orientación; ancho y largo mayores que cero | `validacionPaso1.test.tsx` |
 | Solo con permiso | `test_api_terreno`: `test_terreno_exige_generar_layout` |
 
 Evidencia: PR #1, #20, #34 y el PR de SQ-135.
