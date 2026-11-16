@@ -23,6 +23,7 @@ INEXISTENTE = 999_999
 
 CLIENTE = {"nombre": "SolarAndes Instalaciones", "tipo_identificacion": "ruc", "identificacion": "1091234567001"}
 INVERSOR = {"marca": "Genérico", "modelo": "INV-200K", "potencia_kw": 200, "vmax_v": 1100, "vmin_v": 200, "mppts": 10, "strings_por_mppt": 2}
+PANEL = {"marca": "Genérico", "modelo": "PAN-580", "potencia_wp": 580, "largo_mm": 2278, "ancho_mm": 1134, "voc_v": 52.0, "vmp_v": 43.0}
 
 
 def con_permisos(db, *permisos: Permiso) -> dict:
@@ -156,3 +157,41 @@ def test_inversores_por_permiso(api, db, permiso, puede_crear):
     assert api.get("/api/inversores", headers=cabecera).status_code == 200
     esperado = 201 if puede_crear else 403
     assert api.post("/api/inversores", headers=cabecera, json=INVERSOR).status_code == esperado
+
+
+# ─── Paneles (RF-02) ────────────────────────────────────────────────
+
+
+def test_panel_ciclo_completo_y_errores(api, h):
+    r = api.post("/api/paneles", headers=h, json=PANEL)
+    assert r.status_code == 201, r.text
+    pid = r.json()["id"]
+    assert api.get(f"/api/paneles/{pid}", headers=h).json()["modelo"] == "PAN-580"
+    assert api.patch(f"/api/paneles/{pid}", headers=h, json={"potencia_wp": 600}).json()["potencia_wp"] == 600
+
+    assert api.post("/api/paneles", headers=h, json=PANEL).status_code == 409  # misma marca y modelo
+    otro = api.post("/api/paneles", headers=h, json={**PANEL, "modelo": "PAN-670"}).json()["id"]
+    assert api.patch(f"/api/paneles/{otro}", headers=h, json={"modelo": "PAN-580"}).status_code == 409
+    # RF-02: el Voc debe ser mayor que el Vmp
+    assert api.patch(f"/api/paneles/{pid}", headers=h, json={"vmp_v": 60, "voc_v": 55}).status_code == 422
+
+    assert api.get(f"/api/paneles/{INEXISTENTE}", headers=h).status_code == 404
+    assert api.patch(f"/api/paneles/{INEXISTENTE}", headers=h, json={"potencia_wp": 1}).status_code == 404
+
+
+def test_panel_busqueda_y_filtros(api, h):
+    api.post("/api/paneles", headers=h, json=PANEL)
+    api.post("/api/paneles", headers=h, json={**PANEL, "marca": "Canadian Solar", "modelo": "CS6W-580TB"})
+
+    assert len(api.get("/api/paneles", headers=h, params={"q": "canadian"}).json()) == 1
+    assert len(api.get("/api/paneles", headers=h, params={"marca": "Genérico"}).json()) == 1
+    assert len(api.get("/api/paneles", headers=h, params={"potencia_wp": 580}).json()) == 2
+    assert len(api.get("/api/paneles", headers=h, params={"potencia_wp": 999}).json()) == 0
+
+
+@pytest.mark.parametrize("permiso,puede_crear", [(Permiso.PANELES, True), (Permiso.GENERAR_LAYOUT, False)])
+def test_paneles_por_permiso(api, db, permiso, puede_crear):
+    cabecera = con_permisos(db, permiso)
+    assert api.get("/api/paneles", headers=cabecera).status_code == 200
+    esperado = 201 if puede_crear else 403
+    assert api.post("/api/paneles", headers=cabecera, json=PANEL).status_code == esperado

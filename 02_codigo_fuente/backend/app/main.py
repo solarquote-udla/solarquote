@@ -22,6 +22,7 @@ from app.routers import (
     inversor,
     layout,
     material,
+    panel,
     perfiles,
     proyectos,
     tablero,
@@ -64,6 +65,7 @@ app.include_router(usuarios.router)
 app.include_router(cliente.router)
 app.include_router(material.router)
 app.include_router(inversor.router)
+app.include_router(panel.router)
 
 # Proyectos: raíz del trabajo técnico. Cada router trae su propio
 # prefijo porque el terreno cuelga del proyecto: /api/proyectos/{id}/terreno
