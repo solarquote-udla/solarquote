@@ -84,7 +84,10 @@ api.interceptors.response.use(
 /**
  * Traduce un error de axios a un mensaje legible en español.
  * FastAPI devuelve `detail` como string (errores de negocio) o como
- * arreglo (errores de validación de Pydantic).
+ * arreglo (errores de validación de Pydantic) — el manejador global de
+ * 422 del backend (app/core/errores.py) ya entrega cada mensaje en
+ * español y sin el campo (eso lo tiene `erroresDeCampo`, para ponerlo
+ * junto al campo en vez de aquí).
  */
 export function mensajeDeError(error: unknown, porDefecto = "Ocurrió un error inesperado"): string {
   if (!axios.isAxiosError(error)) {
@@ -104,25 +107,10 @@ export function mensajeDeError(error: unknown, porDefecto = "Ocurrió un error i
   }
 
   if (Array.isArray(detalle) && detalle.length > 0) {
-    return detalle.map(traducirErrorValidacion).join(". ");
+    return detalle.map((item) => item.msg).join(". ");
   }
 
   return porDefecto;
-}
-
-/**
- * El manejador global de 422 del backend (app/core/errores.py) ya entrega
- * el mensaje en español y sin el prefijo "Value error, " de Pydantic.
- * Esto queda como respaldo por si algún 422 no pasara por ese manejador.
- */
-function traducirErrorValidacion(error: { msg: string; loc: (string | number)[] }): string {
-  const propio = error.msg.replace(/^Value error, /, "");
-  if (propio !== error.msg) {
-    return propio;
-  }
-
-  const campo = error.loc.filter((parte) => parte !== "body").join(" › ");
-  return campo ? `${campo}: ${error.msg}` : error.msg;
 }
 
 /**
