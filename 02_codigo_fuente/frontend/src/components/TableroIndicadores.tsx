@@ -8,7 +8,6 @@
  */
 
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 
 import { GraficoBarras } from "@/components/graficos/GraficoBarras";
 import { useAuth } from "@/hooks/useAuth";
@@ -41,12 +40,6 @@ function formatoTiempoAhorrado(minutos: number): string {
   const resto = minutos % 60;
   return resto === 0 ? `${horas} h` : `${horas} h ${resto} min`;
 }
-
-const ACCESOS_DIRECTOS: { ruta: string; etiqueta: string; permisos: Permiso[] }[] = [
-  { ruta: "/generar", etiqueta: "Generar layout solar", permisos: [Permiso.GENERAR_LAYOUT] },
-  { ruta: "/historial", etiqueta: "Historial", permisos: [Permiso.HISTORIAL, Permiso.GENERAR_LAYOUT] },
-  { ruta: "/clientes", etiqueta: "Clientes", permisos: [Permiso.CLIENTES] },
-];
 
 /** "2026-05" → "may 26" */
 function etiquetaPeriodo(periodo: string): string {
@@ -94,7 +87,6 @@ export function TableroIndicadores() {
     return null;
   }
 
-  const accesos = ACCESOS_DIRECTOS.filter((a) => tienePermiso(...a.permisos));
   const hayCotizaciones = (tablero?.resumen.total_cotizaciones ?? 0) > 0;
 
   return (
@@ -124,19 +116,6 @@ export function TableroIndicadores() {
         </div>
       </div>
 
-      {accesos.length > 0 && (
-        <div className="mt-4 flex flex-wrap gap-2">
-          {accesos.map((a) => (
-            <Link
-              key={a.ruta}
-              to={a.ruta}
-              className="rounded-lg border border-acero-200 bg-superficie px-3 py-1.5 text-sm font-medium text-acero-700 transition-colors hover:border-solar-500 hover:text-solar-700"
-            >
-              {a.etiqueta} →
-            </Link>
-          ))}
-        </div>
-      )}
 
       {/* "Cargando…" solo en la primera carga; con datos previos, se ven
           atenuados mientras llega el nuevo periodo, en vez de desaparecer. */}
