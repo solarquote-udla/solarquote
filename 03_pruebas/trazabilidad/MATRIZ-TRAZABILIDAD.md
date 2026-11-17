@@ -18,14 +18,15 @@ requisito es la corrida verde del PR indicado.
 
 | Componente | Pruebas | Cobertura de líneas | Cómo se ejecutan |
 |---|---|---|---|
-| Backend (API principal) | 564 | 96 % | `pytest` en `02_codigo_fuente/backend` |
+| Backend (API principal) | 592 | 96 % | `pytest` en `02_codigo_fuente/backend` |
 | calc-service | 32 | 100 % | `pytest` en `02_codigo_fuente/calc-service` |
 | ia-service | 96 | 94 % | `pytest` en `02_codigo_fuente/ia-service` |
-| Frontend (interfaz) | 195 | — | `npm test` en `02_codigo_fuente/frontend` |
-| **Total** | **887** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
+| Frontend (interfaz) | 227 | — | `npm test` en `02_codigo_fuente/frontend` |
+| **Total** | **947** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
 
 La cobertura se midió con `pytest --cov=app`. RNF-02 pide al menos 60 %
 en el backend.
+
 | Estado de los requisitos | Cantidad |
 |---|---|
 | Cubiertos por pruebas automatizadas | RF-01 a RF-16; RNF-01 (layout), RNF-02, RNF-03, RNF-04 |
@@ -50,7 +51,8 @@ calc-service e ia-service.
 | El área de los caminos se descuenta (área neta) | `test_geometria`: `test_un_camino`, `test_caminos_que_se_cruzan_no_se_cuentan_dos_veces`, `test_camino_que_sobresale_solo_descuenta_la_parte_interior`; `test_api_terreno`: `test_terreno_y_caminos_ciclo_completo` |
 | El área neta debe alcanzar para un panel | `test_geometria`: `test_camino_que_cubre_todo_el_terreno`; `test_layout`: `test_terreno_demasiado_chico` |
 | Corregir el polígono antes de confirmar | `asistentePaso1.test.tsx` (dibujo, coordenadas y medidas) |
-| Cada error junto a su campo y en rojo; obligatorios marcados; rangos de latitud, longitud y orientación; ancho y largo mayores que cero | `validacionPaso1.test.tsx` |
+| Cada error junto a su campo y en rojo; obligatorios marcados; orientación entre 0 y 359,99; ancho y largo mayores que cero | `validacionPaso1.test.tsx` |
+| Ubicación con un punto en el mapa satelital (norte arriba) en lugar de escribir latitud y longitud, al estilo de Smart Design: mapa grande con pestañas Mapa y Plano, búsqueda de la dirección (OpenStreetMap) y longitud siempre entre -180 y 180; sin punto se avisa que no habrá sombra | `mapaUbicacion.test.tsx`; `coordenadas.test.tsx`; `validacionPaso1.test.tsx` (ubicación en el mapa y búsqueda de la dirección) |
 | Solo con permiso | `test_api_terreno`: `test_terreno_exige_generar_layout` |
 
 Evidencia: PR #1, #20, #34 y el PR de SQ-135.
@@ -66,6 +68,8 @@ Evidencia: PR #1, #20, #34 y el PR de SQ-135.
 | Presets de paneles comunes | `test_calculo_equipo`: `test_cada_preset_pasa_las_validaciones`, `test_claves_unicas` |
 | Varios inversores por proyecto | `test_varios_inversores` (17 pruebas); `inversores.test.tsx` |
 | Catálogo de paneles administrable, con búsqueda por marca, modelo y potencia (la búsqueda libre también compara contra la potencia cuando el texto es un número) | `test_panel_administracion` (25 pruebas); `test_api_administracion`: `test_panel_ciclo_completo_y_errores`, `test_panel_busqueda_y_filtros`, `test_panel_busqueda_libre_tambien_encuentra_por_potencia`, `test_paneles_por_permiso`; `test_seguridad`: `test_generar_layout_puede_leer_paneles_pero_no_administrarlos`, `test_sin_ningun_permiso_relacionado_no_lee_paneles` |
+| El Paso 2 elige el panel del catálogo, con búsqueda por marca, modelo o potencia; pantalla Configuración, Paneles con el error de cada dato junto a su campo | `catalogoPaneles.test.tsx` |
+| Catálogo inicial según Producción: paneles de más de 600 W de LONGi, Jinko, JA Solar y Canadian Solar; los demás quedan desactivados | `test_catalogo_produccion`: cada panel pasa las validaciones de la API y es compatible con cada inversor (migración `e7b2a9c41d06`) |
 | Mensajes de validación en español, con el campo (`loc`) correcto — tanto en las restricciones de Pydantic (rango, obligatorio, tipo) como en las reglas entre dos campos (Voc/Vmp, largo/ancho, Vmax/Vmin) | `test_errores_validacion` (11 pruebas) |
 
 Evidencia: PR #2, #38 y los del catálogo de paneles y los mensajes de validación.
@@ -163,6 +167,7 @@ Evidencia: PR de SQ-79/SQ-80/SQ-81/SQ-83/SQ-84.
 | Marca y modelo únicos | `test_api_administracion` (409) |
 | Solo con permiso de parametrización | `test_api_administracion`: `test_inversores_por_permiso`; `test_seguridad`: `test_generar_layout_puede_leer_inversores_pero_no_administrarlos` |
 | Selector en RF-02 | `inversores.test.tsx` |
+| Catálogo inicial según Producción: Huawei SUN2000-100KTL-M2, 330KTL-H1 y 506KTL-H1 | `test_catalogo_produccion`: `test_cada_inversor_nuevo_pasa_las_validaciones_de_la_api` |
 
 Evidencia: PR #37 y el PR de SQ-135.
 

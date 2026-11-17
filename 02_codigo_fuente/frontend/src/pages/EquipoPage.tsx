@@ -1,8 +1,8 @@
 /**
  * Asistente, Paso 2 — Panel + Inversores (RF-02).
  *
- * Como en el prototipo: a la izquierda el panel (presets en tarjetas o
- * ingreso manual) y a la derecha los inversores: la potencia objetivo del
+ * Como en el prototipo: a la izquierda el panel (elegido del catálogo
+ * con búsqueda, o ingreso manual) y a la derecha los inversores: la potencia objetivo del
  * sistema, la sugerencia automática de cuántos usar y una tarjeta por
  * inversor, cada una con su color (el mismo de sus bloques en el Paso 3).
  * "Siguiente" guarda si hay cambios y pasa al Paso 3.
@@ -23,8 +23,9 @@ import { rutaPaso } from "@/components/asistente";
 import { useCambiosSinGuardar } from "@/hooks/useCambiosSinGuardar";
 import { useAccionUnica } from "@/hooks/useAccionUnica";
 import { mensajeDeError } from "@/services/api";
-import { guardarEquipo, listarPanelesReferencia, obtenerEquipo } from "@/services/equipo";
+import { guardarEquipo, obtenerEquipo } from "@/services/equipo";
 import { listarInversores } from "@/services/inversores";
+import { listarPaneles } from "@/services/paneles";
 import { obtenerProyecto } from "@/services/proyectos";
 import {
   MAX_INVERSORES,
@@ -32,9 +33,10 @@ import {
   type ConfiguracionEquipoGuardar,
   type Inversor,
   type InversorCatalogo,
-  type PanelReferencia,
+  type PanelCatalogo,
   type Proyecto,
 } from "@/types/api";
+import { filtrarPaneles } from "@/utils/buscarPanel";
 import { colorInversor, sugerenciaInversores } from "@/utils/inversores";
 
 // Los campos numéricos se editan como texto: así el usuario puede borrar
@@ -279,13 +281,15 @@ export function EquipoPage() {
 
   const [proyecto, setProyecto] = useState<Proyecto | null>(null);
   const [guardado, setGuardado] = useState<ConfiguracionEquipo | null>(null);
-  const [presets, setPresets] = useState<PanelReferencia[]>([]);
+  const [paneles, setPaneles] = useState<PanelCatalogo[]>([]);
+  const [catalogoPanelesFallo, setCatalogoPanelesFallo] = useState(false);
+  const [busqueda, setBusqueda] = useState("");
   const [catalogo, setCatalogo] = useState<InversorCatalogo[]>([]);
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
 
   const [formulario, setFormulario] = useState<Formulario>(FORMULARIO_VACIO);
-  const [presetAplicado, setPresetAplicado] = useState<PanelReferencia | null>(null);
+  const [presetAplicado, setPresetAplicado] = useState<PanelCatalogo | null>(null);
 
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -301,11 +305,10 @@ export function EquipoPage() {
     if (!idValido) return;
     let cancelado = false;
 
-    Promise.all([obtenerProyecto(proyectoId), obtenerEquipo(proyectoId), listarPanelesReferencia()])
-      .then(([p, c, lista]) => {
+    Promise.all([obtenerProyecto(proyectoId), obtenerEquipo(proyectoId)])
+      .then(([p, c]) => {
         if (cancelado) return;
         setProyecto(p);
-        setPresets(lista);
         cargarEnFormulario(c);
       })
       .catch((e) => {
@@ -315,7 +318,14 @@ export function EquipoPage() {
         if (!cancelado) setCargando(false);
       });
 
-    // El catálogo solo ayuda a llenar: si no carga, los inversores se escriben a mano
+    // Los catálogos solo ayudan a llenar: si no cargan, se escribe a mano
+    listarPaneles()
+      .then((lista) => {
+        if (!cancelado) setPaneles(lista);
+      })
+      .catch(() => {
+        if (!cancelado) setCatalogoPanelesFallo(true);
+      });
     listarInversores()
       .then((lista) => {
         if (!cancelado) setCatalogo(lista);
@@ -377,8 +387,8 @@ export function EquipoPage() {
     setFormulario((f) => ({ ...f, inversores: f.inversores.filter((_, i) => i !== indice) }));
   }
 
-  function aplicarPreset(clave: string) {
-    const preset = presets.find((p) => p.clave === clave);
+  function aplicarPreset(id: number) {
+    const preset = paneles.find((p) => p.id === id);
     if (!preset) return;
     setFormulario((f) => ({
       ...f,
@@ -450,12 +460,13 @@ export function EquipoPage() {
   }
 
   const calculos = guardado?.calculos;
-  const presetElegido = presets.find(
+  const presetElegido = paneles.find(
     (p) =>
       p.marca === formulario.panel_marca.trim() &&
       p.modelo === formulario.panel_modelo.trim() &&
       String(p.potencia_wp) === formulario.panel_potencia_wp.trim(),
   );
+  const encontrados = filtrarPaneles(paneles, busqueda);
   const largoMm = aNumero(formulario.panel_largo_mm);
   const anchoMm = aNumero(formulario.panel_ancho_mm);
   const inversores = formulario.inversores;
@@ -523,15 +534,31 @@ export function EquipoPage() {
         <div className="space-y-5">
           <section className="rounded-xl border border-acero-200 bg-superficie p-5">
             <h2 className="text-sm font-semibold text-acero-900">Panel solar</h2>
-            <p className="mt-3 text-xs font-semibold tracking-wider text-acero-400">PRESETS</p>
-            <ul className="mt-2 space-y-2">
-              {presets.map((p) => {
-                const elegido = presetElegido?.clave === p.clave;
+            <p className="mt-3 text-xs font-semibold tracking-wider text-acero-400">CATÁLOGO DE PANELES</p>
+            <input
+              type="search"
+              className={`mt-2 ${CAMPO}`}
+              placeholder="Buscar por marca, modelo o potencia (ej. jinko 580)"
+              aria-label="Buscar panel"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+            />
+            {catalogoPanelesFallo && (
+              <p className="mt-2 text-xs text-amber-700">No se pudo cargar el catálogo de paneles. Ingresa los datos manualmente.</p>
+            )}
+            {!catalogoPanelesFallo && busqueda.trim() !== "" && encontrados.length === 0 && (
+              <p className="mt-2 text-xs text-acero-500">
+                Ningún panel coincide. Ingrésalo manualmente o agrégalo en Configuración, Paneles.
+              </p>
+            )}
+            <ul className="mt-2 max-h-72 space-y-2 overflow-y-auto" aria-label="Paneles del catálogo">
+              {encontrados.map((p) => {
+                const elegido = presetElegido?.id === p.id;
                 return (
-                  <li key={p.clave}>
+                  <li key={p.id}>
                     <button
                       type="button"
-                      onClick={() => aplicarPreset(p.clave)}
+                      onClick={() => aplicarPreset(p.id)}
                       className={[
                         "flex w-full items-center justify-between gap-3 rounded-lg border px-4 py-2.5 text-left transition",
                         elegido ? "border-solar-500 bg-solar-50" : "border-acero-200 hover:border-acero-300",
@@ -576,11 +603,7 @@ export function EquipoPage() {
 
             {presetAplicado && (
               <p className="mt-2 text-xs text-acero-500">
-                Datos tomados de la{" "}
-                <a href={presetAplicado.fuente} target="_blank" rel="noreferrer" className="text-solar-700 hover:underline">
-                  ficha técnica
-                </a>
-                . Si tu lote es de otra potencia, ajusta potencia, Voc y Vmp.
+                Datos del catálogo de paneles. Si tu lote es de otra potencia, ajusta potencia, Voc y Vmp.
               </p>
             )}
 
