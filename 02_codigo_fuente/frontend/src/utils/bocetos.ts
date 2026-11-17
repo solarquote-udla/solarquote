@@ -35,11 +35,9 @@ export function tamanoLegible(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1).replace(".", ",")} MB`;
 }
 
-/** Ancho / largo del bloque con el panel indicado (mm), como en el backend. */
-export function proporcion(L: number, A: number, panel: { largo_mm: number; ancho_mm: number }): number {
-  const mayor = Math.max(panel.largo_mm, panel.ancho_mm);
-  const menor = Math.min(panel.largo_mm, panel.ancho_mm);
-  return (A * menor) / (L * mayor);
+/** A / L en paneles: el bloque compacto (antisísmico) da 3 (revisión del 17 nov 2026). */
+export function proporcion(L: number, A: number): number {
+  return A / L;
 }
 
 export function enProporcion(valor: number, tolerancia: number): boolean {

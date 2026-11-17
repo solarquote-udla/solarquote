@@ -52,6 +52,7 @@ import {
   type BloqueEdicion,
   type GeometriaLayout,
 } from "@/utils/edicionLayout";
+import { aCompacto, esCompacto } from "@/utils/bloque";
 import { formatearArea, limitesDe } from "@/utils/geometria";
 import { colorInversor } from "@/utils/inversores";
 
@@ -101,11 +102,25 @@ function letrasPorA(bloques: BloqueEdicion[]): Map<number, string> {
 const CAMPO =
   "w-full rounded-lg border border-acero-300 px-3 py-2 text-sm focus:border-solar-500 focus:outline-none focus:ring-1 focus:ring-solar-500";
 
-// Mismos valores por defecto que el backend (schemas/layout.py)
-const PARAMETROS_DEFECTO = { L: "4", pasillo: "2", tolerancia: "20", kwp: "", aMinimo: "1" };
+// Mismos valores por defecto que el backend (schemas/layout.py). A vacío =
+// bloque compacto (A = 3 × L). Las separaciones van en centímetros en la
+// pantalla y en metros en la API.
+const PARAMETROS_DEFECTO = {
+  L: "4",
+  A: "",
+  pasillo: "2",
+  tolerancia: "20",
+  kwp: "",
+  aMinimo: "1",
+  sepLargo: "6",
+  sepAncho: "2",
+};
 type Parametros = typeof PARAMETROS_DEFECTO;
 
-const OPCIONES_L = [2, 4, 6, 8, 10, 12];
+/** Igual que PANELES_LARGO_MAXIMO y PANELES_ANCHO_MAXIMO del backend. */
+const L_MAXIMO = 40;
+const A_MAXIMO = 500;
+
 
 type Direccion = "horizontal" | "vertical";
 
@@ -188,6 +203,7 @@ function desdeLayout(l: Layout | null, objetivoKwp: number | null = null): Param
   const usarObjetivo = l.desactualizado && objetivoKwp != null;
   return {
     L: String(l.parametros.paneles_largo),
+    A: l.parametros.paneles_ancho == null ? "" : String(l.parametros.paneles_ancho),
     pasillo: String(l.parametros.pasillo_m),
     tolerancia: String(Math.round(l.parametros.tolerancia_proporcion * 100)),
     kwp: usarObjetivo
@@ -196,6 +212,8 @@ function desdeLayout(l: Layout | null, objetivoKwp: number | null = null): Param
         ? ""
         : String(l.parametros.capacidad_deseada_kwp),
     aMinimo: String(l.parametros.paneles_ancho_minimo ?? 1),
+    sepLargo: String(Math.round((l.parametros.separacion_paneles_largo_m ?? 0) * 1000) / 10),
+    sepAncho: String(Math.round((l.parametros.separacion_paneles_ancho_m ?? 0) * 1000) / 10),
   };
 }
 
@@ -208,20 +226,40 @@ function aNumero(valor: string): number | null {
 }
 
 function aPeticion(p: Parametros): { datos: LayoutGenerar } | { error: string } {
+  const largo = aNumero(p.L);
+  const ancho = aNumero(p.A);
   const pasillo = aNumero(p.pasillo);
   const tolerancia = aNumero(p.tolerancia);
   const kwp = aNumero(p.kwp);
   const aMinimo = aNumero(p.aMinimo);
+  const sepLargo = aNumero(p.sepLargo);
+  const sepAncho = aNumero(p.sepAncho);
 
+  if (largo === null || !Number.isInteger(largo) || largo < 2 || largo > L_MAXIMO || largo % 2)
+    return { error: `Revisa L: debe ser un número par entre 2 y ${L_MAXIMO}.` };
+  if (ancho !== null && (!Number.isInteger(ancho) || ancho < 1 || ancho > A_MAXIMO))
+    return { error: `Revisa A: debe ser un número entero entre 1 y ${A_MAXIMO}, o dejarse vacío para el bloque compacto.` };
+  for (const [valor, nombre] of [
+    [sepLargo, "la separación a lo largo"],
+    [sepAncho, "la separación entre paneles"],
+  ] as const) {
+    if (valor === null || Number.isNaN(valor) || valor < 0 || valor > 50)
+      return { error: `Revisa ${nombre}: debe ser un número entre 0 y 50 cm.` };
+  }
   if (pasillo === null || Number.isNaN(pasillo)) return { error: "Revisa el pasillo: debe ser un número en metros." };
   if (tolerancia === null || Number.isNaN(tolerancia)) return { error: "Revisa la tolerancia: debe ser un porcentaje." };
   if (kwp !== null && Number.isNaN(kwp)) return { error: "Revisa la capacidad deseada: debe ser un número en kWp." };
   if (aMinimo === null || !Number.isInteger(aMinimo) || aMinimo < 1)
     return { error: "Revisa el A mínimo: debe ser un número entero desde 1." };
+  if (aMinimo > (ancho ?? aCompacto(largo)))
+    return { error: `Revisa el A mínimo: no puede ser mayor que A (${ancho ?? aCompacto(largo)}).` };
 
   return {
     datos: {
-      paneles_largo: Number(p.L),
+      paneles_largo: largo,
+      paneles_ancho: ancho,
+      separacion_paneles_largo_m: (sepLargo as number) / 100,
+      separacion_paneles_ancho_m: (sepAncho as number) / 100,
       pasillo_m: pasillo,
       tolerancia_proporcion: tolerancia / 100,
       capacidad_deseada_kwp: kwp,
@@ -274,6 +312,29 @@ export function LayoutPage() {
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
 
   const [parametros, setParametros] = useState<Parametros>(PARAMETROS_DEFECTO);
+
+  // ─── Bloque compacto (revisión con HEXtructure, 17 nov 2026) ──
+  // L y A los elige el Gerente; el sistema solo avisa si el bloque no es
+  // compacto (A = 3 × L). Nunca bloquea.
+  const largoEscrito = aNumero(parametros.L);
+  const largoValido =
+    largoEscrito !== null && Number.isInteger(largoEscrito) && largoEscrito >= 2 && largoEscrito % 2 === 0
+      ? largoEscrito
+      : null;
+  const aCompactoTexto = largoValido ? String(aCompacto(largoValido)) : "3 × L";
+  const indicadorBloque = useMemo(() => {
+    if (!largoValido) return null;
+    const anchoEscrito = aNumero(parametros.A);
+    const ancho = anchoEscrito === null ? aCompacto(largoValido) : anchoEscrito;
+    if (!Number.isInteger(ancho) || ancho < 1) return null;
+    const tolerancia = (aNumero(parametros.tolerancia) ?? 20) / 100;
+    return esCompacto(largoValido, ancho, tolerancia)
+      ? { compacto: true, texto: `Bloque ${largoValido} × ${ancho}: compacto (antisísmico), cumple A = 3 × L.` }
+      : {
+          compacto: false,
+          texto: `Bloque ${largoValido} × ${ancho}: no es compacto. Para un bloque antisísmico se recomienda A = 3 × L = ${aCompacto(largoValido)}. Se genera igual si el cliente lo pide así.`,
+        };
+  }, [largoValido, parametros.A, parametros.tolerancia]);
   const [generando, setGenerando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -313,7 +374,12 @@ export function LayoutPage() {
   const geometria = useMemo<GeometriaLayout | null>(
     () =>
       layout
-        ? { largo_m: layout.largo_bloque_m, lado_menor_m: layout.lado_menor_m, angulo_norte: layout.angulo_norte }
+        ? {
+            largo_m: layout.largo_bloque_m,
+            lado_menor_m: layout.lado_menor_m,
+            separacion_ancho_m: layout.separacion_paneles_ancho_m ?? 0,
+            angulo_norte: layout.angulo_norte,
+          }
         : null,
     [layout],
   );
@@ -340,9 +406,6 @@ export function LayoutPage() {
     if (!borrador || !geometria) {
       return layout.bloques.map((b, i) => ({ ...b, clave: i }));
     }
-    // La proporción es lineal en A: se toma la constante de cualquier tipo guardado.
-    const ref = layout.tipos[0];
-    const porPanel = ref ? ref.proporcion / ref.paneles_ancho : 0;
     const tolerancia = layout.parametros.tolerancia_proporcion;
     const letras = letrasPorA(borrador);
     return borrador.map((b) => ({
@@ -351,7 +414,7 @@ export function LayoutPage() {
       tipo: letras.get(b.paneles_ancho) ?? "?",
       paneles_largo: layout.parametros.paneles_largo,
       paneles_ancho: b.paneles_ancho,
-      en_proporcion: Math.abs((porPanel * b.paneles_ancho) / 3 - 1) <= tolerancia + 1e-6,
+      en_proporcion: esCompacto(layout.parametros.paneles_largo, b.paneles_ancho, tolerancia),
       inversor: b.inversor,
       problema: problemas.get(b.clave),
     }));
@@ -719,19 +782,16 @@ export function LayoutPage() {
             className="rounded-xl border border-acero-200 bg-superficie p-5"
           >
             <div className="grid gap-4 sm:grid-cols-3 xl:grid-cols-5">
-              <Entrada etiqueta="Paneles en el largo (L)" ayuda="Par: soportes en A y V">
-                <select className={CAMPO} value={parametros.L} onChange={(e) => actualizar("L", e.target.value)}>
-                  {OPCIONES_L.map((l) => (
-                    <option key={l} value={l}>
-                      {l}
-                    </option>
-                  ))}
-                </select>
+              <Entrada etiqueta="Paneles en el largo (L)" ayuda="Par, en la pendiente">
+                <input className={CAMPO} inputMode="numeric" aria-label="Paneles en el largo (L)" value={parametros.L} onChange={(e) => actualizar("L", e.target.value)} />
+              </Entrada>
+              <Entrada etiqueta="Paneles en el ancho (A)" ayuda={`Vacío = compacto (${aCompactoTexto})`}>
+                <input className={CAMPO} inputMode="numeric" aria-label="Paneles en el ancho (A)" placeholder={aCompactoTexto} value={parametros.A} onChange={(e) => actualizar("A", e.target.value)} />
               </Entrada>
               <Entrada etiqueta="Pasillo (m)" ayuda="Entre bloques">
                 <input className={CAMPO} inputMode="decimal" value={parametros.pasillo} onChange={(e) => actualizar("pasillo", e.target.value)} />
               </Entrada>
-              <Entrada etiqueta="Tolerancia (%)" ayuda="Sobre ancho = 3 × largo">
+              <Entrada etiqueta="Tolerancia (%)" ayuda="Sobre A = 3 × L">
                 <input className={CAMPO} inputMode="decimal" value={parametros.tolerancia} onChange={(e) => actualizar("tolerancia", e.target.value)} />
               </Entrada>
               <Entrada etiqueta="Capacidad deseada (kWp)" ayuda="Opcional. Vacío = máximo">
@@ -740,7 +800,24 @@ export function LayoutPage() {
               <Entrada etiqueta="A mínimo" ayuda="Bloques más cortos no se generan">
                 <input className={CAMPO} inputMode="numeric" aria-label="A mínimo" value={parametros.aMinimo} onChange={(e) => actualizar("aMinimo", e.target.value)} />
               </Entrada>
+              <Entrada etiqueta="Separación a lo largo (cm)" ayuda="Entre filas de la pendiente">
+                <input className={CAMPO} inputMode="decimal" aria-label="Separación a lo largo (cm)" value={parametros.sepLargo} onChange={(e) => actualizar("sepLargo", e.target.value)} />
+              </Entrada>
+              <Entrada etiqueta="Separación entre paneles (cm)" ayuda="Clamp intermedio">
+                <input className={CAMPO} inputMode="decimal" aria-label="Separación entre paneles (cm)" value={parametros.sepAncho} onChange={(e) => actualizar("sepAncho", e.target.value)} />
+              </Entrada>
             </div>
+            {indicadorBloque && (
+              <p
+                role="status"
+                className={[
+                  "mt-3 rounded-lg px-3 py-2 text-sm",
+                  indicadorBloque.compacto ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-900",
+                ].join(" ")}
+              >
+                {indicadorBloque.texto}
+              </p>
+            )}
             {confirmarRegenerar ? (
               <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                 <p>
@@ -1070,12 +1147,12 @@ export function LayoutPage() {
             const ideal = 3;
             return (
               <div key={t.tipo} className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-                <p className="font-semibold">Tipo {t.tipo}: proporción antisísmica</p>
+                <p className="font-semibold">Tipo {t.tipo}: bloque no compacto</p>
                 <p className="mt-1 text-xs">
-                  {t.repeticiones} bloque{t.repeticiones === 1 ? "" : "s"} de {t.paneles_largo} × {t.paneles_ancho} con
-                  proporción {numero(t.proporcion)} : 1, fuera del rango de {ideal} : 1 ±{" "}
-                  {numero(layout.parametros.tolerancia_proporcion * 100, 0)} %. Ajústalo o confírmalo bajo tu
-                  responsabilidad.
+                  {t.repeticiones} bloque{t.repeticiones === 1 ? "" : "s"} de {t.paneles_largo} × {t.paneles_ancho}: para
+                  un bloque antisísmico se recomienda A = {ideal} × L = {ideal * t.paneles_largo} (±
+                  {numero(layout.parametros.tolerancia_proporcion * 100, 0)} %). Es una recomendación: ajústalo o
+                  confírmalo si el cliente lo pide así.
                 </p>
                 <button
                   type="button"
@@ -1143,8 +1220,8 @@ export function LayoutPage() {
                     <tr className="text-left text-xs text-acero-400">
                       <th className="pb-2 font-medium">Tipo</th>
                       <th className="pb-2 font-medium">L × A</th>
-                      <th className="pb-2 text-right font-medium">Cant.</th>
-                      <th className="pb-2 text-right font-medium">Prop.</th>
+                      <th className="pb-2 text-right font-medium">Bloques iguales</th>
+                      <th className="pb-2 text-right font-medium">Compacto</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-acero-100">
@@ -1164,20 +1241,27 @@ export function LayoutPage() {
                           {t.paneles_largo} × {t.paneles_ancho}
                         </td>
                         <td className="py-1.5 text-right font-medium text-acero-800">{t.repeticiones}</td>
-                        <td className="py-1.5 text-right text-acero-600">{numero(t.proporcion)}</td>
+                        <td className="py-1.5 text-right text-acero-600">{t.en_proporcion ? "Sí" : "No"}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
                 {fueraDeProporcion.length > 0 && (
                   <p className="mt-3 text-xs text-amber-800">
-                    Los tipos en ámbar se apartan más de{" "}
-                    {numero(layout.parametros.tolerancia_proporcion * 100, 0)} % de la proporción 3 : 1.
-                    Suelen ser los bloques cortos que aprovechan el final de cada franja.
+                    Los tipos en ámbar no son compactos: se apartan más de{" "}
+                    {numero(layout.parametros.tolerancia_proporcion * 100, 0)} % de A = 3 × L. Es una
+                    recomendación antisísmica; se pueden confirmar igual.
                   </p>
                 )}
                 <dl className="mt-4 space-y-2 border-t border-acero-200 pt-3">
-                  <Fila nombre="Bloque ideal" valor={`${layout.parametros.paneles_largo} × ${layout.paneles_ancho_ideal}`} />
+                  <Fila
+                    nombre="Bloque"
+                    valor={`${layout.parametros.paneles_largo} × ${layout.paneles_ancho_ideal}${layout.bloque_compacto ? " (compacto)" : " (no compacto)"}`}
+                  />
+                  <Fila
+                    nombre="Separación entre paneles"
+                    valor={`${numero((layout.parametros.separacion_paneles_largo_m ?? 0) * 100, 1)} cm a lo largo · ${numero((layout.parametros.separacion_paneles_ancho_m ?? 0) * 100, 1)} cm entre paneles`}
+                  />
                   <Fila nombre="Medidas en planta" valor={`${numero(layout.largo_bloque_m)} × ${numero(layout.ancho_bloque_m)} m`} />
                   <Fila nombre="Separación este-oeste" valor={`${numero(layout.separacion_este_oeste_m)} m`} />
                   <Fila nombre="Separación norte-sur" valor={`${numero(layout.separacion_norte_sur_m)} m`} />

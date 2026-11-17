@@ -230,6 +230,9 @@ erDiagram
         float tolerancia_proporcion
         float capacidad_deseada_kwp "nullable"
         int paneles_ancho_minimo
+        int paneles_ancho "nullable"
+        float separacion_paneles_largo_m
+        float separacion_paneles_ancho_m
         int total_paneles
         float potencia_kwp
         jsonb resumen

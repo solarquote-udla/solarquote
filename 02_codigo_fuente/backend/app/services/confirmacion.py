@@ -102,7 +102,7 @@ def cotizar_layout(
     fuera = sum(1 for b in layout.bloques if not b.en_proporcion)
     if fuera and not acepta_fuera_de_proporcion:
         raise NoSePuedeCotizar(
-            f"{fuera} bloque(s) están fuera de la proporción antisísmica. Ajústalos o "
+            f"{fuera} bloque(s) no son compactos (A distinto de 3 × L). Ajústalos o "
             f"confírmalos bajo tu responsabilidad."
         )
 
@@ -169,7 +169,7 @@ def cotizar_boceto(
     fuera = sum(b.repeticiones for b in leido.bloques if not b.en_proporcion)
     if fuera and not acepta_fuera_de_proporcion:
         raise NoSePuedeCotizar(
-            f"{fuera} bloque(s) están fuera de la proporción antisísmica. Ajústalos o "
+            f"{fuera} bloque(s) no son compactos (A distinto de 3 × L). Ajústalos o "
             f"confírmalos bajo tu responsabilidad."
         )
 

@@ -470,11 +470,17 @@ export interface LayoutGenerar {
   /** L: paneles en la dirección de la pendiente. Siempre par. */
   paneles_largo: number;
   pasillo_m: number;
-  /** 0.2 = ±20 % respecto a ancho = 3 × largo */
+  /** 0.2 = ±20 % respecto al bloque compacto A = 3 × L */
   tolerancia_proporcion: number;
   capacidad_deseada_kwp: number | null;
   /** A mínimo de los bloques cortos (SQ-170). 1 = sin mínimo. */
   paneles_ancho_minimo: number;
+  /** A del bloque. Null = bloque compacto (A = 3 × L). */
+  paneles_ancho: number | null;
+  /** Separación entre paneles a lo largo (entre filas de la pendiente), en metros */
+  separacion_paneles_largo_m: number;
+  /** Separación entre paneles a lo ancho (clamp intermedio), en metros */
+  separacion_paneles_ancho_m: number;
 }
 
 /** Espejo de `BloqueLeer`. Vértices en metros, coordenadas del terreno. */
@@ -571,8 +577,12 @@ export interface Layout {
   advertencias: string[];
   /** Grados del norte usados al generar; la edición arma los bloques con este ángulo */
   angulo_norte: number;
-  /** Lo que suma cada panel de A al bloque, en metros */
+  /** Lado menor del panel, en metros */
   lado_menor_m: number;
+  /** El bloque mide A · lado_menor_m + (A − 1) · separacion_paneles_ancho_m */
+  separacion_paneles_ancho_m: number;
+  /** El bloque completo cumple A = 3 × L dentro de la tolerancia */
+  bloque_compacto: boolean;
   /** Cambios hechos a mano desde la última generación (SQ-64) */
   ediciones_manuales: number;
   /** Terreno, caminos, equipo o latitud cambiaron después de generar */

@@ -111,7 +111,7 @@ export function ConfirmacionPage() {
       : layout.desactualizado
         ? "El terreno, los caminos, el panel o la latitud cambiaron después de generar el layout. Vuelve a generarlo en el Paso 3."
         : bloquesFuera > 0 && !acepta
-          ? "Ajusta los bloques fuera de proporción o acéptalos bajo tu responsabilidad."
+          ? "Ajusta los bloques no compactos o acéptalos bajo tu responsabilidad."
           : null;
 
   async function confirmar() {
@@ -225,9 +225,9 @@ export function ConfirmacionPage() {
                 <thead>
                   <tr className="text-left text-xs text-acero-400">
                     <th className="pb-2 font-medium">Tipo</th>
-                    <th className="pb-2 text-right font-medium">L</th>
-                    <th className="pb-2 text-right font-medium">A</th>
-                    <th className="pb-2 text-right font-medium">B</th>
+                    <th className="pb-2 text-right font-medium">L (largo)</th>
+                    <th className="pb-2 text-right font-medium">A (ancho)</th>
+                    <th className="pb-2 text-right font-medium">Bloques iguales</th>
                     <th className="pb-2 text-right font-medium">Estado</th>
                   </tr>
                 </thead>
@@ -245,14 +245,14 @@ export function ConfirmacionPage() {
                             t.en_proporcion ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-900",
                           ].join(" ")}
                         >
-                          {t.en_proporcion ? "OK" : "Revisar"}
+                          {t.en_proporcion ? "Compacto" : "No compacto"}
                         </span>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              <p className="mt-2 text-xs text-acero-400">L: paneles en el largo · A: en el ancho · B: bloques iguales</p>
+              <p className="mt-2 text-xs text-acero-400">L: paneles en el largo (pendiente) · A: paneles en el ancho (fila) · Compacto: A = 3 × L</p>
             </div>
           )}
 
@@ -260,12 +260,12 @@ export function ConfirmacionPage() {
           {layout &&
             fuera.map((t) => (
               <div key={t.tipo} className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-                <p className="font-semibold">Tipo {t.tipo}: proporción antisísmica</p>
+                <p className="font-semibold">Tipo {t.tipo}: bloque no compacto</p>
                 <p className="mt-1 text-xs">
-                  {t.repeticiones} bloque{t.repeticiones === 1 ? "" : "s"} de {t.paneles_largo} × {t.paneles_ancho} con
-                  proporción {numero(t.proporcion)} : 1, fuera de 3 : 1 ±{" "}
-                  {numero(layout.parametros.tolerancia_proporcion * 100, 0)} %. Ajústalo o confírmalo bajo tu
-                  responsabilidad.
+                  {t.repeticiones} bloque{t.repeticiones === 1 ? "" : "s"} de {t.paneles_largo} × {t.paneles_ancho}: para un
+                  bloque antisísmico se recomienda A = 3 × L = {3 * t.paneles_largo} (±{" "}
+                  {numero(layout.parametros.tolerancia_proporcion * 100, 0)} %). Es una recomendación: ajústalo o
+                  confírmalo si el cliente lo pide así.
                 </p>
               </div>
             ))}
@@ -305,8 +305,8 @@ export function ConfirmacionPage() {
                     onChange={(e) => setAcepta(e.target.checked)}
                   />
                   <span>
-                    Acepto bajo mi responsabilidad {bloquesFuera === 1 ? "el bloque" : `los ${bloquesFuera} bloques`} fuera de
-                    la proporción antisísmica.
+                    Acepto bajo mi responsabilidad {bloquesFuera === 1 ? "el bloque no compacto" : `los ${bloquesFuera} bloques no compactos`}{" "}
+                    (A distinto de 3 × L).
                   </span>
                 </label>
               )}

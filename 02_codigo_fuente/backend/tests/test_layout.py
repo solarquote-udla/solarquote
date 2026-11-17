@@ -26,9 +26,11 @@ from app.services.calculo_layout import (
     ParametrosLayout,
     asignar_inversores,
     cumple_proporcion,
+    medida_fila,
     electrica_inversor,
     generar_layout,
     paneles_ancho_ideal,
+    paneles_que_entran,
     proporcion_bloque,
 )
 
@@ -47,20 +49,87 @@ def rectangulo(ancho: float, alto: float, x: float = 0, y: float = 0) -> list[li
 # ─── Bloque ideal y proporción ──────────────────────────────────────
 
 
-def test_a_ideal_para_l4():
-    assert paneles_ancho_ideal(4, 2.278, 1.134) == 24
+@pytest.mark.parametrize("l, a", [(2, 6), (4, 12), (8, 24)])
+def test_bloque_compacto_es_a_igual_a_tres_l(l, a):
+    """Ejemplos de HEXtructure (revisión del 17 de noviembre de 2026)."""
+    assert paneles_ancho_ideal(l) == a
+    assert proporcion_bloque(l, a) == 3
+    assert cumple_proporcion(proporcion_bloque(l, a), 0.20)
 
 
-def test_proporcion_del_bloque_ideal():
-    assert proporcion_bloque(4, 24, 2.278, 1.134) == pytest.approx(2.987, abs=1e-3)
+@pytest.mark.parametrize("l, a", [(4, 28), (22, 28), (2, 30), (8, 13)])
+def test_bloques_reales_de_clientes_no_son_compactos(l, a):
+    """Los clientes eligen L y A por su inversor; el sistema solo avisa."""
+    assert not cumple_proporcion(proporcion_bloque(l, a), 0.20)
 
 
-def test_bloque_real_de_emihana_pasa_con_20_por_ciento():
-    """L=4, A=28 de la cotización real: proporción ≈ 3,48."""
-    prop = proporcion_bloque(4, 28, 2.278, 1.134)
-    assert prop == pytest.approx(3.485, abs=1e-3)
+def test_la_tolerancia_decide_el_borde():
+    """4 × 14: A / L = 3,5, un 16,7 % sobre 3."""
+    prop = proporcion_bloque(4, 14)
     assert cumple_proporcion(prop, 0.20)
     assert not cumple_proporcion(prop, 0.10)
+
+
+def test_sin_a_se_usa_el_bloque_compacto():
+    r = generar_layout(rectangulo(100, 60), [], PANEL_PLANO, ParametrosLayout(), orientacion_norte=0)
+    assert r.paneles_ancho_ideal == 12
+    assert r.bloque_compacto
+    assert not any("no es compacto" in a for a in r.advertencias)
+
+
+def test_a_manual_no_compacto_avisa_pero_genera():
+    r = generar_layout(
+        rectangulo(100, 60), [], PANEL_PLANO, ParametrosLayout(paneles_ancho=24), orientacion_norte=0
+    )
+    assert r.paneles_ancho_ideal == 24
+    assert not r.bloque_compacto
+    assert r.total_paneles > 0
+    assert any("4 × 24 no es compacto" in a and "A = 3 × L = 12" in a for a in r.advertencias)
+
+
+def test_separacion_entre_paneles_agranda_el_bloque():
+    """
+    Panel de 2278 × 1134 mm, L = 4, A = 12, con 6 cm a lo largo y 2 cm a lo ancho:
+        largo = 4 × 2,278 + 3 × 0,06 = 9,292 m
+        ancho = 12 × 1,134 + 11 × 0,02 = 13,828 m
+    """
+    r = generar_layout(
+        rectangulo(100, 60),
+        [],
+        PANEL_PLANO,
+        ParametrosLayout(paneles_ancho=12, separacion_largo_m=0.06, separacion_ancho_m=0.02),
+        orientacion_norte=0,
+    )
+    assert r.largo_bloque_m == pytest.approx(9.292)
+    assert r.ancho_bloque_m == pytest.approx(13.828)
+    for b in r.bloques:
+        xs = [v[0] for v in b.vertices]
+        ys = [v[1] for v in b.vertices]
+        assert max(xs) - min(xs) == pytest.approx(9.292, abs=1e-3)
+        assert max(ys) - min(ys) == pytest.approx(medida_fila(b.paneles_ancho, 1.134, 0.02), abs=1e-3)
+
+
+def test_bloque_corto_cuenta_la_separacion():
+    """
+    Una sola franja de 9,292 × 40 m, bloque de 12 (13,828 m) y pasillo de 2 m:
+    dos completos llegan a 2 × 13,828 + 2 = 29,656 m; tras el pasillo
+    sobran 40 − 31,656 = 8,344 m → (8,344 + 0,02) / 1,154 = 7,25 → 7 paneles.
+    """
+    r = generar_layout(
+        rectangulo(9.292, 40),
+        [],
+        PANEL_PLANO,
+        ParametrosLayout(paneles_ancho=12, separacion_largo_m=0.06, separacion_ancho_m=0.02),
+        orientacion_norte=0,
+    )
+    assert sorted(b.paneles_ancho for b in r.bloques) == [7, 12, 12]
+
+
+def test_medida_fila_y_paneles_que_entran_son_inversas():
+    for n in range(1, 40):
+        medida = medida_fila(n, 1.134, 0.02)
+        assert paneles_que_entran(medida, 1.134, 0.02) == n
+        assert paneles_que_entran(medida - 0.001, 1.134, 0.02) == n - 1
 
 
 # ─── Óptimos contados a mano ────────────────────────────────────────
@@ -74,13 +143,14 @@ def test_encaje_exacto_sin_bloques_cortos():
     → 6 bloques de 4 × 24 = 576 paneles, todos en proporción.
     """
     r = generar_layout(
-        rectangulo(31.336, 56.432), [], PANEL_PLANO, ParametrosLayout(), orientacion_norte=0
+        rectangulo(31.336, 56.432), [], PANEL_PLANO, ParametrosLayout(paneles_ancho=24), orientacion_norte=0
     )
     assert r.total_paneles == 576
     assert len(r.tipos) == 1
     t = r.tipos[0]
     assert (t.tipo, t.paneles_largo, t.paneles_ancho, t.repeticiones) == ("A", 4, 24, 6)
-    assert t.en_proporcion
+    # 4 × 24 no es compacto (A = 3 × L = 12): se genera igual y se avisa
+    assert not t.en_proporcion
 
 
 def test_rectangulo_100_por_60():
@@ -90,10 +160,10 @@ def test_rectangulo_100_por_60():
     menos el pasillo quedan 1,568 m → 1 panel más (bloque 4 × 1).
     Total: 9 × (2 × 96 + 4) = 1764 paneles.
     """
-    r = generar_layout(rectangulo(100, 60), [], PANEL_PLANO, ParametrosLayout(), orientacion_norte=0)
+    r = generar_layout(rectangulo(100, 60), [], PANEL_PLANO, ParametrosLayout(paneles_ancho=24), orientacion_norte=0)
     assert r.total_paneles == 1764
     tipos = {(t.paneles_ancho, t.repeticiones, t.en_proporcion) for t in r.tipos}
-    assert tipos == {(24, 18, True), (1, 9, False)}
+    assert tipos == {(24, 18, False), (1, 9, False)}
     assert r.tipos[0].tipo == "A"  # el más repetido
 
 
@@ -106,11 +176,10 @@ def test_a_minimo_descarta_los_bloques_de_una_fila():
     4 × 1. Con A mínimo 2 no se generan y quedan solo los 18 completos.
     """
     r = generar_layout(
-        rectangulo(100, 60), [], PANEL_PLANO, ParametrosLayout(paneles_ancho_minimo=2), orientacion_norte=0
+        rectangulo(100, 60), [], PANEL_PLANO, ParametrosLayout(paneles_ancho=24, paneles_ancho_minimo=2), orientacion_norte=0
     )
     assert r.total_paneles == 1764 - 9 * 4
     assert {(t.paneles_ancho, t.repeticiones) for t in r.tipos} == {(24, 18)}
-    assert all(t.en_proporcion for t in r.tipos)
 
 
 def test_a_minimo_conserva_los_bloques_cortos_que_lo_alcanzan():
@@ -120,9 +189,9 @@ def test_a_minimo_conserva_los_bloques_cortos_que_lo_alcanzan():
     Con A mínimo 9 se quedan; con 10 ya no.
     """
     params = dict(orientacion_norte=0)
-    con_9 = generar_layout(rectangulo(60, 40), [], PANEL_PLANO, ParametrosLayout(paneles_ancho_minimo=9), **params)
-    con_10 = generar_layout(rectangulo(60, 40), [], PANEL_PLANO, ParametrosLayout(paneles_ancho_minimo=10), **params)
-    sin_minimo = generar_layout(rectangulo(60, 40), [], PANEL_PLANO, ParametrosLayout(), **params)
+    con_9 = generar_layout(rectangulo(60, 40), [], PANEL_PLANO, ParametrosLayout(paneles_ancho=24, paneles_ancho_minimo=9), **params)
+    con_10 = generar_layout(rectangulo(60, 40), [], PANEL_PLANO, ParametrosLayout(paneles_ancho=24, paneles_ancho_minimo=10), **params)
+    sin_minimo = generar_layout(rectangulo(60, 40), [], PANEL_PLANO, ParametrosLayout(paneles_ancho=24), **params)
 
     assert {(t.paneles_ancho, t.repeticiones) for t in con_9.tipos} == {(24, 5), (9, 5)}
     assert con_9.total_paneles == sin_minimo.total_paneles == 5 * 4 * (24 + 9)
@@ -133,13 +202,13 @@ def test_a_minimo_conserva_los_bloques_cortos_que_lo_alcanzan():
 def test_a_minimo_mayor_que_el_bloque_ideal_se_rechaza():
     with pytest.raises(LayoutImposible, match="A mínimo"):
         generar_layout(
-            rectangulo(100, 60), [], PANEL_PLANO, ParametrosLayout(paneles_ancho_minimo=25), orientacion_norte=0
+            rectangulo(100, 60), [], PANEL_PLANO, ParametrosLayout(paneles_ancho=24, paneles_ancho_minimo=25), orientacion_norte=0
         )
 
 
 def test_a_minimo_igual_al_ideal_solo_deja_bloques_completos():
     r = generar_layout(
-        rectangulo(60, 40), [], PANEL_PLANO, ParametrosLayout(paneles_ancho_minimo=24), orientacion_norte=0
+        rectangulo(60, 40), [], PANEL_PLANO, ParametrosLayout(paneles_ancho=24, paneles_ancho_minimo=24), orientacion_norte=0
     )
     assert {t.paneles_ancho for t in r.tipos} == {24}
 
@@ -149,7 +218,7 @@ def test_cumple_rnf01_frente_al_optimo_teorico():
     RNF-01: variación ≤ 5 % respecto al óptimo calculado manualmente.
     Para el rectángulo de 100 × 60 el óptimo contado es 1764.
     """
-    r = generar_layout(rectangulo(100, 60), [], PANEL_PLANO, ParametrosLayout(), orientacion_norte=0)
+    r = generar_layout(rectangulo(100, 60), [], PANEL_PLANO, ParametrosLayout(paneles_ancho=24), orientacion_norte=0)
     assert r.total_paneles >= 0.95 * 1764
 
 
@@ -158,7 +227,7 @@ def test_rotar_terreno_y_norte_da_el_mismo_resultado():
     Un terreno de 60 × 100 con el norte apuntando a +X (90°) es el mismo
     terreno de 100 × 60 con el norte hacia arriba.
     """
-    r = generar_layout(rectangulo(60, 100), [], PANEL_PLANO, ParametrosLayout(), orientacion_norte=90)
+    r = generar_layout(rectangulo(60, 100), [], PANEL_PLANO, ParametrosLayout(paneles_ancho=24), orientacion_norte=90)
     assert r.total_paneles == 1764
 
 
@@ -186,7 +255,7 @@ def test_terreno_irregular_con_caminos_cruzados():
         rectangulo(6, 200, x=80, y=-10),  # norte-sur, se cruza con el otro
     ]
     r = generar_layout(
-        terreno, caminos, PANEL_INCLINADO, ParametrosLayout(), orientacion_norte=15, latitud=0.35
+        terreno, caminos, PANEL_INCLINADO, ParametrosLayout(paneles_ancho=24), orientacion_norte=15, latitud=0.35
     )
     assert r.total_paneles > 0
     _validar_bloques(r, terreno, caminos, PASILLO)
@@ -194,7 +263,7 @@ def test_terreno_irregular_con_caminos_cruzados():
 
 def test_pasillo_configurable_se_respeta():
     terreno = rectangulo(120, 90)
-    r = generar_layout(terreno, [], PANEL_PLANO, ParametrosLayout(pasillo_m=4), orientacion_norte=0)
+    r = generar_layout(terreno, [], PANEL_PLANO, ParametrosLayout(paneles_ancho=24, pasillo_m=4), orientacion_norte=0)
     _validar_bloques(r, terreno, [], 4)
     assert r.separacion_norte_sur_m == 4
 
@@ -208,7 +277,7 @@ def test_la_sombra_reemplaza_al_pasillo_si_es_mayor():
         rectangulo(100, 60),
         [],
         PanelLayout(2278, 1134, 580, 30),
-        ParametrosLayout(pasillo_m=0.5),
+        ParametrosLayout(paneles_ancho=24, pasillo_m=0.5),
         orientacion_norte=0,
         latitud=0.35,
     )
@@ -218,7 +287,7 @@ def test_la_sombra_reemplaza_al_pasillo_si_es_mayor():
 
 
 def test_inclinacion_reduce_el_largo_en_planta():
-    r = generar_layout(rectangulo(100, 60), [], PANEL_INCLINADO, ParametrosLayout(), orientacion_norte=0)
+    r = generar_layout(rectangulo(100, 60), [], PANEL_INCLINADO, ParametrosLayout(paneles_ancho=24), orientacion_norte=0)
     assert r.largo_bloque_m == pytest.approx(LARGO * math.cos(math.radians(7.5)), abs=1e-3)
 
 
@@ -226,7 +295,7 @@ def test_inclinacion_reduce_el_largo_en_planta():
 
 
 def test_advierte_sin_orientacion_ni_latitud():
-    r = generar_layout(rectangulo(100, 60), [], PANEL_PLANO, ParametrosLayout())
+    r = generar_layout(rectangulo(100, 60), [], PANEL_PLANO, ParametrosLayout(paneles_ancho=24))
     texto = " ".join(r.advertencias)
     assert "orientación del norte" in texto
     assert "latitud" in texto
@@ -234,20 +303,20 @@ def test_advierte_sin_orientacion_ni_latitud():
 
 def test_terreno_demasiado_chico():
     with pytest.raises(LayoutImposible, match="No entra ningún bloque"):
-        generar_layout(rectangulo(5, 5), [], PANEL_PLANO, ParametrosLayout(), orientacion_norte=0)
+        generar_layout(rectangulo(5, 5), [], PANEL_PLANO, ParametrosLayout(paneles_ancho=24), orientacion_norte=0)
 
 
 def test_camino_que_cubre_todo_el_terreno():
     with pytest.raises(LayoutImposible):
         generar_layout(
-            rectangulo(50, 50), [rectangulo(60, 60, -5, -5)], PANEL_PLANO, ParametrosLayout()
+            rectangulo(50, 50), [rectangulo(60, 60, -5, -5)], PANEL_PLANO, ParametrosLayout(paneles_ancho=24)
         )
 
 
 @pytest.mark.parametrize("l", [0, 3, 5])
 def test_l_impar_o_cero_se_rechaza(l):
     with pytest.raises(LayoutImposible, match="par"):
-        generar_layout(rectangulo(100, 60), [], PANEL_PLANO, ParametrosLayout(paneles_largo=l))
+        generar_layout(rectangulo(100, 60), [], PANEL_PLANO, ParametrosLayout(paneles_ancho=24, paneles_largo=l))
 
 
 # ─── Capacidad deseada ──────────────────────────────────────────────
@@ -263,7 +332,7 @@ def test_capacidad_que_cabe_recorta_el_layout():
         rectangulo(100, 60),
         [],
         PANEL_PLANO,
-        ParametrosLayout(capacidad_deseada_kwp=300),
+        ParametrosLayout(paneles_ancho=24, capacidad_deseada_kwp=300),
         orientacion_norte=0,
     )
     c = r.capacidad
@@ -285,7 +354,7 @@ def test_capacidad_con_a_minimo_no_deja_un_bloque_chico_al_final():
         rectangulo(100, 60),
         [],
         PANEL_PLANO,
-        ParametrosLayout(capacidad_deseada_kwp=300, paneles_ancho_minimo=12),
+        ParametrosLayout(paneles_ancho=24, capacidad_deseada_kwp=300, paneles_ancho_minimo=12),
         orientacion_norte=0,
     )
     assert r.capacidad.cabe
@@ -299,7 +368,7 @@ def test_capacidad_que_no_cabe_devuelve_la_maxima():
         rectangulo(100, 60),
         [],
         PANEL_PLANO,
-        ParametrosLayout(capacidad_deseada_kwp=5000),
+        ParametrosLayout(paneles_ancho=24, capacidad_deseada_kwp=5000),
         orientacion_norte=0,
     )
     assert not r.capacidad.cabe
@@ -363,7 +432,7 @@ def test_electrica_inversor_incompatible_con_el_panel():
 
 def _planta_100x60():
     """27 bloques: 9 franjas de 2 bloques 4 × 24 y uno corto 4 × 1 arriba."""
-    r = generar_layout(rectangulo(100, 60), [], PANEL_PLANO, ParametrosLayout(), orientacion_norte=0)
+    r = generar_layout(rectangulo(100, 60), [], PANEL_PLANO, ParametrosLayout(paneles_ancho=24), orientacion_norte=0)
     return [(b.vertices, b.paneles) for b in r.bloques]
 
 

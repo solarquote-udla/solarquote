@@ -11,10 +11,10 @@ from app.core.database import get_db
 from app.core.security import crear_access_token
 from app.main import app
 from app.models.cliente import Cliente, TipoIdentificacion
-from tests.fabricas import crear_usuario
+from tests.fabricas import LAYOUT_CLASICO, crear_usuario
 from tests.test_proyecto_avance import EQUIPO
 
-PARAMETROS = {"paneles_largo": 4, "pasillo_m": 2, "tolerancia_proporcion": 0.2, "capacidad_deseada_kwp": None}
+PARAMETROS = {"paneles_largo": 4, "pasillo_m": 2, "tolerancia_proporcion": 0.2, "capacidad_deseada_kwp": None, **LAYOUT_CLASICO}
 
 
 @pytest.fixture
