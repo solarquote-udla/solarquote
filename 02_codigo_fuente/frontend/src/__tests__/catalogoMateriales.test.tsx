@@ -65,7 +65,7 @@ describe("Configuración, Materiales: alta con error por campo", () => {
   it("error del backend por campo (422 con loc) se muestra junto al campo", async () => {
     const { crearMaterial } = await import("@/services/materiales");
     vi.mocked(crearMaterial).mockRejectedValue(
-      errorValidacion([{ msg: "Ya existe un material con ese código.", loc: ["body", "codigo"], type: "value_error" }]),
+      errorValidacion([{ msg: "Ya existe un material con ese código.", loc: ["body", "codigo"] }]),
     );
     await abrir();
     escribir(/^Código/, "VAR9999");
@@ -115,7 +115,7 @@ describe("Precios unitarios: error por campo", () => {
   it("error del backend por campo (422 con loc) se muestra junto al precio", async () => {
     const { actualizarPrecio } = await import("@/services/materiales");
     vi.mocked(actualizarPrecio).mockRejectedValue(
-      errorValidacion([{ msg: "Debe ser mayor o igual a 0.", loc: ["body", "precio"], type: "greater_than_equal" }]),
+      errorValidacion([{ msg: "Debe ser mayor o igual a 0.", loc: ["body", "precio"] }]),
     );
     await abrir();
     fireEvent.change(campoPrecio(), { target: { value: "8.50" } });
