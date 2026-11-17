@@ -19,8 +19,9 @@ from app.models.material import Material, PrecioMaterial
 
 # Códigos que usan las fórmulas f(L,A,B) de calc-service
 # (calc-service/app/services/calculo_materiales.py::calcular_materiales).
-# Una cotización siempre los necesita, sin importar L/A/B, así que un
-# material con uno de estos códigos no se puede desactivar.
+# Cualquiera se puede desactivar (pedido de Santi): `crear_cotizacion`
+# solo pide precio de los activos, y calc-service excluye del todo los
+# que no tengan precio — una cotización nueva simplemente no los incluye.
 CODIGOS_FORMULA = frozenset(
     {
         "VAR1650",
@@ -58,14 +59,6 @@ class CodigoDuplicado(ValueError):
     def __init__(self, codigo: str) -> None:
         self.codigo = codigo
         super().__init__(f"Ya existe un material con el código {codigo}")
-
-
-class MaterialEnUso(ValueError):
-    """El código lo usan las fórmulas del cálculo: no se puede desactivar."""
-
-    def __init__(self, codigo: str) -> None:
-        self.codigo = codigo
-        super().__init__(f"{codigo} lo usan las fórmulas f(L,A,B); no se puede desactivar")
 
 
 def obtener_precios_vigentes(db: Session, codigos: list[str]) -> dict[str, Decimal]:
@@ -195,9 +188,6 @@ def actualizar_material(
     material = db.get(Material, material_id)
     if material is None:
         return None
-
-    if activo is False and material.codigo in CODIGOS_FORMULA:
-        raise MaterialEnUso(material.codigo)
 
     if nombre is not None:
         material.nombre = nombre

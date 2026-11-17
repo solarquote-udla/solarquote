@@ -178,11 +178,11 @@ Evidencia: PR #37, el PR de SQ-135 y el PR de SQ-209.
 |---|---|
 | Precio con fecha de vigencia e historial | `test_material_administracion`: `test_actualizar_precio_cierra_el_anterior_y_crea_uno_nuevo`, `test_historial_queda_ordenado_*`; `test_api_administracion`: `test_material_ciclo_completo` |
 | Las cotizaciones emitidas conservan sus precios | `test_cotizacion_servicio`: `test_persiste_la_cantidad_y_precio_unitario_de_cada_material` |
-| Los materiales de las fórmulas no se desactivan | `test_material_administracion`: `test_desactivar_un_codigo_de_formula_*`; `test_api_administracion` (409) |
+| Cualquier material se puede desactivar, incluido uno de las fórmulas; una cotización nueva simplemente lo excluye (pedido de Santi en la reunión del 17 de noviembre) | `test_material_administracion`: `test_se_puede_desactivar_un_codigo_de_formula`; `test_cotizacion_servicio`: `test_material_de_formula_desactivado_se_excluye_de_la_cotizacion`; `test_api_administracion`; calc-service `test_endpoint_cotizacion`: `test_material_sin_precio_se_excluye_de_la_cotizacion`, `test_cargo_fijo_sin_precio_se_excluye_de_la_cotizacion` |
 | Precio mayor o igual a cero | `test_material_administracion`: `test_acepta_cero`, `test_rechaza_negativo`; `test_api_administracion` (422) |
 | Precios y catálogo con permisos separados | `test_api_administracion`: `test_precios_y_materiales_por_permiso`; `test_seguridad`: `test_ver_materiales_no_permite_cambiar_precios` |
 
-Evidencia: PR #23 a #25, #35 y el PR de SQ-135.
+Evidencia: PR #23 a #25, #35, el PR de SQ-135 y el PR de SQ-212.
 
 ### RF-10 Historial de cotizaciones
 

@@ -11,7 +11,6 @@ from app.models.material import Material, PrecioMaterial
 from app.schemas.material import MaterialActualizar, MaterialCrear, PrecioActualizar
 from app.services.material import (
     CodigoDuplicado,
-    MaterialEnUso,
     actualizar_material,
     actualizar_precio,
     crear_material,
@@ -161,22 +160,14 @@ def test_actualizar_material_inexistente_devuelve_none(db: Session) -> None:
     assert actualizar_material(db, 999999, nombre="X") is None
 
 
-def test_desactivar_un_codigo_de_formula_lanza_material_en_uso(db: Session) -> None:
-    """Revisión del PR #35 (Joseph): desactivar VAR1650 rompía todas las cotizaciones."""
+def test_se_puede_desactivar_un_codigo_de_formula(db: Session) -> None:
+    """Pedido de Santi: cualquier material se puede desactivar; las cotizaciones
+    nuevas simplemente lo excluyen (ver test_crea_cotizacion_sin_un_material_de_formula_desactivado)."""
     material = _crear_material(db, "VAR1650")
 
-    with pytest.raises(MaterialEnUso):
-        actualizar_material(db, material.id, activo=False)
+    actualizado, _ = actualizar_material(db, material.id, activo=False)
 
-
-def test_desactivar_un_codigo_de_formula_no_cambia_nada(db: Session) -> None:
-    """El intento no debe dejar a medias otros campos que vinieran en el mismo PATCH."""
-    material = _crear_material(db, "VAR1650")
-
-    with pytest.raises(MaterialEnUso):
-        actualizar_material(db, material.id, nombre="Otro nombre", activo=False)
-
-    assert material.nombre == "VAR1650"
+    assert actualizado.activo is False
 
 
 class TestMaterialCrearSchema:
