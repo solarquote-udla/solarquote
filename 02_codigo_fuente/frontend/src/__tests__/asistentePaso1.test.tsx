@@ -10,6 +10,8 @@ import { montar, PROYECTO, rect, TERRENO } from "./utilidades";
 
 vi.mock("@/services/proyectos", () => ({ obtenerProyecto: vi.fn(), crearProyecto: vi.fn(), actualizarProyecto: vi.fn() }));
 vi.mock("@/services/terreno", () => ({ obtenerTerreno: vi.fn(), crearTerreno: vi.fn(), actualizarTerreno: vi.fn() }));
+vi.mock("@/components/MapaUbicacion", async () => ({ MapaUbicacion: (await import("./mapaFalso")).MapaFalso }));
+vi.mock("@/services/geocodificacion", () => ({ buscarDireccion: vi.fn() }));
 vi.mock("@/services/clientes", () => ({
   listarClientes: vi.fn().mockResolvedValue([{ id: 9, nombre: "Cliente", identificacion: "1", activo: true }]),
 }));
@@ -43,7 +45,10 @@ describe("Paso 1: cambios sin guardar", () => {
 
   const cambios: [string, () => void][] = [
     ["nombre del proyecto", () => escribir(campo(/^Nombre del proyecto/), "Otro")],
-    ["latitud", () => escribir(campo(/^Latitud/), "0,5")],
+    ["ubicación en el mapa", () => {
+      fireEvent.click(screen.getByRole("tab", { name: "Mapa" }));
+      fireEvent.click(screen.getByText("CLIC EN EL MAPA"));
+    }],
     ["ancho sin Actualizar plano", () => escribir(campo(/^Ancho \(m\)/), "120")],
     ["largo sin Actualizar plano", () => escribir(campo(/^Largo \(m\)/), "70")],
     ["orientación", () => fireEvent.click(screen.getByText(/^Este/))],
