@@ -21,8 +21,8 @@ requisito es la corrida verde del PR indicado.
 | Backend (API principal) | 581 | 96 % | `pytest` en `02_codigo_fuente/backend` |
 | calc-service | 32 | 100 % | `pytest` en `02_codigo_fuente/calc-service` |
 | ia-service | 96 | 94 % | `pytest` en `02_codigo_fuente/ia-service` |
-| Frontend (interfaz) | 213 | — | `npm test` en `02_codigo_fuente/frontend` |
-| **Total** | **922** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
+| Frontend (interfaz) | 227 | — | `npm test` en `02_codigo_fuente/frontend` |
+| **Total** | **936** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
 
 La cobertura se midió con `pytest --cov=app`. RNF-02 pide al menos 60 %
 en el backend.
@@ -51,7 +51,7 @@ calc-service e ia-service.
 | El área neta debe alcanzar para un panel | `test_geometria`: `test_camino_que_cubre_todo_el_terreno`; `test_layout`: `test_terreno_demasiado_chico` |
 | Corregir el polígono antes de confirmar | `asistentePaso1.test.tsx` (dibujo, coordenadas y medidas) |
 | Cada error junto a su campo y en rojo; obligatorios marcados; orientación entre 0 y 359,99; ancho y largo mayores que cero | `validacionPaso1.test.tsx` |
-| Ubicación con un punto en el mapa satelital (norte arriba) en lugar de escribir latitud y longitud; sin punto se avisa que no habrá sombra | `mapaUbicacion.test.tsx`; `validacionPaso1.test.tsx` (Paso 1: ubicación en el mapa) |
+| Ubicación con un punto en el mapa satelital (norte arriba) en lugar de escribir latitud y longitud, al estilo de Smart Design: mapa grande con pestañas Mapa y Plano, búsqueda de la dirección (OpenStreetMap) y longitud siempre entre -180 y 180; sin punto se avisa que no habrá sombra | `mapaUbicacion.test.tsx`; `coordenadas.test.tsx`; `validacionPaso1.test.tsx` (ubicación en el mapa y búsqueda de la dirección) |
 | Solo con permiso | `test_api_terreno`: `test_terreno_exige_generar_layout` |
 
 Evidencia: PR #1, #20, #34 y el PR de SQ-135.

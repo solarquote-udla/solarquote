@@ -2,10 +2,11 @@
  * Paso 1: cada error aparece junto a su campo, en rojo, y no se avanza
  * hasta corregirlo (revisión del 16 de noviembre).
  */
-import { act, cleanup, fireEvent, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TerrenoPage } from "@/pages/TerrenoPage";
+import * as geocodificacion from "@/services/geocodificacion";
 import * as proyectos from "@/services/proyectos";
 import * as terreno from "@/services/terreno";
 
@@ -14,6 +15,7 @@ import { montar, PROYECTO, rect, TERRENO } from "./utilidades";
 vi.mock("@/services/proyectos", () => ({ obtenerProyecto: vi.fn(), crearProyecto: vi.fn(), actualizarProyecto: vi.fn() }));
 vi.mock("@/services/terreno", () => ({ obtenerTerreno: vi.fn(), crearTerreno: vi.fn(), actualizarTerreno: vi.fn() }));
 vi.mock("@/components/MapaUbicacion", async () => ({ MapaUbicacion: (await import("./mapaFalso")).MapaFalso }));
+vi.mock("@/services/geocodificacion", () => ({ buscarDireccion: vi.fn() }));
 vi.mock("@/services/clientes", () => ({
   listarClientes: vi.fn().mockResolvedValue([{ id: 9, nombre: "Cliente", identificacion: "1", activo: true }]),
 }));
@@ -23,6 +25,7 @@ const escribir = (el: HTMLElement, v: string) => fireEvent.change(el, { target: 
 const existente = () => montar(<TerrenoPage />, "/generar/5/terreno", ["/generar/:proyectoId/terreno"]);
 const nuevo = () => montar(<TerrenoPage />, "/generar", ["/generar"]);
 const listo = () => screen.findByText("Actualizar plano");
+const pestana = (nombre: "Mapa" | "Plano") => fireEvent.click(screen.getByRole("tab", { name: nombre }));
 const siguiente = () => act(async () => fireEvent.click(screen.getByText(/Siguiente/)));
 
 /** Mensaje de error asociado al campo, o null si no tiene. */
@@ -124,6 +127,7 @@ describe("Paso 1: ubicación en el mapa", () => {
     vi.mocked(proyectos.actualizarProyecto).mockResolvedValue(PROYECTO as never);
     existente();
     await listo();
+    pestana("Mapa");
     fireEvent.click(screen.getByText("CLIC EN EL MAPA"));
     expect(screen.getByTestId("coordenadas").textContent).toBe("-0,2298, -78,5249");
     await siguiente();
@@ -135,6 +139,7 @@ describe("Paso 1: ubicación en el mapa", () => {
     vi.mocked(proyectos.obtenerProyecto).mockResolvedValue({ ...PROYECTO, latitud: 0.35, longitud: -78.12 } as never);
     existente();
     await listo();
+    pestana("Mapa");
     expect(screen.getByTestId("marcador").textContent).toBe("0.35,-78.12");
     fireEvent.click(screen.getByText("Quitar ubicación"));
     expect(screen.getByTestId("marcador").textContent).toBe("sin marcador");
@@ -145,6 +150,81 @@ describe("Paso 1: ubicación en el mapa", () => {
     existente();
     await listo();
     expect(screen.getByText(/Tiene latitud 0,1900 pero falta el punto en el mapa/)).toBeTruthy();
+  });
+
+  it("un proyecto con terreno abre en el plano; uno nuevo, en el mapa", async () => {
+    existente();
+    await listo();
+    expect(screen.getByRole("tab", { name: "Plano" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.queryByText("CLIC EN EL MAPA")).toBeNull();
+    cleanup();
+
+    nuevo();
+    await listo();
+    expect(screen.getByRole("tab", { name: "Mapa" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByText("CLIC EN EL MAPA")).toBeTruthy();
+  });
+
+  it("cambiar de pestaña no cuenta como cambio sin guardar", async () => {
+    existente();
+    await listo();
+    pestana("Mapa");
+    pestana("Plano");
+    await siguiente();
+    expect(await screen.findByText("PASO 2")).toBeTruthy();
+    expect(proyectos.actualizarProyecto).not.toHaveBeenCalled();
+  });
+});
+
+describe("Paso 1: buscar la dirección", () => {
+  const direccion = () => screen.getByLabelText("Dirección o lugar") as HTMLInputElement;
+
+  it("busca, muestra los resultados y al elegir uno marca el punto y va al mapa", async () => {
+    vi.mocked(geocodificacion.buscarDireccion).mockResolvedValue([
+      { nombre: "Quito, Pichincha, Ecuador", latitud: -0.2201641, longitud: -78.5123274 },
+      { nombre: "Quito, Esmeraldas, Ecuador", latitud: 0.9, longitud: -79.6 },
+    ]);
+    existente();
+    await listo();
+    escribir(direccion(), "Quito");
+    await act(async () => fireEvent.click(screen.getByText("Buscar")));
+
+    expect(geocodificacion.buscarDireccion).toHaveBeenCalledWith("Quito");
+    const lista = screen.getByRole("list", { name: "Resultados de la búsqueda" });
+    fireEvent.click(within(lista).getByText("Quito, Pichincha, Ecuador"));
+
+    expect(screen.getByRole("tab", { name: "Mapa" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByTestId("marcador").textContent).toBe("-0.2201641,-78.5123274");
+    expect(direccion().value).toBe("Quito, Pichincha, Ecuador");
+    expect(screen.queryByRole("list", { name: "Resultados de la búsqueda" })).toBeNull();
+  });
+
+  it("Enter en el campo también busca", async () => {
+    vi.mocked(geocodificacion.buscarDireccion).mockResolvedValue([]);
+    existente();
+    await listo();
+    escribir(direccion(), "Ibarra");
+    await act(async () => fireEvent.keyDown(direccion(), { key: "Enter" }));
+    expect(geocodificacion.buscarDireccion).toHaveBeenCalledWith("Ibarra");
+    expect(screen.getByText(/No se encontró esa dirección/)).toBeTruthy();
+  });
+
+  it("con menos de 3 letras no consulta el buscador", async () => {
+    existente();
+    await listo();
+    escribir(direccion(), "Qu");
+    await act(async () => fireEvent.click(screen.getByText("Buscar")));
+    expect(geocodificacion.buscarDireccion).not.toHaveBeenCalled();
+    expect(screen.getByText(/al menos 3 letras/)).toBeTruthy();
+  });
+
+  it("si el buscador falla, se puede marcar el punto a mano", async () => {
+    vi.mocked(geocodificacion.buscarDireccion).mockRejectedValue(new Error("sin red"));
+    existente();
+    await listo();
+    escribir(direccion(), "Cayambe");
+    await act(async () => fireEvent.click(screen.getByText("Buscar")));
+    expect(screen.getByText(/Marca el punto directamente en el mapa/)).toBeTruthy();
   });
 });
 

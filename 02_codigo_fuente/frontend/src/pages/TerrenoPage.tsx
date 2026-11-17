@@ -33,6 +33,7 @@ import { useCambiosSinGuardar } from "@/hooks/useCambiosSinGuardar";
 import { useAccionUnica } from "@/hooks/useAccionUnica";
 import { mensajeDeError } from "@/services/api";
 import { listarClientes } from "@/services/clientes";
+import { buscarDireccion, type ResultadoDireccion } from "@/services/geocodificacion";
 import { actualizarProyecto, crearProyecto, obtenerProyecto } from "@/services/proyectos";
 import { actualizarTerreno, crearTerreno, obtenerTerreno } from "@/services/terreno";
 import type { ClienteListado, Proyecto, ProyectoActualizar, Punto, Terreno } from "@/types/api";
@@ -200,6 +201,13 @@ export function TerrenoPage() {
 
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // ─── Mapa (al estilo de Smart Design) ─────────────────
+  const [vista, setVista] = useState<"mapa" | "plano">("mapa");
+  const [enfoque, setEnfoque] = useState(0);
+  const [buscando, setBuscando] = useState(false);
+  const [resultados, setResultados] = useState<ResultadoDireccion[] | null>(null);
+  const [errorBusqueda, setErrorBusqueda] = useState<string | null>(null);
   // Un error se muestra cuando el usuario dejó el campo o intentó avanzar:
   // marcar en rojo mientras escribe la primera letra molesta.
   const [tocados, setTocados] = useState<Partial<Record<CampoPaso1, boolean>>>({});
@@ -232,6 +240,8 @@ export function TerrenoPage() {
         setDatos(p ? datosDe(p) : DATOS_VACIOS);
         setClientes(lista);
         cargarEnEditor(t);
+        // Sin terreno se empieza por el mapa, como en Smart Design; con terreno, por el plano
+        setVista(t && t.vertices.length >= 3 ? "plano" : "mapa");
       })
       .catch((e) => {
         if (!cancelado) setErrorCarga(mensajeDeError(e, "No se pudo cargar el proyecto"));
@@ -373,6 +383,40 @@ export function TerrenoPage() {
     cambiarContorno(vertices.map((p, i) => (i === indice ? (eje === 0 ? [valor, p[1]] : [p[0], valor]) : p)));
   }
 
+  // ─── Búsqueda de dirección ───────────────────────────
+
+  async function buscar() {
+    const texto = datos.ubicacion.trim();
+    setErrorBusqueda(null);
+    setResultados(null);
+    if (texto.length < 3) {
+      setErrorBusqueda("Escribe al menos 3 letras de la dirección o el lugar.");
+      return;
+    }
+    setBuscando(true);
+    try {
+      const encontrados = await buscarDireccion(texto);
+      if (encontrados.length === 0) setErrorBusqueda("No se encontró esa dirección. Prueba con la ciudad o el cantón.");
+      setResultados(encontrados);
+    } catch {
+      setErrorBusqueda("No se pudo buscar la dirección. Marca el punto directamente en el mapa.");
+    } finally {
+      setBuscando(false);
+    }
+  }
+
+  function elegirResultado(r: ResultadoDireccion) {
+    setDatos((d) => ({
+      ...d,
+      ubicacion: r.nombre.slice(0, 255),
+      latitud: String(r.latitud),
+      longitud: String(r.longitud),
+    }));
+    setResultados(null);
+    setVista("mapa");
+    setEnfoque((n) => n + 1);
+  }
+
   // ─── Siguiente: guarda proyecto y terreno ────────────
 
   function validar():
@@ -496,77 +540,113 @@ export function TerrenoPage() {
       )}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_340px]">
-        {/* ─── Plano ────────────────────────────────────── */}
+        {/* ─── Mapa y plano ─────────────────────────────── */}
         <section>
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            {!dibujando ? (
+          <div className="mb-3 inline-flex rounded-lg border border-acero-300 p-0.5" role="tablist" aria-label="Vista del terreno">
+            {(["mapa", "plano"] as const).map((v) => (
               <button
+                key={v}
                 type="button"
-                className={BOTON}
-                onClick={() => {
-                  setError(null);
-                  setBorrador([]);
-                  setDibujando(true);
-                }}
+                role="tab"
+                aria-selected={vista === v}
+                onClick={() => setVista(v)}
+                className={[
+                  "rounded-md px-4 py-1.5 text-sm font-medium transition",
+                  vista === v ? "bg-solar-500 text-acero-50" : "text-acero-600 hover:bg-acero-100",
+                ].join(" ")}
               >
-                {vertices.length ? "Redibujar contorno" : "Dibujar contorno"}
+                {v === "mapa" ? "Mapa" : "Plano"}
               </button>
-            ) : (
-              <>
-                <button type="button" className={BOTON} onClick={() => setBorrador((b) => b.slice(0, -1))} disabled={borrador.length === 0}>
-                  Deshacer punto
-                </button>
-                <button type="button" className={BOTON} onClick={cerrarBorrador} disabled={borrador.length < 3}>
-                  Cerrar contorno
-                </button>
-                <button type="button" className={BOTON} onClick={() => { setBorrador([]); setDibujando(false); }}>
-                  Cancelar
-                </button>
-              </>
-            )}
-            <span className="rounded-lg bg-acero-100 px-3 py-1.5 text-xs text-acero-600">
-              {dibujando
-                ? "Haz clic en el plano para marcar cada vértice; clic en el primero para cerrar."
-                : "Ingresa ancho y largo a la derecha, o dibuja el contorno si el terreno es irregular."}
-            </span>
-            <label className="ml-auto flex items-center gap-2 text-sm text-acero-600">
-              <input type="checkbox" checked={ajustarAlMetro} onChange={(e) => setAjustarAlMetro(e.target.checked)} className="accent-solar-500" />
-              Ajustar al metro
-            </label>
-          </div>
-
-          <EditorPoligonos
-            terreno={dibujando ? [] : vertices}
-            caminos={caminos}
-            borrador={borrador}
-            dibujando={dibujando ? "terreno" : null}
-            lienzo={lienzo}
-            pasoAjuste={ajustarAlMetro ? 1 : null}
-            onAgregarPunto={(p) => setBorrador((b) => [...b, p])}
-            onCerrarBorrador={cerrarBorrador}
-          />
-
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-acero-500">
-            <span>Plano mínimo</span>
-            {(["ancho", "alto"] as const).map((eje, i) => (
-              <span key={eje} className="flex items-center gap-2">
-                {i === 1 && <span>×</span>}
-                <input
-                  type="number"
-                  min={10}
-                  className="w-20 rounded border border-acero-300 bg-acero-50 px-1.5 py-0.5"
-                  value={lienzo[eje]}
-                  aria-label={`Plano mínimo, ${eje}`}
-                  onChange={(e) => {
-                    const v = e.target.valueAsNumber;
-                    if (v > 0) setLienzo((l) => ({ ...l, [eje]: v }));
-                  }}
-                />
-              </span>
             ))}
-            <span>m: amplíalo para dibujar terrenos grandes con clics</span>
-            {caminos.length > 0 && <span className="ml-auto">Los caminos se editan en el Paso 3.</span>}
           </div>
+
+          {vista === "mapa" ? (
+            <div>
+              <MapaUbicacion
+                valor={coordenadas}
+                enfoque={enfoque}
+                alto="h-[32rem]"
+                onCambio={({ latitud, longitud }) =>
+                  setDatos((d) => ({ ...d, latitud: String(latitud), longitud: String(longitud) }))
+                }
+              />
+              <p className="mt-2 text-xs text-acero-500">
+                Busca la dirección a la derecha o haz clic sobre el terreno; el punto se puede arrastrar. El norte está arriba.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                {!dibujando ? (
+                  <button
+                    type="button"
+                    className={BOTON}
+                    onClick={() => {
+                      setError(null);
+                      setBorrador([]);
+                      setDibujando(true);
+                    }}
+                  >
+                    {vertices.length ? "Redibujar contorno" : "Dibujar contorno"}
+                  </button>
+                ) : (
+                  <>
+                    <button type="button" className={BOTON} onClick={() => setBorrador((b) => b.slice(0, -1))} disabled={borrador.length === 0}>
+                      Deshacer punto
+                    </button>
+                    <button type="button" className={BOTON} onClick={cerrarBorrador} disabled={borrador.length < 3}>
+                      Cerrar contorno
+                    </button>
+                    <button type="button" className={BOTON} onClick={() => { setBorrador([]); setDibujando(false); }}>
+                      Cancelar
+                    </button>
+                  </>
+                )}
+                <span className="rounded-lg bg-acero-100 px-3 py-1.5 text-xs text-acero-600">
+                  {dibujando
+                    ? "Haz clic en el plano para marcar cada vértice; clic en el primero para cerrar."
+                    : "Ingresa ancho y largo a la derecha, o dibuja el contorno si el terreno es irregular."}
+                </span>
+                <label className="ml-auto flex items-center gap-2 text-sm text-acero-600">
+                  <input type="checkbox" checked={ajustarAlMetro} onChange={(e) => setAjustarAlMetro(e.target.checked)} className="accent-solar-500" />
+                  Ajustar al metro
+                </label>
+              </div>
+
+              <EditorPoligonos
+                terreno={dibujando ? [] : vertices}
+                caminos={caminos}
+                borrador={borrador}
+                dibujando={dibujando ? "terreno" : null}
+                lienzo={lienzo}
+                pasoAjuste={ajustarAlMetro ? 1 : null}
+                onAgregarPunto={(p) => setBorrador((b) => [...b, p])}
+                onCerrarBorrador={cerrarBorrador}
+              />
+
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-acero-500">
+                <span>Plano mínimo</span>
+                {(["ancho", "alto"] as const).map((eje, i) => (
+                  <span key={eje} className="flex items-center gap-2">
+                    {i === 1 && <span>×</span>}
+                    <input
+                      type="number"
+                      min={10}
+                      className="w-20 rounded border border-acero-300 bg-acero-50 px-1.5 py-0.5"
+                      value={lienzo[eje]}
+                      aria-label={`Plano mínimo, ${eje}`}
+                      onChange={(e) => {
+                        const v = e.target.valueAsNumber;
+                        if (v > 0) setLienzo((l) => ({ ...l, [eje]: v }));
+                      }}
+                    />
+                  </span>
+                ))}
+                <span>m: amplíalo para dibujar terrenos grandes con clics</span>
+                {caminos.length > 0 && <span className="ml-auto">Los caminos se editan en el Paso 3.</span>}
+              </div>
+            </>
+          )}
         </section>
 
         {/* ─── Panel derecho ────────────────────────────── */}
@@ -601,37 +681,69 @@ export function TerrenoPage() {
                 Fecha
                 <input className={`mt-1 ${CAMPO}`} value={fecha} disabled />
               </label>
-              <label className={ETIQUETA}>
-                Ubicación
-                <input className={`mt-1 ${CAMPO}`} value={datos.ubicacion} maxLength={255} placeholder="Provincia, cantón, referencia" onChange={(e) => setDatos((d) => ({ ...d, ubicacion: e.target.value }))} />
-              </label>
               <div>
-                <p className={ETIQUETA}>Ubicación en el mapa</p>
-                <p className="mt-0.5 text-xs text-acero-400">Haz clic sobre el terreno; el punto se puede arrastrar. El norte está arriba.</p>
-                <div className="mt-2">
-                  <MapaUbicacion
-                    valor={coordenadas}
-                    onCambio={({ latitud, longitud }) =>
-                      setDatos((d) => ({ ...d, latitud: String(latitud), longitud: String(longitud) }))
-                    }
+                <label className={ETIQUETA} htmlFor="direccion-proyecto">
+                  Dirección o lugar
+                </label>
+                <div className="mt-1 flex gap-2">
+                  <input
+                    id="direccion-proyecto"
+                    className={CAMPO}
+                    value={datos.ubicacion}
+                    maxLength={255}
+                    placeholder="Ej. Ibarra, Imbabura"
+                    onChange={(e) => setDatos((d) => ({ ...d, ubicacion: e.target.value }))}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void buscar();
+                      }
+                    }}
                   />
+                  <button type="button" className={BOTON} onClick={() => void buscar()} disabled={buscando}>
+                    {buscando ? "Buscando…" : "Buscar"}
+                  </button>
                 </div>
+                {errorBusqueda && <p className="mt-1 text-xs text-red-600">{errorBusqueda}</p>}
+                {resultados && resultados.length > 0 && (
+                  <ul className="mt-1 max-h-48 overflow-y-auto rounded-lg border border-acero-200" aria-label="Resultados de la búsqueda">
+                    {resultados.map((r) => (
+                      <li key={`${r.latitud},${r.longitud},${r.nombre}`}>
+                        <button
+                          type="button"
+                          className="block w-full px-3 py-2 text-left text-xs text-acero-700 hover:bg-acero-100"
+                          onClick={() => elegirResultado(r)}
+                        >
+                          {r.nombre}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="mt-1 text-[11px] text-acero-400">Búsqueda: © colaboradores de OpenStreetMap</p>
                 {coordenadas ? (
                   <p className="mt-1 flex items-center justify-between gap-2 text-xs text-acero-500">
                     <span data-testid="coordenadas">
                       {formatoCoordenada.format(coordenadas.latitud)}, {formatoCoordenada.format(coordenadas.longitud)}
                     </span>
-                    <button
-                      type="button"
-                      className="text-acero-500 hover:text-red-600"
-                      onClick={() => setDatos((d) => ({ ...d, latitud: "", longitud: "" }))}
-                    >
-                      Quitar ubicación
-                    </button>
+                    <span className="flex gap-3">
+                      {vista !== "mapa" && (
+                        <button type="button" className="text-solar-700 hover:underline" onClick={() => setVista("mapa")}>
+                          Ver en el mapa
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="text-acero-500 hover:text-red-600"
+                        onClick={() => setDatos((d) => ({ ...d, latitud: "", longitud: "" }))}
+                      >
+                        Quitar ubicación
+                      </button>
+                    </span>
                   </p>
                 ) : latitudNumero !== null && !Number.isNaN(latitudNumero) ? (
                   <p className="mt-1 text-xs text-amber-700">
-                    Tiene latitud {formatoCoordenada.format(latitudNumero)} pero falta el punto en el mapa. Márcalo para completar la ubicación.
+                    Tiene latitud {formatoCoordenada.format(latitudNumero)} pero falta el punto en el mapa. Búscalo o márcalo para completar la ubicación.
                   </p>
                 ) : (
                   <p className="mt-1 text-xs text-amber-700">Sin ubicación no se calcula la sombra entre filas ni entre bloques.</p>
