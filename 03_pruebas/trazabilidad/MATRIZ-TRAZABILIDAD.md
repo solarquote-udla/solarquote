@@ -21,8 +21,8 @@ requisito es la corrida verde del PR indicado.
 | Backend (API principal) | 593 | 96 % | `pytest` en `02_codigo_fuente/backend` |
 | calc-service | 32 | 100 % | `pytest` en `02_codigo_fuente/calc-service` |
 | ia-service | 96 | 94 % | `pytest` en `02_codigo_fuente/ia-service` |
-| Frontend (interfaz) | 232 | — | `npm test` en `02_codigo_fuente/frontend` |
-| **Total** | **953** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
+| Frontend (interfaz) | 237 | — | `npm test` en `02_codigo_fuente/frontend` |
+| **Total** | **958** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
 
 La cobertura se midió con `pytest --cov=app`. RNF-02 pide al menos 60 %
 en el backend.
@@ -181,8 +181,9 @@ Evidencia: PR #37, el PR de SQ-135 y el PR de SQ-209.
 | Los materiales de las fórmulas no se desactivan | `test_material_administracion`: `test_desactivar_un_codigo_de_formula_*`; `test_api_administracion` (409) |
 | Precio mayor o igual a cero | `test_material_administracion`: `test_acepta_cero`, `test_rechaza_negativo`; `test_api_administracion` (422) |
 | Precios y catálogo con permisos separados | `test_api_administracion`: `test_precios_y_materiales_por_permiso`; `test_seguridad`: `test_ver_materiales_no_permite_cambiar_precios` |
+| Error de validación (propio o del backend, por `loc`) junto al campo correspondiente, en Materiales y en Precios | `catalogoMateriales.test.tsx` (5 pruebas) |
 
-Evidencia: PR #23 a #25, #35 y el PR de SQ-135.
+Evidencia: PR #23 a #25, #35, el PR de SQ-135 y el PR de SQ-211.
 
 ### RF-10 Historial de cotizaciones
 
