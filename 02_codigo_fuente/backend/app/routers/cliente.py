@@ -7,7 +7,11 @@ Endpoints de clientes — RF-12. Ver CONTRATO-CLIENTES.md.
   PATCH  /api/clientes/{id}   → corrección parcial / reactivación
   DELETE /api/clientes/{id}   → baja lógica (idempotente)
 
-Solo Gerente General.
+Administrar (PATCH, DELETE) es solo Gerente General. El alta (POST)
+también la puede hacer quien tiene GENERAR_LAYOUT o CARGAR_BOCETO,
+igual que la lectura: el Paso 1 del asistente permite crear el cliente
+ahí mismo si todavía no está en el catálogo, sin mandar a esa persona a
+Operaciones, Clientes primero.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -65,7 +69,7 @@ def detalle(cliente_id: int, db: Session = Depends(get_db)) -> ClienteLeer:
     return _respuesta(*resultado)
 
 
-@router.post("", response_model=ClienteLeer, status_code=status.HTTP_201_CREATED, dependencies=[Depends(administrar)])
+@router.post("", response_model=ClienteLeer, status_code=status.HTTP_201_CREATED)
 def crear(datos: ClienteCrear, db: Session = Depends(get_db)) -> ClienteLeer:
     try:
         cliente, total = servicio.crear_cliente(db, datos)

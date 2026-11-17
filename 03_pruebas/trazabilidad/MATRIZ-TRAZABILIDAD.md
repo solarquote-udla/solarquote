@@ -18,11 +18,11 @@ requisito es la corrida verde del PR indicado.
 
 | Componente | Pruebas | Cobertura de líneas | Cómo se ejecutan |
 |---|---|---|---|
-| Backend (API principal) | 592 | 96 % | `pytest` en `02_codigo_fuente/backend` |
+| Backend (API principal) | 593 | 96 % | `pytest` en `02_codigo_fuente/backend` |
 | calc-service | 32 | 100 % | `pytest` en `02_codigo_fuente/calc-service` |
 | ia-service | 96 | 94 % | `pytest` en `02_codigo_fuente/ia-service` |
 | Frontend (interfaz) | 227 | — | `npm test` en `02_codigo_fuente/frontend` |
-| **Total** | **947** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
+| **Total** | **948** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
 
 La cobertura se midió con `pytest --cov=app`. RNF-02 pide al menos 60 %
 en el backend.
@@ -217,8 +217,9 @@ Evidencia: PR #30 a #33, #36 y el PR de SQ-135.
 | Correo y teléfono con formato válido; cédula y RUC | `test_validaciones_identificacion` (21 pruebas), paridad con `utils/identificacion.ts`; `test_api_administracion`: `test_cliente_errores_traducidos` |
 | La baja conserva las cotizaciones | `test_cliente_servicio`: `test_marca_inactivo`; `test_cotizacion_servicio`: `test_snapshot_del_cliente_viene_de_la_base_y_no_del_request` |
 | Solo con permiso | `test_api_administracion`: `test_clientes_lectura_y_administracion_por_permiso` |
+| Crear el cliente desde el Paso 1 (Lenin): el alta también la puede hacer quien tiene permiso de generar layout, no solo quien administra clientes | `test_api_administracion`: `test_crear_cliente_desde_el_proyecto` |
 
-Evidencia: PR #17, #18, #22 y el PR de SQ-135.
+Evidencia: PR #17, #18, #22, el PR de SQ-135 y el de crear cliente desde el proyecto.
 
 ### RF-13 Tablero de indicadores
 
