@@ -9,9 +9,11 @@ Documentación interactiva:
 """
 
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
+from app.core.errores import manejador_422
 from app.routers import (
     auth,
     bocetos,
@@ -50,6 +52,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mensajes de validación en español, con el loc intacto (RF-02 y en general).
+app.add_exception_handler(RequestValidationError, manejador_422)
 
 # ─── Rutas ──────────────────────────────────────────────
 app.include_router(health.router)
