@@ -458,7 +458,6 @@ def a_respuesta(c: Cotizacion) -> ValidacionLeer:
         cotizacion_id=c.id,
         numero_proforma=c.numero_proforma,
         cliente_nombre=c.cliente_nombre,
-        cliente_empresa=c.cliente_empresa,
         proyecto_nombre=c.proyecto_nombre,
         estado=c.estado,
         created_at=c.created_at,

@@ -30,7 +30,6 @@ def _crear_cotizacion(
         numero_proforma=numero_proforma,
         estado=estado,
         subtotal=total,
-        addendum_monto=Decimal("0"),
         iva_porcentaje=Decimal("15"),
         iva_monto=Decimal("0"),
         total=total,

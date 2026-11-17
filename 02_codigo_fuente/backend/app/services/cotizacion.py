@@ -91,18 +91,15 @@ def crear_cotizacion(
         ],
         precios=precios,
         cargos_fijos=cargos_fijos,
-        addendum_porcentaje=datos.addendum_porcentaje,
         iva_porcentaje=settings.IVA_PORCENTAJE,
     )
 
     if cliente is not None:
         cliente_nombre = cliente.nombre
-        cliente_empresa = cliente.empresa
         cliente_email = cliente.email
         cliente_telefono = cliente.telefono
     else:
         cliente_nombre = datos.cliente_nombre
-        cliente_empresa = datos.cliente_empresa
         cliente_email = datos.cliente_email
         cliente_telefono = datos.cliente_telefono
 
@@ -114,13 +111,10 @@ def crear_cotizacion(
         cliente_id=datos.cliente_id,
         proyecto_id=datos.proyecto_id,
         cliente_nombre=cliente_nombre,
-        cliente_empresa=cliente_empresa,
         cliente_email=cliente_email,
         cliente_telefono=cliente_telefono,
         proyecto_nombre=datos.proyecto_nombre,
-        addendum_porcentaje=datos.addendum_porcentaje,
         subtotal=resultado.subtotal,
-        addendum_monto=resultado.addendum_monto,
         iva_porcentaje=resultado.iva_porcentaje,
         iva_monto=resultado.iva_monto,
         total=resultado.total,

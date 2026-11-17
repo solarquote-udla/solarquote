@@ -26,14 +26,12 @@ def calcular_via_calc_service(
     items: list[ItemCalculoEntrada],
     precios: dict[str, Decimal],
     cargos_fijos: dict[str, int],
-    addendum_porcentaje: Decimal,
     iva_porcentaje: Decimal,
 ) -> ResultadoCalculoCotizacion:
     payload = {
         "items": [item.model_dump() for item in items],
         "precios": {codigo: str(precio) for codigo, precio in precios.items()},
         "cargos_fijos": cargos_fijos,
-        "addendum_porcentaje": str(addendum_porcentaje),
         "iva_porcentaje": str(iva_porcentaje),
     }
 

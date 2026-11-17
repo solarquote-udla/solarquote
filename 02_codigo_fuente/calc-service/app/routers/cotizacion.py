@@ -14,8 +14,8 @@ router = APIRouter(
 @router.post("/calcular", response_model=CalcularCotizacionSalida)
 def calcular_cotizacion(entrada: CalcularCotizacionEntrada) -> CalcularCotizacionSalida:
     """
-    Calcula cantidades de materiales, subtotal, addendum e IVA para una
-    cotización a partir de sus ítems (L, A, B) y los precios vigentes.
+    Calcula cantidades de materiales, subtotal e IVA para una cotización
+    a partir de sus ítems (L, A, B) y los precios vigentes.
     """
     try:
         return armar_cotizacion(entrada)

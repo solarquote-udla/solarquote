@@ -21,13 +21,12 @@ PRECIOS = {
 }
 
 
-def test_calcula_total_de_un_item_sin_addendum():
+def test_calcula_total_de_un_item():
     respuesta = client.post(
         "/api/cotizacion/calcular",
         json={
             "items": [{"paneles_largo": 4, "paneles_ancho": 3, "bloques": 1}],
             "precios": PRECIOS,
-            "addendum_porcentaje": "0",
             "iva_porcentaje": "15",
         },
     )
@@ -52,7 +51,7 @@ def test_calcula_total_de_un_item_sin_addendum():
     subtotal_esperado = sum(Decimal(PRECIOS[c]) * q for c, q in cantidades.items())
     assert Decimal(cuerpo["subtotal"]) == subtotal_esperado.quantize(Decimal("0.01"))
 
-    # Sin addendum, el IVA (15%) se aplica directo sobre el subtotal.
+    # El IVA (15%) se aplica directo sobre el subtotal.
     iva_esperado = (subtotal_esperado * Decimal("15") / Decimal("100")).quantize(Decimal("0.01"))
     assert Decimal(cuerpo["iva_monto"]) == iva_esperado
     assert Decimal(cuerpo["total"]) == (subtotal_esperado + iva_esperado).quantize(Decimal("0.01"))
@@ -67,7 +66,6 @@ def test_suma_cantidades_de_varios_items():
                 {"paneles_largo": 4, "paneles_ancho": 3, "bloques": 1},
             ],
             "precios": PRECIOS,
-            "addendum_porcentaje": "0",
             "iva_porcentaje": "15",
         },
     )
@@ -78,13 +76,12 @@ def test_suma_cantidades_de_varios_items():
     assert cuerpo["cantidades_totales"]["VAR1650"] == 16  # 8 + 8
 
 
-def test_aplica_addendum_antes_del_iva():
+def test_el_total_es_subtotal_mas_iva():
     respuesta = client.post(
         "/api/cotizacion/calcular",
         json={
             "items": [{"paneles_largo": 2, "paneles_ancho": 1, "bloques": 1}],
             "precios": PRECIOS,
-            "addendum_porcentaje": "10",
             "iva_porcentaje": "15",
         },
     )
@@ -93,14 +90,11 @@ def test_aplica_addendum_antes_del_iva():
     cuerpo = respuesta.json()
 
     subtotal = Decimal(cuerpo["subtotal"])
-    addendum_monto = Decimal(cuerpo["addendum_monto"])
     iva_monto = Decimal(cuerpo["iva_monto"])
     total = Decimal(cuerpo["total"])
 
-    assert addendum_monto == (subtotal * Decimal("10") / Decimal("100")).quantize(Decimal("0.01"))
-    base_con_addendum = subtotal + addendum_monto
-    assert iva_monto == (base_con_addendum * Decimal("15") / Decimal("100")).quantize(Decimal("0.01"))
-    assert total == (base_con_addendum + iva_monto).quantize(Decimal("0.01"))
+    assert iva_monto == (subtotal * Decimal("15") / Decimal("100")).quantize(Decimal("0.01"))
+    assert total == (subtotal + iva_monto).quantize(Decimal("0.01"))
 
 
 def test_rechaza_l_impar():

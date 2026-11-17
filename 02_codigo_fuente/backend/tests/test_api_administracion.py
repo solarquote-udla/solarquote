@@ -58,7 +58,7 @@ def test_cliente_errores_traducidos(api, h):
     assert api.post("/api/clientes", headers=h, json={**CLIENTE, "identificacion": "1791234567001", "email": "sin-arroba"}).status_code == 422
 
     assert api.get(f"/api/clientes/{INEXISTENTE}", headers=h).status_code == 404
-    assert api.patch(f"/api/clientes/{INEXISTENTE}", headers=h, json={"empresa": "X"}).status_code == 404
+    assert api.patch(f"/api/clientes/{INEXISTENTE}", headers=h, json={"telefono": "0991234567"}).status_code == 404
     assert api.delete(f"/api/clientes/{INEXISTENTE}", headers=h).status_code == 404
 
 
