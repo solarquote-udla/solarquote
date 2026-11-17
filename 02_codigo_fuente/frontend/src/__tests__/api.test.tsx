@@ -1,7 +1,14 @@
 /**
  * services/api.ts: mensajeDeError y erroresDeCampo contra lo que entrega
  * el manejador global de 422 del backend (app/core/errores.py) — ya en
- * español y sin el prefijo "Value error, " de Pydantic.
+ * español, con el `type` de cada error y sin el prefijo "Value error, "
+ * de Pydantic.
+ *
+ * `mensajeDeError` solo tiene el mensaje general (para las pantallas que
+ * todavía no muestran el error junto a cada campo, como Paso 2/3,
+ * Clientes y Despacho): un `value_error` (los que escribimos nosotros)
+ * ya menciona el campo en el propio texto, pero las restricciones de
+ * Pydantic no, así que ahí se antepone el campo usando el `loc`.
  */
 import { AxiosError, AxiosHeaders } from "axios";
 import { describe, expect, it } from "vitest";
@@ -20,9 +27,19 @@ describe("mensajeDeError", () => {
     );
   });
 
-  it("no antepone el nombre del campo a un mensaje de validación con loc", () => {
+  it("un value_error (propio) no lleva el campo antepuesto: el texto ya lo menciona", () => {
     const error = errorConDetail(422, [{ msg: "El Voc debe ser mayor que el Vmp.", loc: ["body", "voc_v"], type: "value_error" }]);
     expect(mensajeDeError(error)).toBe("El Voc debe ser mayor que el Vmp.");
+  });
+
+  it("una restricción de Pydantic (no value_error) antepone el campo, legible", () => {
+    const error = errorConDetail(422, [{ msg: "Debe ser mayor que 0.", loc: ["body", "potencia_wp"], type: "greater_than" }]);
+    expect(mensajeDeError(error)).toBe("Potencia Wp: Debe ser mayor que 0.");
+  });
+
+  it("un campo anidado antepone la ruta completa, cada nivel legible", () => {
+    const error = errorConDetail(422, [{ msg: "Debe ser un número entero.", loc: ["body", "inversores", 0, "strings_por_mppt"], type: "int_type" }]);
+    expect(mensajeDeError(error)).toBe("Inversores › 0 › Strings Por Mppt: Debe ser un número entero.");
   });
 
   it("une varios mensajes de validación con un punto", () => {
@@ -30,7 +47,7 @@ describe("mensajeDeError", () => {
       { msg: "Este campo es obligatorio.", loc: ["body", "marca"], type: "missing" },
       { msg: "Debe ser mayor que 0.", loc: ["body", "potencia_kw"], type: "greater_than" },
     ]);
-    expect(mensajeDeError(error)).toBe("Este campo es obligatorio.. Debe ser mayor que 0.");
+    expect(mensajeDeError(error)).toBe("Marca: Este campo es obligatorio.. Potencia Kw: Debe ser mayor que 0.");
   });
 
   it("no es un error de axios: devuelve el mensaje por defecto", () => {

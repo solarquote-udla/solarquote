@@ -21,8 +21,8 @@ requisito es la corrida verde del PR indicado.
 | Backend (API principal) | 593 | 96 % | `pytest` en `02_codigo_fuente/backend` |
 | calc-service | 32 | 100 % | `pytest` en `02_codigo_fuente/calc-service` |
 | ia-service | 96 | 94 % | `pytest` en `02_codigo_fuente/ia-service` |
-| Frontend (interfaz) | 239 | — | `npm test` en `02_codigo_fuente/frontend` |
-| **Total** | **960** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
+| Frontend (interfaz) | 232 | — | `npm test` en `02_codigo_fuente/frontend` |
+| **Total** | **953** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
 
 La cobertura se midió con `pytest --cov=app`. RNF-02 pide al menos 60 %
 en el backend.
@@ -168,7 +168,7 @@ Evidencia: PR de SQ-79/SQ-80/SQ-81/SQ-83/SQ-84.
 | Solo con permiso de parametrización | `test_api_administracion`: `test_inversores_por_permiso`; `test_seguridad`: `test_generar_layout_puede_leer_inversores_pero_no_administrarlos` |
 | Selector en RF-02 | `inversores.test.tsx` |
 | Catálogo inicial según Producción: Huawei SUN2000-100KTL-M2, 330KTL-H1 y 506KTL-H1 | `test_catalogo_produccion`: `test_cada_inversor_nuevo_pasa_las_validaciones_de_la_api` |
-| Error de validación (propio o del backend, por `loc`) junto al campo correspondiente, y el mensaje general sin ese campo repetido como prefijo | `inversores-catalogo.test.tsx` ("Configuración, Inversores: alta con error por campo", 5 pruebas); `api.test.tsx` (`mensajeDeError`/`erroresDeCampo`, 7 pruebas) |
+| Error de validación (propio o del backend, por `loc`) junto al campo correspondiente; en el mensaje general (pantallas que todavía no muestran el error por campo) se antepone el campo solo si no es un `value_error` propio — esos ya lo mencionan en el texto —, legible en vez de `snake_case` | `inversores-catalogo.test.tsx` ("Configuración, Inversores: alta con error por campo", 5 pruebas); `api.test.tsx` (`mensajeDeError`/`erroresDeCampo`, 9 pruebas) |
 
 Evidencia: PR #37, el PR de SQ-135, el PR de SQ-209 y su corrección (SQ-210).
 
