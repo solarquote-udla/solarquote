@@ -64,7 +64,7 @@ describe("Paso 2: panel del catálogo", () => {
 
     // El panel es la primera sección del paso: sus campos van antes que los del inversor
     expect((screen.getAllByLabelText(/^Marca/)[0] as HTMLInputElement).value).toBe("Jinko Solar");
-    expect((screen.getAllByLabelText(/^Potencia/)[0] as HTMLInputElement).value).toBe("670");
+    expect((screen.getByLabelText(/^Potencia\(Wp\)/) as HTMLInputElement).value).toBe("670");
     expect(screen.getByText(/Datos del catálogo de paneles/)).toBeTruthy();
   });
 
