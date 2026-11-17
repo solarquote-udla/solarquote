@@ -14,7 +14,7 @@ Reglas del documento de titulación:
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 
 
 class Panel(BaseModel):
@@ -26,19 +26,34 @@ class Panel(BaseModel):
     voc_v: float = Field(gt=0, le=200, description="Voltaje de circuito abierto en STC")
     vmp_v: float = Field(gt=0, le=200, description="Voltaje en el punto de máxima potencia en STC")
 
-    @model_validator(mode="after")
-    def validar_coherencia(self) -> "Panel":
-        if self.voc_v <= self.vmp_v:
-            raise ValueError(
-                "El Voc debe ser mayor que el Vmp. Revisa que no estén "
-                "intercambiados: en toda ficha técnica el Voc es el mayor."
-            )
-        if self.largo_mm < self.ancho_mm:
+    # Comparaciones entre dos campos, cada una en el campo declarado
+    # después (así `info.data` ya tiene el otro) para que el error del
+    # 422 diga junto a cuál poner el mensaje, en vez de solo "body".
+    # Todos los campos de este modelo son obligatorios (sin default), así
+    # que `info.data` siempre refleja lo que mandó el cliente, no un
+    # valor por omisión a medias.
+
+    @field_validator("ancho_mm", mode="after")
+    @classmethod
+    def _ancho_no_mayor_que_largo(cls, v: float, info: ValidationInfo) -> float:
+        largo = info.data.get("largo_mm")
+        if largo is not None and largo < v:
             raise ValueError(
                 "El largo es el lado mayor del panel. Los valores parecen "
                 "estar intercambiados con el ancho."
             )
-        return self
+        return v
+
+    @field_validator("vmp_v", mode="after")
+    @classmethod
+    def _vmp_menor_que_voc(cls, v: float, info: ValidationInfo) -> float:
+        voc = info.data.get("voc_v")
+        if voc is not None and voc <= v:
+            raise ValueError(
+                "El Voc debe ser mayor que el Vmp. Revisa que no estén "
+                "intercambiados: en toda ficha técnica el Voc es el mayor."
+            )
+        return v
 
 
 class Inversor(BaseModel):
@@ -52,16 +67,28 @@ class Inversor(BaseModel):
     mppts: int | None = Field(default=None, ge=1, le=50)
     strings_por_mppt: int | None = Field(default=None, ge=1, le=50)
 
+    # "Ambos o ninguno" necesita saber si cada voltaje vino realmente en
+    # el request (no solo si terminó en None), y eso solo se sabe con el
+    # modelo ya armado — por eso sigue siendo un model_validator, con
+    # loc en el cuerpo entero. La comparación Vmax > Vmin, en cambio, solo
+    # necesita los valores ya puestos: va en vmin_v, el campo declarado
+    # después, para que el 422 diga junto a cuál va el error.
     @model_validator(mode="after")
-    def validar_voltajes(self) -> "Inversor":
+    def validar_ambos_o_ninguno(self) -> "Inversor":
         if (self.vmax_v is None) != (self.vmin_v is None):
             raise ValueError(
                 "Ingresa ambos voltajes del inversor (máximo y mínimo) o "
                 "ninguno. Con uno solo no se pueden calcular los límites de string."
             )
-        if self.vmax_v is not None and self.vmin_v is not None and self.vmax_v <= self.vmin_v:
-            raise ValueError("El voltaje máximo del inversor debe ser mayor que el mínimo.")
         return self
+
+    @field_validator("vmin_v", mode="after")
+    @classmethod
+    def _vmin_menor_que_vmax(cls, v: float | None, info: ValidationInfo) -> float | None:
+        vmax = info.data.get("vmax_v")
+        if v is not None and vmax is not None and vmax <= v:
+            raise ValueError("El voltaje máximo del inversor debe ser mayor que el mínimo.")
+        return v
 
 
 #: Tope práctico: una planta de 5 MWp con paneles de 550 Wp usa ~23
