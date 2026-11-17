@@ -8,11 +8,13 @@
 
 import { Fragment, useEffect, useState } from "react";
 
+import { Campo } from "@/components/Campo";
 import { useAccionUnica } from "@/hooks/useAccionUnica";
 import { useCambiosSinGuardar } from "@/hooks/useCambiosSinGuardar";
-import { mensajeDeError } from "@/services/api";
+import { erroresDeCampo, mensajeDeError } from "@/services/api";
 import { actualizarInversor, crearInversor, listarInversores, type DatosInversor } from "@/services/inversores";
 import type { InversorCatalogo } from "@/types/api";
+import { bordeCampo } from "@/utils/campo";
 
 interface FormularioInversor {
   marca: string;
@@ -24,6 +26,9 @@ interface FormularioInversor {
   stringsPorMppt: string;
 }
 
+type CampoInversor = keyof FormularioInversor;
+type ErroresInversor = Partial<Record<CampoInversor, string>>;
+
 const FORM_VACIO: FormularioInversor = {
   marca: "",
   modelo: "",
@@ -33,6 +38,32 @@ const FORM_VACIO: FormularioInversor = {
   mppts: "",
   stringsPorMppt: "",
 };
+
+/** Nombre del campo en la respuesta del backend (ver `loc`) → clave local. */
+const CAMPO_API: Record<string, CampoInversor> = {
+  marca: "marca",
+  modelo: "modelo",
+  potencia_kw: "potenciaKw",
+  vmax_v: "vmaxV",
+  vmin_v: "vminV",
+  mppts: "mppts",
+  strings_por_mppt: "stringsPorMppt",
+};
+
+/**
+ * Errores de validación del backend (422) que sí vienen por campo, para
+ * mostrarlos junto al campo igual que los del propio frontend. Los que no
+ * traen campo (por ejemplo "ambos o ninguno", que queda en `loc: ["body"]`)
+ * no caen aquí: se siguen mostrando como mensaje general con `mensajeDeError`.
+ */
+function erroresServidorPorCampo(error: unknown): ErroresInversor {
+  const errores: ErroresInversor = {};
+  for (const [campo, msg] of Object.entries(erroresDeCampo(error))) {
+    const clave = CAMPO_API[campo];
+    if (clave) errores[clave] = msg;
+  }
+  return errores;
+}
 
 /** Número desde texto, aceptando coma decimal. Vacío → null. */
 function aNumero(valor: string): number | null {
@@ -54,45 +85,44 @@ function formularioDesdeInversor(inversor: InversorCatalogo): FormularioInversor
   };
 }
 
-function erroresDe(form: FormularioInversor): string | null {
-  if (form.marca.trim().replace(/\s+/g, " ").length < 2) return "La marca debe tener al menos 2 caracteres.";
-  if (form.modelo.trim().length < 1) return "El modelo es obligatorio.";
+/** Mismas reglas que `InversorCrear` en el backend. */
+function erroresDe(form: FormularioInversor): ErroresInversor {
+  const errores: ErroresInversor = {};
+  if (form.marca.trim().replace(/\s+/g, " ").length < 2) errores.marca = "Debe tener al menos 2 caracteres.";
+  if (form.modelo.trim().length < 1) errores.modelo = "El modelo es obligatorio.";
 
   const potencia = aNumero(form.potenciaKw);
   // NaN (texto no numérico) no es > 0 pero tampoco es <= 0: !(n > 0) sí lo atrapa.
-  if (potencia === null || !(potencia > 0)) return "La potencia debe ser un número mayor a cero.";
+  if (potencia === null || !(potencia > 0)) errores.potenciaKw = "Debe ser un número mayor a cero.";
 
-  for (const [campo, etiqueta] of [
-    [form.vmaxV, "Vmax"],
-    [form.vminV, "Vmin"],
-  ] as const) {
-    if (campo.trim() === "") continue;
-    const n = aNumero(campo);
-    if (n === null || !(n > 0)) return `${etiqueta} debe ser un número mayor a cero, o dejarse en blanco.`;
+  for (const campo of ["vmaxV", "vminV"] as const) {
+    const valor = form[campo];
+    if (valor.trim() === "") continue;
+    const n = aNumero(valor);
+    if (n === null || !(n > 0)) errores[campo] = "Debe ser un número mayor a cero, o dejarse en blanco.";
   }
-  for (const [campo, etiqueta] of [
-    [form.mppts, "MPPTs"],
-    [form.stringsPorMppt, "Strings por MPPT"],
-  ] as const) {
-    if (campo.trim() === "") continue;
-    const n = aNumero(campo);
+  for (const campo of ["mppts", "stringsPorMppt"] as const) {
+    const valor = form[campo];
+    if (valor.trim() === "") continue;
+    const n = aNumero(valor);
     if (n === null || !Number.isInteger(n) || n <= 0) {
-      return `${etiqueta} debe ser un número entero mayor a cero, o dejarse en blanco.`;
+      errores[campo] = "Debe ser un número entero mayor a cero, o dejarse en blanco.";
     }
   }
 
   // Igual que ConfiguracionEquipoGuardar: con uno solo no se pueden
   // calcular los límites de string.
-  const vmax = aNumero(form.vmaxV);
-  const vmin = aNumero(form.vminV);
-  if ((vmax === null) !== (vmin === null)) {
-    return "Ingresa Vmax y Vmin juntos, o deja los dos en blanco.";
-  }
-  if (vmax !== null && vmin !== null && vmax <= vmin) {
-    return "Vmax debe ser mayor que Vmin.";
+  if (!errores.vmaxV && !errores.vminV) {
+    const vmax = aNumero(form.vmaxV);
+    const vmin = aNumero(form.vminV);
+    if ((vmax === null) !== (vmin === null)) {
+      errores.vmaxV = "Ingresa Vmax y Vmin juntos, o deja los dos en blanco.";
+    } else if (vmax !== null && vmin !== null && vmax <= vmin) {
+      errores.vmaxV = "Vmax debe ser mayor que Vmin.";
+    }
   }
 
-  return null;
+  return errores;
 }
 
 function datosDesdeFormulario(form: FormularioInversor): DatosInversor {
@@ -107,81 +137,42 @@ function datosDesdeFormulario(form: FormularioInversor): DatosInversor {
   };
 }
 
+const CAMPO_BASE =
+  "mt-1 w-full rounded-md border px-2 py-1.5 text-sm font-normal text-acero-900 placeholder:text-acero-300 focus:outline-none focus:ring-1";
+
+const CAMPOS: { campo: CampoInversor; etiqueta: string; obligatorio?: boolean; modo?: "decimal" | "numeric" }[] = [
+  { campo: "marca", etiqueta: "Marca", obligatorio: true },
+  { campo: "modelo", etiqueta: "Modelo", obligatorio: true },
+  { campo: "potenciaKw", etiqueta: "Potencia (kW)", obligatorio: true, modo: "decimal" },
+  { campo: "vmaxV", etiqueta: "Vmax (V)", modo: "decimal" },
+  { campo: "vminV", etiqueta: "Vmin (V)", modo: "decimal" },
+  { campo: "mppts", etiqueta: "MPPTs", modo: "numeric" },
+  { campo: "stringsPorMppt", etiqueta: "Strings por MPPT", modo: "numeric" },
+];
+
 function CamposInversor({
   form,
+  errores,
   onChange,
 }: {
   form: FormularioInversor;
+  errores: ErroresInversor;
   onChange: (form: FormularioInversor) => void;
 }) {
   return (
     <div className="grid gap-3 sm:grid-cols-3">
-      <label className="text-sm">
-        <span className="mb-1 block text-acero-600">Marca</span>
-        <input
-          autoFocus
-          value={form.marca}
-          onChange={(e) => onChange({ ...form, marca: e.target.value })}
-          className="w-full rounded-md border border-acero-300 px-2 py-1.5 text-sm focus:border-solar-500 focus:outline-none focus:ring-1 focus:ring-solar-500"
-        />
-      </label>
-      <label className="text-sm">
-        <span className="mb-1 block text-acero-600">Modelo</span>
-        <input
-          value={form.modelo}
-          onChange={(e) => onChange({ ...form, modelo: e.target.value })}
-          className="w-full rounded-md border border-acero-300 px-2 py-1.5 text-sm focus:border-solar-500 focus:outline-none focus:ring-1 focus:ring-solar-500"
-        />
-      </label>
-      <label className="text-sm">
-        <span className="mb-1 block text-acero-600">Potencia (kW)</span>
-        <input
-          inputMode="decimal"
-          value={form.potenciaKw}
-          onChange={(e) => onChange({ ...form, potenciaKw: e.target.value })}
-          className="w-full rounded-md border border-acero-300 px-2 py-1.5 text-sm focus:border-solar-500 focus:outline-none focus:ring-1 focus:ring-solar-500"
-        />
-      </label>
-      <label className="text-sm">
-        <span className="mb-1 block text-acero-600">Vmax (V)</span>
-        <input
-          inputMode="decimal"
-          placeholder="opcional"
-          value={form.vmaxV}
-          onChange={(e) => onChange({ ...form, vmaxV: e.target.value })}
-          className="w-full rounded-md border border-acero-300 px-2 py-1.5 text-sm placeholder:text-acero-300 focus:border-solar-500 focus:outline-none focus:ring-1 focus:ring-solar-500"
-        />
-      </label>
-      <label className="text-sm">
-        <span className="mb-1 block text-acero-600">Vmin (V)</span>
-        <input
-          inputMode="decimal"
-          placeholder="opcional"
-          value={form.vminV}
-          onChange={(e) => onChange({ ...form, vminV: e.target.value })}
-          className="w-full rounded-md border border-acero-300 px-2 py-1.5 text-sm placeholder:text-acero-300 focus:border-solar-500 focus:outline-none focus:ring-1 focus:ring-solar-500"
-        />
-      </label>
-      <label className="text-sm">
-        <span className="mb-1 block text-acero-600">MPPTs</span>
-        <input
-          inputMode="numeric"
-          placeholder="opcional"
-          value={form.mppts}
-          onChange={(e) => onChange({ ...form, mppts: e.target.value })}
-          className="w-full rounded-md border border-acero-300 px-2 py-1.5 text-sm placeholder:text-acero-300 focus:border-solar-500 focus:outline-none focus:ring-1 focus:ring-solar-500"
-        />
-      </label>
-      <label className="text-sm">
-        <span className="mb-1 block text-acero-600">Strings por MPPT</span>
-        <input
-          inputMode="numeric"
-          placeholder="opcional"
-          value={form.stringsPorMppt}
-          onChange={(e) => onChange({ ...form, stringsPorMppt: e.target.value })}
-          className="w-full rounded-md border border-acero-300 px-2 py-1.5 text-sm placeholder:text-acero-300 focus:border-solar-500 focus:outline-none focus:ring-1 focus:ring-solar-500"
-        />
-      </label>
+      {CAMPOS.map(({ campo, etiqueta, obligatorio, modo }, i) => (
+        <Campo key={campo} etiqueta={etiqueta} obligatorio={obligatorio} error={errores[campo]} className="text-sm">
+          <input
+            autoFocus={i === 0}
+            inputMode={modo}
+            placeholder={obligatorio ? undefined : "opcional"}
+            value={form[campo]}
+            onChange={(e) => onChange({ ...form, [campo]: e.target.value })}
+            className={`${CAMPO_BASE} ${bordeCampo(errores[campo])}`}
+          />
+        </Campo>
+      ))}
     </div>
   );
 }
@@ -197,17 +188,24 @@ export function InversoresPage() {
 
   const [mostrarForm, setMostrarForm] = useState(false);
   const [formNuevo, setFormNuevo] = useState<FormularioInversor>(FORM_VACIO);
+  const [intentoCrear, setIntentoCrear] = useState(false);
+  const [erroresServidorNuevo, setErroresServidorNuevo] = useState<ErroresInversor>({});
   const [creando, setCreando] = useState(false);
 
   const [editandoId, setEditandoId] = useState<number | null>(null);
   const [formOriginalEdicion, setFormOriginalEdicion] = useState<FormularioInversor>(FORM_VACIO);
   const [formEdicion, setFormEdicion] = useState<FormularioInversor>(FORM_VACIO);
+  const [intentoEditar, setIntentoEditar] = useState(false);
+  const [erroresServidorEdicion, setErroresServidorEdicion] = useState<ErroresInversor>({});
   const [guardando, setGuardando] = useState(false);
 
   const unaVez = useAccionUnica();
   const nuevoSucio = mostrarForm && JSON.stringify(formNuevo) !== JSON.stringify(FORM_VACIO);
   const edicionSucia = editandoId !== null && JSON.stringify(formEdicion) !== JSON.stringify(formOriginalEdicion);
   useCambiosSinGuardar(nuevoSucio || edicionSucia);
+
+  const erroresNuevo = { ...(intentoCrear ? erroresDe(formNuevo) : {}), ...erroresServidorNuevo };
+  const erroresEdicion = { ...(intentoEditar ? erroresDe(formEdicion) : {}), ...erroresServidorEdicion };
 
   useEffect(() => {
     let cancelado = false;
@@ -227,11 +225,8 @@ export function InversoresPage() {
   }, [incluirInactivos]);
 
   async function crear() {
-    const problema = erroresDe(formNuevo);
-    if (problema) {
-      setError(problema);
-      return;
-    }
+    setIntentoCrear(true);
+    if (Object.keys(erroresDe(formNuevo)).length > 0) return;
     setError(null);
     setCreando(true);
     try {
@@ -242,8 +237,14 @@ export function InversoresPage() {
       setAviso(`${creado.marca} ${creado.modelo} agregado al catálogo.`);
       setMostrarForm(false);
       setFormNuevo(FORM_VACIO);
+      setIntentoCrear(false);
     } catch (e) {
-      setError(mensajeDeError(e, "No se pudo crear el inversor"));
+      const camposServidor = erroresServidorPorCampo(e);
+      if (Object.keys(camposServidor).length > 0) {
+        setErroresServidorNuevo(camposServidor);
+      } else {
+        setError(mensajeDeError(e, "No se pudo crear el inversor"));
+      }
     } finally {
       setCreando(false);
     }
@@ -255,6 +256,8 @@ export function InversoresPage() {
     }
     setAviso(null);
     setEditandoId(inversor.id);
+    setIntentoEditar(false);
+    setErroresServidorEdicion({});
     const form = formularioDesdeInversor(inversor);
     setFormEdicion(form);
     setFormOriginalEdicion(form);
@@ -268,11 +271,8 @@ export function InversoresPage() {
   }
 
   async function guardarEdicion(inversor: InversorCatalogo) {
-    const problema = erroresDe(formEdicion);
-    if (problema) {
-      setError(problema);
-      return;
-    }
+    setIntentoEditar(true);
+    if (Object.keys(erroresDe(formEdicion)).length > 0) return;
     setError(null);
     setGuardando(true);
     try {
@@ -281,7 +281,12 @@ export function InversoresPage() {
       setAviso(`${actualizado.marca} ${actualizado.modelo} actualizado.`);
       setEditandoId(null);
     } catch (e) {
-      setError(mensajeDeError(e, "No se pudo actualizar el inversor"));
+      const camposServidor = erroresServidorPorCampo(e);
+      if (Object.keys(camposServidor).length > 0) {
+        setErroresServidorEdicion(camposServidor);
+      } else {
+        setError(mensajeDeError(e, "No se pudo actualizar el inversor"));
+      }
     } finally {
       setGuardando(false);
     }
@@ -330,6 +335,8 @@ export function InversoresPage() {
             }
             setMostrarForm((v) => !v);
             setFormNuevo(FORM_VACIO);
+            setIntentoCrear(false);
+            setErroresServidorNuevo({});
           }}
           className="rounded-lg bg-solar-500 px-4 py-2 text-sm font-semibold text-acero-50 transition hover:bg-solar-600"
         >
@@ -350,7 +357,14 @@ export function InversoresPage() {
 
       {mostrarForm && (
         <div className="mt-4 rounded-xl border border-acero-200 bg-superficie p-5">
-          <CamposInversor form={formNuevo} onChange={setFormNuevo} />
+          <CamposInversor
+            form={formNuevo}
+            errores={erroresNuevo}
+            onChange={(f) => {
+              setFormNuevo(f);
+              setErroresServidorNuevo({});
+            }}
+          />
           <div className="mt-3 flex justify-end">
             <button
               type="button"
@@ -448,7 +462,14 @@ export function InversoresPage() {
                   {editandoId === inversor.id && (
                     <tr>
                       <td colSpan={5} className="bg-acero-50/60 px-4 py-4">
-                        <CamposInversor form={formEdicion} onChange={setFormEdicion} />
+                        <CamposInversor
+                          form={formEdicion}
+                          errores={erroresEdicion}
+                          onChange={(f) => {
+                            setFormEdicion(f);
+                            setErroresServidorEdicion({});
+                          }}
+                        />
                         <div className="mt-3 flex justify-end gap-3 text-sm">
                           <button
                             type="button"
