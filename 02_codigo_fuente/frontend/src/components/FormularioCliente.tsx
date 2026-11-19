@@ -44,7 +44,6 @@ function desdeCliente(c: Cliente | null) {
     nombre: c?.nombre ?? "",
     tipo_identificacion: c?.tipo_identificacion ?? TipoIdentificacion.RUC,
     identificacion: c?.identificacion ?? "",
-    empresa: c?.empresa ?? "",
     email: c?.email ?? "",
     telefono: c?.telefono ?? "",
     direccion: c?.direccion ?? "",
@@ -75,7 +74,6 @@ function aCrear(f: Formulario): ClienteCrear {
     nombre: f.nombre.trim(),
     tipo_identificacion: f.tipo_identificacion,
     identificacion: f.identificacion.trim(),
-    empresa: opcional(f.empresa),
     email: opcional(f.email),
     telefono: opcional(f.telefono),
     direccion: opcional(f.direccion),
@@ -91,7 +89,6 @@ function aActualizar(original: Formulario, f: Formulario): ClienteActualizar {
     cambios.tipo_identificacion = completo.tipo_identificacion;
     cambios.identificacion = completo.identificacion;
   }
-  if (f.empresa !== original.empresa) cambios.empresa = completo.empresa;
   if (f.email !== original.email) cambios.email = completo.email;
   if (f.telefono !== original.telefono) cambios.telefono = completo.telefono;
   if (f.direccion !== original.direccion) cambios.direccion = completo.direccion;
@@ -213,10 +210,6 @@ export function FormularioCliente({ cliente, onGuardado, onCancelar, onCambiosSi
 
         <Campo etiqueta="Identificación" error={visible("identificacion")} ayuda={AYUDA_IDENTIFICACION[formulario.tipo_identificacion]}>
           <input className={clase("identificacion")} inputMode={formulario.tipo_identificacion === TipoIdentificacion.PASAPORTE ? "text" : "numeric"} value={formulario.identificacion} onChange={(e) => actualizar("identificacion", e.target.value)} onBlur={tocar("identificacion")} maxLength={20} />
-        </Campo>
-
-        <Campo etiqueta="Empresa" ayuda="Opcional">
-          <input className={clase("empresa")} value={formulario.empresa} onChange={(e) => actualizar("empresa", e.target.value)} maxLength={150} />
         </Campo>
 
         <Campo etiqueta="Correo" error={visible("email")} ayuda="Opcional">

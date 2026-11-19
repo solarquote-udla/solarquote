@@ -64,10 +64,10 @@ const tarjeta = (n: number) => screen.getByLabelText(`Inversor ${n}`);
 const camposDe = (n: number) => within(tarjeta(n)).getAllByRole("textbox");
 const escribir = (campo: HTMLElement, valor: string) => fireEvent.change(campo, { target: { value: valor } });
 
-/** Panel (8 campos) y potencia objetivo, en el orden de la pantalla. */
+/** Potencia objetivo (va primero, aparte de los inversores) y panel (8 campos), en el orden de la pantalla. */
 function llenarPanel(objetivo = "") {
   const textos = screen.getAllByRole("textbox");
-  ["A", "B", "550", "2278", "1134", "52", "43", "15", objetivo].forEach((v, i) => escribir(textos[i], v));
+  [objetivo, "A", "B", "550", "2278", "1134", "52", "43", "15"].forEach((v, i) => escribir(textos[i], v));
 }
 
 function llenarInversor(n: number, marca = "Huawei", modelo = "SUN2000", potencia = "160") {
@@ -138,11 +138,13 @@ describe("Paso 2: varios inversores", () => {
     escribir(camposDe(2)[3], "1100"); // Vmax sin Vmin
 
     await act(async () => fireEvent.click(screen.getByText("Guardar y calcular")));
-    expect(screen.getByText("Inversor 2: falta la marca.")).toBeTruthy();
+    // El error aparece junto al campo del inversor que lo tiene
+    expect(within(tarjeta(2)).getByText("Escribe la marca.")).toBeTruthy();
+    expect(within(tarjeta(1)).queryByText(/Escribe la marca/)).toBeNull();
 
     escribir(camposDe(2)[0], "SMA");
     await act(async () => fireEvent.click(screen.getByText("Guardar y calcular")));
-    expect(screen.getByText(/Inversor 2: ingresa los dos voltajes/)).toBeTruthy();
+    expect(within(tarjeta(2)).getByText("Ingresa los dos voltajes o ninguno.")).toBeTruthy();
     expect(equipo.guardarEquipo).not.toHaveBeenCalled();
   });
 

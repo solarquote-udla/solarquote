@@ -11,10 +11,14 @@
  *     componente no decide nada: informa el desplazamiento en metros y la
  *     página actualiza el borrador y valida.
  *
+ * Cada bloque muestra sus paneles: L filas en la pendiente y A paneles a
+ * lo largo de la fila, como en el plano de AutoCAD (revisión con
+ * HEXtructure del 17 de noviembre de 2026).
+ *
  * Colores (como el prototipo):
  *   relleno        el color del inversor al que va conectado el bloque
- *   borde ámbar    bloque que se aparta de ancho = 3 × largo (RF-03 lo
- *   punteado       exige)
+ *   borde ámbar    bloque no compacto: se aparta de A = 3 × L
+ *   punteado
  *   rojo           bloque que no se puede guardar (fuera del terreno,
  *                  sobre un camino o encima de otro)
  */
@@ -22,6 +26,7 @@
 import { useRef, type PointerEvent } from "react";
 
 import type { Punto } from "@/types/api";
+import { divisionesPaneles } from "@/utils/bloque";
 import { encuadre, marcas, pasoCuadricula } from "@/utils/geometria";
 import { colorInversor } from "@/utils/inversores";
 
@@ -178,11 +183,23 @@ export function VistaLayout({
               >
                 <title>
                   {`Bloque ${b.tipo} · ${b.paneles_largo} × ${b.paneles_ancho} = ${b.paneles_largo * b.paneles_ancho} paneles · Inversor ${b.inversor + 1}`}
-                  {b.problema ? ` · ${b.problema}` : b.en_proporcion ? "" : " · fuera de proporción"}
+                  {b.problema ? ` · ${b.problema}` : b.en_proporcion ? " · compacto" : " · no compacto"}
                 </title>
               </polygon>
             ))}
-            {/* Fuera de proporción: borde ámbar punteado encima del color del inversor */}
+            {/* Paneles dentro de cada bloque */}
+            {bloques.map((b) => (
+              <path
+                key={`d${b.clave}`}
+                d={divisionesPaneles(b)}
+                data-testid="paneles-bloque"
+                fill="none"
+                className="pointer-events-none stroke-white/70"
+                strokeWidth={0.6}
+                vectorEffect="non-scaling-stroke"
+              />
+            ))}
+            {/* No compacto: borde ámbar punteado encima del color del inversor */}
             {bloques
               .filter((b) => !b.en_proporcion && !b.problema)
               .map((b) => (
@@ -227,7 +244,7 @@ export function VistaLayout({
         ))}
         {inversores > MAX_LEYENDA && <span>+{inversores - MAX_LEYENDA} inversores</span>}
         <span className="flex items-center gap-1.5">
-          <span className="inline-block h-3 w-3 rounded-sm border-2 border-dashed border-amber-400" /> Fuera de proporción
+          <span className="inline-block h-3 w-3 rounded-sm border-2 border-dashed border-amber-400" /> No compacto
         </span>
         {editable && (
           <span className="flex items-center gap-1.5">

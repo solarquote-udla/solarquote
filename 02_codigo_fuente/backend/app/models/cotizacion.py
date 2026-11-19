@@ -83,18 +83,10 @@ class Cotizacion(Base):
     # comercial: si el cliente cambia de teléfono en marzo, la proforma
     # emitida en enero debe seguir mostrando el teléfono de enero.
     cliente_nombre: Mapped[str] = mapped_column(String(150), nullable=False)
-    cliente_empresa: Mapped[str | None] = mapped_column(String(150), nullable=True)
     cliente_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     cliente_telefono: Mapped[str | None] = mapped_column(String(30), nullable=True)
 
     proyecto_nombre: Mapped[str | None] = mapped_column(String(150), nullable=True)
-
-    # Mermas de instalación: porcentaje configurable por cotización, no fijo.
-    addendum_porcentaje: Mapped[Decimal] = mapped_column(
-        Numeric(5, 2),
-        default=Decimal("0"),
-        nullable=False,
-    )
 
     # ─── Desglose, congelado al momento de crear la cotización ──────────
     # Nullable: las cotizaciones creadas antes de que existiera este
@@ -102,7 +94,6 @@ class Cotizacion(Base):
     # vigente de entonces ya no es el de ahora). Toda cotización nueva
     # los llena siempre — ver services/cotizacion.py.
     subtotal: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
-    addendum_monto: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     iva_porcentaje: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     iva_monto: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     total: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)

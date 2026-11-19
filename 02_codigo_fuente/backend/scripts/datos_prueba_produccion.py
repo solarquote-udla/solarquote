@@ -44,7 +44,7 @@ def _coincide(*valores: str | None) -> bool:
 
 
 def _clientes_de_prueba(db: Session) -> list[Cliente]:
-    return [c for c in db.query(Cliente).all() if _coincide(c.nombre, c.identificacion, c.empresa)]
+    return [c for c in db.query(Cliente).all() if _coincide(c.nombre, c.identificacion)]
 
 
 def _proyectos_de_prueba(db: Session, ids_clientes_de_prueba: set[int]) -> list[Proyecto]:

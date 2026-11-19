@@ -74,15 +74,6 @@ class TestClienteCrearSchema:
         )
         assert datos.identificacion == "AB12345"
 
-    def test_empresa_vacia_se_guarda_como_none(self) -> None:
-        datos = ClienteCrear(
-            nombre="Juan Pérez",
-            tipo_identificacion=TipoIdentificacion.CEDULA,
-            identificacion=CEDULA_VALIDA,
-            empresa="   ",
-        )
-        assert datos.empresa is None
-
     def test_rechaza_telefono_invalido(self) -> None:
         with pytest.raises(ValidationError, match="no es un teléfono válido"):
             ClienteCrear(

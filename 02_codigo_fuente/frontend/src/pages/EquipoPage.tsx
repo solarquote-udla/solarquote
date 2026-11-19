@@ -18,11 +18,12 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNo
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { BarraPaso } from "@/components/BarraPaso";
+import { Campo } from "@/components/Campo";
 import { EncabezadoProyecto } from "@/components/EncabezadoProyecto";
 import { rutaPaso } from "@/components/asistente";
 import { useCambiosSinGuardar } from "@/hooks/useCambiosSinGuardar";
 import { useAccionUnica } from "@/hooks/useAccionUnica";
-import { mensajeDeError } from "@/services/api";
+import { erroresDeCampo, mensajeDeError } from "@/services/api";
 import { guardarEquipo, obtenerEquipo } from "@/services/equipo";
 import { listarInversores } from "@/services/inversores";
 import { listarPaneles } from "@/services/paneles";
@@ -37,6 +38,7 @@ import {
   type Proyecto,
 } from "@/types/api";
 import { filtrarPaneles } from "@/utils/buscarPanel";
+import { bordeCampo } from "@/utils/campo";
 import { colorInversor, sugerenciaInversores } from "@/utils/inversores";
 
 // Los campos numéricos se editan como texto: así el usuario puede borrar
@@ -74,8 +76,8 @@ type Formulario = typeof PANEL_VACIO & {
 
 const FORMULARIO_VACIO: Formulario = { ...PANEL_VACIO, potencia_objetivo_kwp: "", inversores: [INVERSOR_VACIO] };
 
-const CAMPO =
-  "w-full rounded-lg border border-acero-300 px-3 py-2 text-sm focus:border-solar-500 focus:outline-none focus:ring-1 focus:ring-solar-500";
+const CAMPO_BASE = "w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-1";
+const CAMPO = `${CAMPO_BASE} ${bordeCampo()}`;
 
 const texto = (valor: number | null | undefined) => (valor == null ? "" : String(valor));
 
@@ -115,119 +117,125 @@ function aNumero(valor: string): number | null {
   return Number.isFinite(n) ? n : Number.NaN;
 }
 
-const ETIQUETAS_PANEL: Record<CampoPanel, string> = {
-  panel_marca: "la marca del panel",
-  panel_modelo: "el modelo del panel",
-  panel_potencia_wp: "la potencia del panel",
-  panel_largo_mm: "el largo del panel",
-  panel_ancho_mm: "el ancho del panel",
-  panel_voc_v: "el Voc",
-  panel_vmp_v: "el Vmp",
-  angulo_montaje: "el ángulo de montaje",
-};
+/** Errores por campo. Claves: los campos del panel, "potencia_objetivo_kwp" e "inversores.N.campo". */
+type Errores = Record<string, string>;
 
-/**
- * Valida un inversor con las mismas reglas que el backend. Se repiten
- * aquí para poder decir cuál de los inversores tiene el problema: el
- * mensaje del backend no lo dice.
- */
-function inversorAPeticion(f: FormInversor, numero: number): { datos: Inversor } | { error: string } {
-  const prefijo = `Inversor ${numero}:`;
-  if (!f.marca.trim()) return { error: `${prefijo} falta la marca.` };
-  if (!f.modelo.trim()) return { error: `${prefijo} falta el modelo.` };
+/** Número obligatorio dentro de un rango, o el error del campo. */
+function errorNumero(valor: string, minimoExclusivo: number, maximo: number, unidad: string): string | undefined {
+  const n = aNumero(valor);
+  if (n === null) return "Obligatorio.";
+  if (Number.isNaN(n)) return `Debe ser un número en ${unidad}.`;
+  if (!(n > minimoExclusivo) || n > maximo) return `Debe ser mayor que ${minimoExclusivo} y hasta ${maximo} ${unidad}.`;
+  return undefined;
+}
 
-  const potencia = aNumero(f.potencia_kw);
-  if (potencia === null) return { error: `${prefijo} falta la potencia.` };
-  if (!(potencia > 0)) return { error: `${prefijo} la potencia debe ser un número mayor a cero.` };
-
-  const vmax = aNumero(f.vmax_v);
-  const vmin = aNumero(f.vmin_v);
-  for (const [v, etiqueta] of [[vmax, "el voltaje máximo"], [vmin, "el voltaje mínimo"]] as const) {
-    if (v !== null && !(v > 0)) return { error: `${prefijo} ${etiqueta} debe ser un número mayor a cero.` };
-  }
-  if ((vmax === null) !== (vmin === null)) {
-    return { error: `${prefijo} ingresa los dos voltajes (máximo y mínimo) o ninguno.` };
-  }
-  if (vmax !== null && vmin !== null && vmax <= vmin) {
-    return { error: `${prefijo} el voltaje máximo debe ser mayor que el mínimo.` };
-  }
-
-  const mppts = aNumero(f.mppts);
-  const strings = aNumero(f.strings_por_mppt);
-  for (const [v, etiqueta] of [[mppts, "MPPTs"], [strings, "strings por MPPT"]] as const) {
-    if (v !== null && !(Number.isInteger(v) && v > 0)) {
-      return { error: `${prefijo} ${etiqueta} debe ser un número entero mayor a cero.` };
-    }
-  }
-
-  return {
-    datos: {
-      marca: f.marca.trim(),
-      modelo: f.modelo.trim(),
-      potencia_kw: potencia,
-      vmax_v: vmax,
-      vmin_v: vmin,
-      mppts,
-      strings_por_mppt: strings,
-    },
-  };
+/** Número opcional mayor que cero (y entero si se pide), o el error del campo. */
+function errorOpcional(valor: string, entero: boolean, maximo: number): string | undefined {
+  const n = aNumero(valor);
+  if (n === null) return undefined;
+  if (Number.isNaN(n) || !(n > 0) || n > maximo) return `Debe ser un número mayor que 0 y hasta ${maximo}.`;
+  if (entero && !Number.isInteger(n)) return "Debe ser un número entero.";
+  return undefined;
 }
 
 /**
- * Convierte el formulario en el cuerpo de la petición. Del panel solo
- * verifica que lo obligatorio esté y sea numérico; sus reglas de negocio
- * (Voc > Vmp, ángulo 0–90…) las valida el backend y devuelve el mensaje
- * exacto.
+ * Valida el formulario con las mismas reglas que el backend
+ * (schemas/equipo.py) y devuelve el error de cada campo, para mostrarlo
+ * junto a él (revisión con la tutora del 16 de noviembre).
  */
-function aPeticion(f: Formulario): { datos: ConfiguracionEquipoGuardar } | { error: string } {
-  for (const campo of ["panel_marca", "panel_modelo"] as const) {
-    if (!f[campo].trim()) return { error: `Falta ${ETIQUETAS_PANEL[campo]}.` };
+function erroresDeFormulario(f: Formulario): Errores {
+  const e: Errores = {};
+  if (!f.panel_marca.trim()) e.panel_marca = "Escribe la marca.";
+  if (!f.panel_modelo.trim()) e.panel_modelo = "Escribe el modelo.";
+  const reglas: [CampoPanel, number, number, string][] = [
+    ["panel_potencia_wp", 0, 1500, "Wp"],
+    ["panel_largo_mm", 0, 5000, "mm"],
+    ["panel_ancho_mm", 0, 5000, "mm"],
+    ["panel_voc_v", 0, 200, "V"],
+    ["panel_vmp_v", 0, 200, "V"],
+  ];
+  for (const [campo, minimo, maximo, unidad] of reglas) {
+    const error = errorNumero(f[campo], minimo, maximo, unidad);
+    if (error) e[campo] = error;
   }
+  const angulo = aNumero(f.angulo_montaje);
+  if (angulo === null) e.angulo_montaje = "Obligatorio.";
+  else if (Number.isNaN(angulo) || angulo < 0 || angulo > 90) e.angulo_montaje = "Debe estar entre 0 y 90°.";
 
-  const numericos = [
-    "panel_potencia_wp",
-    "panel_largo_mm",
-    "panel_ancho_mm",
-    "panel_voc_v",
-    "panel_vmp_v",
-    "angulo_montaje",
-  ] as const;
-  const n: Partial<Record<CampoPanel, number>> = {};
-  for (const campo of numericos) {
-    const valor = aNumero(f[campo]);
-    if (valor === null) return { error: `Falta ${ETIQUETAS_PANEL[campo]}.` };
-    if (Number.isNaN(valor)) return { error: `Revisa ${ETIQUETAS_PANEL[campo]}: no es un número.` };
-    n[campo] = valor;
+  const largo = aNumero(f.panel_largo_mm);
+  const ancho = aNumero(f.panel_ancho_mm);
+  if (!e.panel_largo_mm && !e.panel_ancho_mm && largo !== null && ancho !== null && largo < ancho) {
+    e.panel_ancho_mm = "El ancho no puede ser mayor que el largo: el largo es el lado mayor del panel.";
+  }
+  const voc = aNumero(f.panel_voc_v);
+  const vmp = aNumero(f.panel_vmp_v);
+  if (!e.panel_voc_v && !e.panel_vmp_v && voc !== null && vmp !== null && voc <= vmp) {
+    e.panel_vmp_v = "El Vmp debe ser menor que el Voc. Revisa que no estén intercambiados.";
   }
 
   const objetivo = aNumero(f.potencia_objetivo_kwp);
-  if (objetivo !== null && !(objetivo > 0)) {
-    return { error: "La potencia objetivo debe ser un número mayor a cero, o dejarse en blanco." };
+  if (objetivo !== null && (Number.isNaN(objetivo) || !(objetivo > 0))) {
+    e.potencia_objetivo_kwp = "Debe ser un número mayor que 0, o dejarse vacío.";
   }
 
-  const inversores: Inversor[] = [];
-  for (const [i, inversor] of f.inversores.entries()) {
-    const resultado = inversorAPeticion(inversor, i + 1);
-    if ("error" in resultado) return resultado;
-    inversores.push(resultado.datos);
-  }
-  if (inversores.length === 0) return { error: "Agrega al menos un inversor." };
+  f.inversores.forEach((inv, i) => {
+    const clave = (campo: CampoInversor) => `inversores.${i}.${campo}`;
+    if (!inv.marca.trim()) e[clave("marca")] = "Escribe la marca.";
+    if (!inv.modelo.trim()) e[clave("modelo")] = "Escribe el modelo.";
+    const potencia = errorNumero(inv.potencia_kw, 0, 10000, "kW");
+    if (potencia) e[clave("potencia_kw")] = potencia;
+    for (const campo of ["vmax_v", "vmin_v"] as const) {
+      const error = errorOpcional(inv[campo], false, 2000);
+      if (error) e[clave(campo)] = error;
+    }
+    for (const campo of ["mppts", "strings_por_mppt"] as const) {
+      const error = errorOpcional(inv[campo], true, 50);
+      if (error) e[clave(campo)] = error;
+    }
+    const vmax = aNumero(inv.vmax_v);
+    const vmin = aNumero(inv.vmin_v);
+    if (!e[clave("vmax_v")] && !e[clave("vmin_v")]) {
+      if ((vmax === null) !== (vmin === null)) {
+        e[clave(vmax === null ? "vmax_v" : "vmin_v")] = "Ingresa los dos voltajes o ninguno.";
+      } else if (vmax !== null && vmin !== null && vmax <= vmin) {
+        e[clave("vmin_v")] = "Debe ser menor que el voltaje máximo.";
+      }
+    }
+  });
+  return e;
+}
 
+/** Del `loc` del backend (`panel.voc_v`) a la clave del formulario (`panel_voc_v`). */
+function claveDelServidor(loc: string): string {
+  return loc.startsWith("panel.") ? `panel_${loc.slice("panel.".length)}` : loc;
+}
+
+/** Cuerpo de la petición. Solo se llama con un formulario sin errores. */
+function aPeticion(f: Formulario): ConfiguracionEquipoGuardar {
+  const n = (valor: string) => aNumero(valor) as number;
   return {
-    datos: {
-      panel: {
-        marca: f.panel_marca.trim(),
-        modelo: f.panel_modelo.trim(),
-        potencia_wp: n.panel_potencia_wp!,
-        largo_mm: n.panel_largo_mm!,
-        ancho_mm: n.panel_ancho_mm!,
-        voc_v: n.panel_voc_v!,
-        vmp_v: n.panel_vmp_v!,
-      },
-      angulo_montaje: n.angulo_montaje!,
-      inversores,
-      potencia_objetivo_kwp: objetivo,
+    panel: {
+      marca: f.panel_marca.trim(),
+      modelo: f.panel_modelo.trim(),
+      potencia_wp: n(f.panel_potencia_wp),
+      largo_mm: n(f.panel_largo_mm),
+      ancho_mm: n(f.panel_ancho_mm),
+      voc_v: n(f.panel_voc_v),
+      vmp_v: n(f.panel_vmp_v),
     },
+    angulo_montaje: n(f.angulo_montaje),
+    inversores: f.inversores.map(
+      (inv): Inversor => ({
+        marca: inv.marca.trim(),
+        modelo: inv.modelo.trim(),
+        potencia_kw: n(inv.potencia_kw),
+        vmax_v: aNumero(inv.vmax_v),
+        vmin_v: aNumero(inv.vmin_v),
+        mppts: aNumero(inv.mppts),
+        strings_por_mppt: aNumero(inv.strings_por_mppt),
+      }),
+    ),
+    potencia_objetivo_kwp: aNumero(f.potencia_objetivo_kwp),
   };
 }
 
@@ -237,18 +245,29 @@ const numero = (v: number, decimales = 2) =>
 function Entrada({
   etiqueta,
   unidad,
+  error,
+  obligatorio,
   children,
 }: {
   etiqueta: string;
   unidad?: string;
+  error?: string;
+  obligatorio?: boolean;
   children: ReactNode;
 }) {
   return (
-    <label className="block text-xs font-medium text-acero-600">
-      {etiqueta}
-      {unidad && <span className="ml-1 font-normal text-acero-400">({unidad})</span>}
-      <div className="mt-1">{children}</div>
-    </label>
+    <Campo
+      etiqueta={
+        <>
+          {etiqueta}
+          {unidad && <span className="ml-1 font-normal text-acero-400">({unidad})</span>}
+        </>
+      }
+      obligatorio={obligatorio}
+      error={error}
+    >
+      {children}
+    </Campo>
   );
 }
 
@@ -293,6 +312,11 @@ export function EquipoPage() {
 
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Errores por campo: los de la pantalla se muestran al dejar el campo o
+  // al intentar guardar; los del servidor, hasta que se corrige el campo.
+  const [tocados, setTocados] = useState<Set<string>>(new Set());
+  const [intentoGuardar, setIntentoGuardar] = useState(false);
+  const [erroresServidor, setErroresServidor] = useState<Errores>({});
   const [aviso, setAviso] = useState<string | null>(null);
 
   const cargarEnFormulario = useCallback((c: ConfiguracionEquipo | null) => {
@@ -349,13 +373,29 @@ export function EquipoPage() {
 
   const unaVez = useAccionUnica();
 
+  const errores = useMemo(() => erroresDeFormulario(formulario), [formulario]);
+  /** Error a mostrar junto al campo: el de la pantalla si ya se tocó o se intentó guardar; si no, el del servidor. */
+  const visible = (clave: string) =>
+    (intentoGuardar || tocados.has(clave) ? errores[clave] : undefined) ?? erroresServidor[clave];
+  const clase = (clave: string) => `mt-1 ${CAMPO_BASE} ${bordeCampo(visible(clave))}`;
+  const tocar = (clave: string) => () => setTocados((t) => (t.has(clave) ? t : new Set(t).add(clave)));
+  const limpiarServidor = (clave: string) =>
+    setErroresServidor((e) => {
+      if (!(clave in e)) return e;
+      const resto = { ...e };
+      delete resto[clave];
+      return resto;
+    });
+
   function actualizar(campo: CampoPanel | "potencia_objetivo_kwp", valor: string) {
+    limpiarServidor(campo);
     setFormulario((f) => ({ ...f, [campo]: valor }));
     // Editar a mano un dato del panel deja de coincidir con la ficha citada
     if (campo.startsWith("panel_")) setPresetAplicado(null);
   }
 
   function actualizarInversor(indice: number, campo: CampoInversor, valor: string) {
+    limpiarServidor(`inversores.${indice}.${campo}`);
     setFormulario((f) => ({
       ...f,
       inversores: f.inversores.map((inv, i) => (i === indice ? { ...inv, [campo]: valor } : inv)),
@@ -408,17 +448,27 @@ export function EquipoPage() {
     setError(null);
     setAviso(null);
 
-    const resultado = aPeticion(formulario);
-    if ("error" in resultado) {
-      setError(resultado.error);
+    setIntentoGuardar(true);
+    if (Object.keys(errores).length > 0) {
+      setError("Revisa los campos marcados en rojo.");
       return false;
     }
 
     setGuardando(true);
     try {
-      cargarEnFormulario(await guardarEquipo(proyectoId, resultado.datos));
+      cargarEnFormulario(await guardarEquipo(proyectoId, aPeticion(formulario)));
+      setErroresServidor({});
+      setIntentoGuardar(false);
     } catch (e) {
-      setError(mensajeDeError(e, "No se pudo guardar la configuración"));
+      const porCampo = Object.fromEntries(
+        Object.entries(erroresDeCampo(e)).map(([loc, mensaje]) => [claveDelServidor(loc), mensaje]),
+      );
+      setErroresServidor(porCampo);
+      setError(
+        Object.keys(porCampo).length > 0
+          ? "Revisa los campos marcados en rojo."
+          : mensajeDeError(e, "No se pudo guardar la configuración"),
+      );
       return false;
     } finally {
       setGuardando(false);
@@ -530,6 +580,30 @@ export function EquipoPage() {
         }}
         className="mt-6 grid gap-6 lg:grid-cols-2"
       >
+        {/* ─── Potencia objetivo ─────────────────────────── */}
+        {/* Separada de los inversores (Lenin, 16 nov): es la potencia de los
+            paneles en kWp, no la de los inversores en kW. */}
+        <section className="rounded-xl border border-acero-200 bg-superficie p-5 lg:col-span-2">
+          <div className="flex flex-wrap items-end gap-6">
+            <div className="w-full max-w-xs">
+              <Entrada etiqueta="Potencia objetivo del sistema" unidad="kWp de paneles, opcional" error={visible("potencia_objetivo_kwp")}>
+                <input
+                  className={clase("potencia_objetivo_kwp")}
+                  inputMode="decimal"
+                  placeholder="Ej. 316"
+                  value={formulario.potencia_objetivo_kwp}
+                  onChange={(e) => actualizar("potencia_objetivo_kwp", e.target.value)}
+                  onBlur={tocar("potencia_objetivo_kwp")}
+                />
+              </Entrada>
+            </div>
+            <p className="max-w-xl text-xs text-acero-500">
+              Es la potencia de los paneles (DC, en kWp) que pide el cliente. El Paso 3 la usa como capacidad deseada.
+              Los inversores se miden aparte, en kW (AC).
+            </p>
+          </div>
+        </section>
+
         {/* ─── Panel solar ──────────────────────────────── */}
         <div className="space-y-5">
           <section className="rounded-xl border border-acero-200 bg-superficie p-5">
@@ -609,31 +683,31 @@ export function EquipoPage() {
 
             <p className="mt-5 text-xs font-semibold tracking-wider text-acero-400">ESPECIFICACIONES</p>
             <div className="mt-2 grid gap-4 sm:grid-cols-2">
-              <Entrada etiqueta="Marca">
-                <input className={CAMPO} value={formulario.panel_marca} onChange={(e) => actualizar("panel_marca", e.target.value)} maxLength={80} />
+              <Entrada etiqueta="Marca" error={visible("panel_marca")} obligatorio>
+                <input className={clase("panel_marca")} value={formulario.panel_marca} onChange={(e) => actualizar("panel_marca", e.target.value)} onBlur={tocar("panel_marca")} maxLength={80} />
               </Entrada>
-              <Entrada etiqueta="Modelo">
-                <input className={CAMPO} value={formulario.panel_modelo} onChange={(e) => actualizar("panel_modelo", e.target.value)} maxLength={100} />
+              <Entrada etiqueta="Modelo" error={visible("panel_modelo")} obligatorio>
+                <input className={clase("panel_modelo")} value={formulario.panel_modelo} onChange={(e) => actualizar("panel_modelo", e.target.value)} onBlur={tocar("panel_modelo")} maxLength={100} />
               </Entrada>
             </div>
             <div className="mt-4 grid gap-4 sm:grid-cols-3">
-              <Entrada etiqueta="Potencia" unidad="Wp">
-                <input className={CAMPO} inputMode="decimal" value={formulario.panel_potencia_wp} onChange={(e) => actualizar("panel_potencia_wp", e.target.value)} />
+              <Entrada etiqueta="Potencia" unidad="Wp" error={visible("panel_potencia_wp")} obligatorio>
+                <input className={clase("panel_potencia_wp")} inputMode="decimal" value={formulario.panel_potencia_wp} onChange={(e) => actualizar("panel_potencia_wp", e.target.value)} onBlur={tocar("panel_potencia_wp")} />
               </Entrada>
-              <Entrada etiqueta="Largo" unidad="mm, dir. L">
-                <input className={CAMPO} inputMode="decimal" value={formulario.panel_largo_mm} onChange={(e) => actualizar("panel_largo_mm", e.target.value)} />
+              <Entrada etiqueta="Largo" unidad="mm, dir. L" error={visible("panel_largo_mm")} obligatorio>
+                <input className={clase("panel_largo_mm")} inputMode="decimal" value={formulario.panel_largo_mm} onChange={(e) => actualizar("panel_largo_mm", e.target.value)} onBlur={tocar("panel_largo_mm")} />
               </Entrada>
-              <Entrada etiqueta="Ancho" unidad="mm, dir. A">
-                <input className={CAMPO} inputMode="decimal" value={formulario.panel_ancho_mm} onChange={(e) => actualizar("panel_ancho_mm", e.target.value)} />
+              <Entrada etiqueta="Ancho" unidad="mm, dir. A" error={visible("panel_ancho_mm")} obligatorio>
+                <input className={clase("panel_ancho_mm")} inputMode="decimal" value={formulario.panel_ancho_mm} onChange={(e) => actualizar("panel_ancho_mm", e.target.value)} onBlur={tocar("panel_ancho_mm")} />
               </Entrada>
-              <Entrada etiqueta="Voc" unidad="V">
-                <input className={CAMPO} inputMode="decimal" value={formulario.panel_voc_v} onChange={(e) => actualizar("panel_voc_v", e.target.value)} />
+              <Entrada etiqueta="Voc" unidad="V" error={visible("panel_voc_v")} obligatorio>
+                <input className={clase("panel_voc_v")} inputMode="decimal" value={formulario.panel_voc_v} onChange={(e) => actualizar("panel_voc_v", e.target.value)} onBlur={tocar("panel_voc_v")} />
               </Entrada>
-              <Entrada etiqueta="Vmp" unidad="V">
-                <input className={CAMPO} inputMode="decimal" value={formulario.panel_vmp_v} onChange={(e) => actualizar("panel_vmp_v", e.target.value)} />
+              <Entrada etiqueta="Vmp" unidad="V" error={visible("panel_vmp_v")} obligatorio>
+                <input className={clase("panel_vmp_v")} inputMode="decimal" value={formulario.panel_vmp_v} onChange={(e) => actualizar("panel_vmp_v", e.target.value)} onBlur={tocar("panel_vmp_v")} />
               </Entrada>
-              <Entrada etiqueta="Ángulo de montaje" unidad="°, 0 a 90">
-                <input className={CAMPO} inputMode="decimal" placeholder="Ej. 15" value={formulario.angulo_montaje} onChange={(e) => actualizar("angulo_montaje", e.target.value)} />
+              <Entrada etiqueta="Ángulo de montaje" unidad="°, 0 a 90" error={visible("angulo_montaje")} obligatorio>
+                <input className={clase("angulo_montaje")} inputMode="decimal" placeholder="Ej. 15" value={formulario.angulo_montaje} onChange={(e) => actualizar("angulo_montaje", e.target.value)} onBlur={tocar("angulo_montaje")} />
               </Entrada>
             </div>
 
@@ -686,17 +760,6 @@ export function EquipoPage() {
         <div className="space-y-5">
           <section className="rounded-xl border border-acero-200 bg-superficie p-5">
             <h2 className="text-sm font-semibold text-acero-900">Inversores</h2>
-            <div className="mt-3 max-w-xs">
-              <Entrada etiqueta="Potencia objetivo del sistema" unidad="kWp, opcional">
-                <input
-                  className={CAMPO}
-                  inputMode="decimal"
-                  placeholder="Ej. 316"
-                  value={formulario.potencia_objetivo_kwp}
-                  onChange={(e) => actualizar("potencia_objetivo_kwp", e.target.value)}
-                />
-              </Entrada>
-            </div>
 
             {sugerencia ? (
               <div className="mt-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
@@ -785,14 +848,14 @@ export function EquipoPage() {
                     )}
 
                     <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                      <Entrada etiqueta="Marca">
-                        <input className={CAMPO} value={inv.marca} onChange={(e) => actualizarInversor(i, "marca", e.target.value)} maxLength={80} />
+                      <Entrada etiqueta="Marca" error={visible(`inversores.${i}.marca`)} obligatorio>
+                        <input className={clase(`inversores.${i}.marca`)} value={inv.marca} onChange={(e) => actualizarInversor(i, "marca", e.target.value)} onBlur={tocar(`inversores.${i}.marca`)} maxLength={80} />
                       </Entrada>
-                      <Entrada etiqueta="Modelo">
-                        <input className={CAMPO} value={inv.modelo} onChange={(e) => actualizarInversor(i, "modelo", e.target.value)} maxLength={100} />
+                      <Entrada etiqueta="Modelo" error={visible(`inversores.${i}.modelo`)} obligatorio>
+                        <input className={clase(`inversores.${i}.modelo`)} value={inv.modelo} onChange={(e) => actualizarInversor(i, "modelo", e.target.value)} onBlur={tocar(`inversores.${i}.modelo`)} maxLength={100} />
                       </Entrada>
-                      <Entrada etiqueta="Potencia" unidad="kW">
-                        <input className={CAMPO} inputMode="decimal" value={inv.potencia_kw} onChange={(e) => actualizarInversor(i, "potencia_kw", e.target.value)} />
+                      <Entrada etiqueta="Potencia" unidad="kW" error={visible(`inversores.${i}.potencia_kw`)} obligatorio>
+                        <input className={clase(`inversores.${i}.potencia_kw`)} inputMode="decimal" value={inv.potencia_kw} onChange={(e) => actualizarInversor(i, "potencia_kw", e.target.value)} onBlur={tocar(`inversores.${i}.potencia_kw`)} />
                       </Entrada>
                     </div>
 
@@ -800,17 +863,17 @@ export function EquipoPage() {
                       Datos eléctricos <span className="font-normal text-acero-400">(opcionales: sin Vmax y Vmin no se validan los strings)</span>
                     </p>
                     <div className="mt-2 grid gap-3 sm:grid-cols-4">
-                      <Entrada etiqueta="Voltaje máx." unidad="V">
-                        <input className={CAMPO} inputMode="decimal" value={inv.vmax_v} onChange={(e) => actualizarInversor(i, "vmax_v", e.target.value)} />
+                      <Entrada etiqueta="Voltaje máx." unidad="V" error={visible(`inversores.${i}.vmax_v`)}>
+                        <input className={clase(`inversores.${i}.vmax_v`)} inputMode="decimal" value={inv.vmax_v} onChange={(e) => actualizarInversor(i, "vmax_v", e.target.value)} onBlur={tocar(`inversores.${i}.vmax_v`)} />
                       </Entrada>
-                      <Entrada etiqueta="Voltaje mín." unidad="V">
-                        <input className={CAMPO} inputMode="decimal" value={inv.vmin_v} onChange={(e) => actualizarInversor(i, "vmin_v", e.target.value)} />
+                      <Entrada etiqueta="Voltaje mín." unidad="V" error={visible(`inversores.${i}.vmin_v`)}>
+                        <input className={clase(`inversores.${i}.vmin_v`)} inputMode="decimal" value={inv.vmin_v} onChange={(e) => actualizarInversor(i, "vmin_v", e.target.value)} onBlur={tocar(`inversores.${i}.vmin_v`)} />
                       </Entrada>
-                      <Entrada etiqueta="MPPTs">
-                        <input className={CAMPO} inputMode="numeric" value={inv.mppts} onChange={(e) => actualizarInversor(i, "mppts", e.target.value)} />
+                      <Entrada etiqueta="MPPTs" error={visible(`inversores.${i}.mppts`)}>
+                        <input className={clase(`inversores.${i}.mppts`)} inputMode="numeric" value={inv.mppts} onChange={(e) => actualizarInversor(i, "mppts", e.target.value)} onBlur={tocar(`inversores.${i}.mppts`)} />
                       </Entrada>
-                      <Entrada etiqueta="Strings por MPPT">
-                        <input className={CAMPO} inputMode="numeric" value={inv.strings_por_mppt} onChange={(e) => actualizarInversor(i, "strings_por_mppt", e.target.value)} />
+                      <Entrada etiqueta="Strings por MPPT" error={visible(`inversores.${i}.strings_por_mppt`)}>
+                        <input className={clase(`inversores.${i}.strings_por_mppt`)} inputMode="numeric" value={inv.strings_por_mppt} onChange={(e) => actualizarInversor(i, "strings_por_mppt", e.target.value)} onBlur={tocar(`inversores.${i}.strings_por_mppt`)} />
                       </Entrada>
                     </div>
 

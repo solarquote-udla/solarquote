@@ -13,49 +13,61 @@ Notación de HEXtructure, tomada de la cotización EMIHANA (`L=4 A=28 BLOQUES=12
 | Símbolo | Significado | Regla |
 |---|---|---|
 | **L** | Paneles en la dirección de la pendiente | Par: los paneles apoyan de a dos sobre soportes en A y en V (ficha HEX001, aletas de 7,5°) |
-| **A** | Paneles a lo largo de la fila | Lo calcula el algoritmo |
-| **B** | Repeticiones de un mismo tipo de bloque | Agrupación final |
+| **A** | Paneles a lo largo de la fila | Lo elige el usuario; vacío = bloque compacto (3 · L) |
+| **B** | Repeticiones de un mismo tipo de bloque (bloques iguales) | Agrupación final |
 
-El panel va con su lado mayor en la dirección de L:
+El panel va con su lado mayor en la dirección de L. Entre panel y panel
+hay una separación: 6 cm a lo largo (entre las filas de la pendiente) y
+2 cm a lo ancho (el clamp intermedio). Las dos son configurables.
 
 ```
-largo_m = L · lado_mayor        ancho_m = A · lado_menor
+largo_m = L · lado_mayor + (L − 1) · sep_largo
+ancho_m = A · lado_menor + (A − 1) · sep_ancho
 ```
 
-Regla antisísmica del documento de titulación: **ancho = 3 · largo**. Con L
-elegido por el usuario, A es el entero más cercano a esa proporción.
+**Bloque compacto (antisísmico): A = 3 · L, contado en paneles** (4 × 12,
+8 × 24, 2 × 6). Es una recomendación de HEXtructure, no una regla: los
+clientes eligen L y A según su terreno y cuántos paneles conectan a cada
+MPPT del inversor (8 × 13, 10 × 28, 22 × 28, 2 × 30). El sistema marca los
+bloques que se apartan más de la tolerancia como **no compactos** y avisa,
+pero los genera igual.
 
-| Panel 2278 × 1134 mm, L = 4 | Valor |
+| Panel 2278 × 1134 mm, L = 4, A vacío | Valor |
 |---|---|
-| Largo | 4 × 2,278 = 9,112 m |
-| A ideal | round(3 × 9,112 / 1,134) = 24 |
-| Ancho | 24 × 1,134 = 27,216 m |
-| Proporción | 2,987 |
+| A del bloque compacto | 3 × 4 = 12 |
+| Largo | 4 × 2,278 + 3 × 0,06 = 9,292 m |
+| Ancho | 12 × 1,134 + 11 × 0,02 = 13,828 m |
 
-## Decisiones (acordadas el 1 de octubre de 2026)
+## Decisiones
 
 | Tema | Decisión | Motivo |
 |---|---|---|
-| Forma del bloque | L par elegido por el usuario (4 por defecto); A por proporción | Respeta la regla antisísmica sin pedir dos números |
-| Tolerancia ámbar | ±20 %, configurable | El bloque real de EMIHANA (4 × 28) tiene proporción 3,48: con ±10 % saldría en ámbar. **Pendiente de confirmar con HEXtructure** |
-| Separación | Pasillo configurable, 2 m por defecto | Medido en el plano de San Pablo del Lago. La sombra de RF-02 se usa solo si es mayor |
+| Forma del bloque | L par y A los elige el usuario; A vacío = compacto | Revisión con HEXtructure del 17 de noviembre de 2026: depende del cliente y del inversor |
+| Regla compacta | A = 3 · L en paneles, ±20 % configurable; solo avisa | HEXtructure la recomienda pero los clientes casi nunca la respetan. Hasta el 17 de noviembre se medía en metros (ancho = 3 · largo), lo que daba 4 × 24 para L = 4 |
+| Separación entre paneles | 6 cm a lo largo y 2 cm a lo ancho, configurables | Indicado por HEXtructure; medido en el plano de Envasur (≈ 7 cm y ≈ 1 cm) |
+| Separación entre bloques | Pasillo configurable, 2 m por defecto | Medido en el plano de San Pablo del Lago. La sombra de RF-02 se usa solo si es mayor |
 | Orientación | Filas norte-sur según `orientacion_norte` del terreno | Si no está definida se asume el norte arriba y se advierte |
 
 `orientacion_norte` se mide en grados, en sentido horario desde el eje +Y
 del plano (0 = arriba, 90 = derecha).
+
+Los layouts generados antes de este cambio quedan con separación 0 y se
+siguen editando igual; su proporción se recalcula con la regla en paneles
+al leerlos.
 
 ## Pasos
 
 1. **Área útil** = terreno − unión de caminos (Shapely).
 2. Se **rota** el área útil para que el norte quede hacia +Y.
 3. Se recorre el terreno en **franjas verticales** del largo en planta del
-   bloque (L · lado_mayor · cos β), separadas por la separación este-oeste.
+   bloque (largo_m · cos β), separadas por la separación este-oeste.
 4. En cada franja se calculan los **tramos libres**: los intervalos de Y en
    los que la franja entera cae dentro del área útil. Cada obstáculo conexo
    proyecta un intervalo sobre Y, así que el cálculo es exacto.
 5. Cada tramo se llena **desde abajo** con bloques completos separados por
    el pasillo norte-sur. El sobrante se aprovecha con un **bloque corto**
-   (menos paneles en A), que suele salir en ámbar.
+   (menos paneles en A, contando la separación entre paneles), que suele
+   salir como no compacto.
 6. Se prueban **24 desfases** de la primera franja y se elige el que ubica
    más paneles; a igualdad, el que tiene menos bloques cortos.
 7. Si se pidió una **capacidad en kWp**, se recorta el layout a los paneles

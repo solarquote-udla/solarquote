@@ -244,7 +244,7 @@ export function ConfirmacionBocetoPage() {
         if ("problema" in valores || !boceto) {
           return { fila: f, nombre, problema: "problema" in valores ? valores.problema : null, valores: null };
         }
-        const prop = proporcion(valores.L, valores.A, boceto.panel);
+        const prop = proporcion(valores.L, valores.A);
         return { fila: f, nombre, problema: null, valores, prop, ok: enProporcion(prop, boceto.tolerancia_proporcion) };
       });
   }, [filas, boceto]);
@@ -303,7 +303,7 @@ export function ConfirmacionBocetoPage() {
         : hayCambios
           ? "Guarda los cambios antes de confirmar."
           : bloquesFuera > 0 && !acepta
-            ? "Ajusta los bloques fuera de proporción o acéptalos bajo tu responsabilidad."
+            ? "Ajusta los bloques no compactos o acéptalos bajo tu responsabilidad."
             : null;
 
   const cambiar = (clave: number, cambio: Partial<FilaBoceto>) =>
@@ -426,7 +426,7 @@ export function ConfirmacionBocetoPage() {
                 { etiqueta: "kWp", valor: potencia === null ? "–" : numero(potencia, 1), clase: "text-green-800" },
                 { etiqueta: "bloques", valor: numero(totalBloques, 0), clase: "text-acero-900" },
                 {
-                  etiqueta: "fuera de proporción",
+                  etiqueta: "no compactos",
                   valor: String(bloquesFuera),
                   clase: bloquesFuera ? "text-amber-700" : "text-acero-900",
                 },
@@ -449,9 +449,9 @@ export function ConfirmacionBocetoPage() {
               <thead>
                 <tr className="text-left text-xs text-acero-400">
                   <th className="pb-2 font-medium">Tipo</th>
-                  <th className="w-14 pb-2 text-right font-medium">L</th>
-                  <th className="w-16 pb-2 text-right font-medium">A</th>
-                  <th className="w-16 pb-2 text-right font-medium">B</th>
+                  <th className="w-14 pb-2 text-right font-medium">L (largo)</th>
+                  <th className="w-16 pb-2 text-right font-medium">A (ancho)</th>
+                  <th className="w-16 pb-2 text-right font-medium">Bloques iguales</th>
                   <th className="pb-2 text-right font-medium">Estado</th>
                   {!cotizado && <th className="w-6 pb-2" />}
                 </tr>
@@ -517,7 +517,7 @@ export function ConfirmacionBocetoPage() {
                               e.ok ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-900",
                             ].join(" ")}
                           >
-                            {e.ok ? "OK" : "Revisar"}
+                            {e.ok ? "Compacto" : "No compacto"}
                           </span>
                         )}
                       </td>
@@ -576,11 +576,11 @@ export function ConfirmacionBocetoPage() {
           {/* ─── Proporción antisísmica ──────────────── */}
           {fuera.map((e) => (
             <div key={e.fila.clave} className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-              <p className="font-semibold">Tipo {e.nombre}: proporción antisísmica</p>
+              <p className="font-semibold">Tipo {e.nombre}: bloque no compacto</p>
               <p className="mt-1 text-xs">
-                {e.valores!.B} bloque{e.valores!.B === 1 ? "" : "s"} de {e.valores!.L} × {e.valores!.A} con proporción{" "}
-                {numero(e.prop!)} : 1, fuera de 3 : 1 ± {numero(boceto.tolerancia_proporcion * 100, 0)} %. Ajústalo o
-                confírmalo bajo tu responsabilidad.
+                {e.valores!.B} bloque{e.valores!.B === 1 ? "" : "s"} de {e.valores!.L} × {e.valores!.A}: para un bloque
+                antisísmico se recomienda A = 3 × L = {3 * e.valores!.L} (± {numero(boceto.tolerancia_proporcion * 100, 0)}{" "}
+                %). Es una recomendación: ajústalo o confírmalo si el cliente lo pide así.
               </p>
             </div>
           ))}
@@ -597,8 +597,8 @@ export function ConfirmacionBocetoPage() {
                     onChange={(ev) => setAcepta(ev.target.checked)}
                   />
                   <span>
-                    Acepto bajo mi responsabilidad {bloquesFuera === 1 ? "el bloque" : `los ${bloquesFuera} bloques`} fuera de
-                    la proporción antisísmica.
+                    Acepto bajo mi responsabilidad {bloquesFuera === 1 ? "el bloque no compacto" : `los ${bloquesFuera} bloques no compactos`}{" "}
+                    (A distinto de 3 × L).
                   </span>
                 </label>
               )}

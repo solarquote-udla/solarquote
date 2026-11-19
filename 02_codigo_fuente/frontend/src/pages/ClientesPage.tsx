@@ -168,7 +168,7 @@ export function ClientesPage() {
         <input
           type="search"
           className="w-full max-w-sm rounded-lg border border-acero-300 px-3 py-2 text-sm focus:border-solar-500 focus:outline-none focus:ring-1 focus:ring-solar-500"
-          placeholder="Buscar por nombre, empresa o identificación"
+          placeholder="Buscar por nombre o identificación"
           value={buscar}
           onChange={(e) => setBuscar(e.target.value)}
           aria-label="Buscar clientes"
@@ -220,7 +220,6 @@ export function ClientesPage() {
                         </span>
                       )}
                     </p>
-                    {c.empresa && <p className="text-xs text-acero-500">{c.empresa}</p>}
                   </td>
                   <td className="px-4 py-3">
                     <span className="text-xs text-acero-400">{ETIQUETAS_TIPO_IDENTIFICACION[c.tipo_identificacion]}</span>

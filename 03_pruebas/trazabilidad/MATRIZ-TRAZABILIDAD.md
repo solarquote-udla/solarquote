@@ -21,8 +21,8 @@ requisito es la corrida verde del PR indicado.
 | Backend (API principal) | 593 | 96 % | `pytest` en `02_codigo_fuente/backend` |
 | calc-service | 32 | 100 % | `pytest` en `02_codigo_fuente/calc-service` |
 | ia-service | 96 | 94 % | `pytest` en `02_codigo_fuente/ia-service` |
-| Frontend (interfaz) | 232 | — | `npm test` en `02_codigo_fuente/frontend` |
-| **Total** | **953** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
+| Frontend (interfaz) | 237 | — | `npm test` en `02_codigo_fuente/frontend` |
+| **Total** | **958** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
 
 La cobertura se midió con `pytest --cov=app`. RNF-02 pide al menos 60 %
 en el backend.
@@ -71,6 +71,7 @@ Evidencia: PR #1, #20, #34 y el PR de SQ-135.
 | El Paso 2 elige el panel del catálogo, con búsqueda por marca, modelo o potencia; pantalla Configuración, Paneles con el error de cada dato junto a su campo | `catalogoPaneles.test.tsx` |
 | Catálogo inicial según Producción: paneles de más de 600 W de LONGi, Jinko, JA Solar y Canadian Solar; los demás quedan desactivados | `test_catalogo_produccion`: cada panel pasa las validaciones de la API y es compatible con cada inversor (migración `e7b2a9c41d06`) |
 | Mensajes de validación en español, con el campo (`loc`) correcto — tanto en las restricciones de Pydantic (rango, obligatorio, tipo) como en las reglas entre dos campos (Voc/Vmp, largo/ancho, Vmax/Vmin) | `test_errores_validacion` (11 pruebas) |
+| Paso 2: cada error junto a su campo (panel, ángulo, potencia objetivo e inversores), también los del servidor por su `loc`; la potencia objetivo (kWp de paneles) va aparte de los inversores (kW) | `pasos12Revision.test.tsx` (Paso 2); `inversores.test.tsx` |
 
 Evidencia: PR #2, #38 y los del catálogo de paneles y los mensajes de validación.
 
@@ -78,7 +79,9 @@ Evidencia: PR #2, #38 y los del catálogo de paneles y los mensajes de validaci�
 
 | Regla del requisito | Pruebas |
 |---|---|
-| Bloques L × A con ancho = 3 × largo; aviso de los que se apartan | `test_layout`: `test_a_ideal_para_l4`, `test_proporcion_del_bloque_ideal`, `test_bloque_real_de_emihana_pasa_con_20_por_ciento` |
+| L y A los elige el Gerente (L par hasta 40); aviso de bloque compacto A = 3 × L, contado en paneles, sin bloquear (revisión con HEXtructure del 17 de noviembre de 2026) | `test_layout`: `test_bloque_compacto_es_a_igual_a_tres_l`, `test_bloques_reales_de_clientes_no_son_compactos`, `test_la_tolerancia_decide_el_borde`, `test_sin_a_se_usa_el_bloque_compacto`, `test_a_manual_no_compacto_avisa_pero_genera`; `test_api_layout_bloque_manual`; `bloqueCompacto.test.tsx` |
+| Separación entre paneles dentro del bloque (6 cm a lo largo, 2 cm entre paneles), configurable | `test_layout`: `test_separacion_entre_paneles_agranda_el_bloque`, `test_bloque_corto_cuenta_la_separacion`, `test_medida_fila_y_paneles_que_entran_son_inversas`; `test_api_layout_bloque_manual`: `test_editar_reconstruye_el_bloque_con_la_separacion`; `bloqueCompacto.test.tsx` (paridad de `anchoBloque`) |
+| Paneles dibujados dentro de cada bloque en el plano | `bloqueCompacto.test.tsx`: "cada bloque lleva sus paneles dibujados" |
 | Respeta el polígono y los caminos | `test_layout`: `test_terreno_irregular_con_caminos_cruzados`, `test_camino_que_cubre_todo_el_terreno` |
 | Separación por pasillo o sombra, la mayor | `test_layout`: `test_pasillo_configurable_se_respeta`, `test_la_sombra_reemplaza_al_pasillo_si_es_mayor`, `test_inclinacion_reduce_el_largo_en_planta` |
 | Capacidad deseada opcional: cabe o se informa la máxima | `test_layout`: `test_capacidad_que_cabe_recorta_el_layout`, `test_capacidad_que_no_cabe_devuelve_la_maxima` |
@@ -125,12 +128,12 @@ Evidencia: PR #42 y #44.
 |---|---|
 | Las diez fórmulas f(L, A, B) | `calc: test_calculo_materiales` (13 pruebas, casos a mano y EMIHANA) |
 | Varios ítems; total = suma | `calc: test_endpoint_cotizacion`; `test_confirmacion`: `test_items_del_layout_agrupa_bloques_iguales` |
-| Addendum e IVA | `calc: test_endpoint_cotizacion`; `test_cotizacion_servicio`: `test_persiste_el_desglose_en_la_cotizacion` |
+| Subtotal e IVA (sin addendum, decisión de reunión con Santi: SQ-213) | `calc: test_endpoint_cotizacion`; `test_cotizacion_servicio`: `test_persiste_el_desglose_en_la_cotizacion` |
 | L par | `calc: test_calculo_materiales` |
 | Precios vigentes; material nuevo sin precio no bloquea | `test_cotizacion_servicio`: `test_lanza_si_falta_precio_vigente_*`, `test_un_material_nuevo_sin_precio_no_bloquea_la_cotizacion` |
 | Comunicación segura con calc-service | `calc: test_autenticacion`; `test_calc_service` |
 
-Evidencia: PR #5, #10 a #13, #16, #19, #28.
+Evidencia: PR #5, #10 a #13, #16, #19, #28, y el de SQ-213 (quita el addendum).
 
 ### RF-07 Documento de cotización
 
@@ -146,16 +149,16 @@ público.
 | Regla del requisito | Pruebas |
 |---|---|
 | Documento Word con el detalle de materiales | `test_proforma_documentos`: `test_word_materiales_en_orden_con_moneda_ecuador`, `test_word_totales_notas_condiciones_y_pagos` |
-| Hoja de cálculo Excel con las mismas cantidades, editable | `test_excel_incluye_encabezado_materiales_en_orden_y_datos_bancarios`, `test_excel_subtotales_y_totales_son_formulas` (fórmulas, no valores fijos: cantidad × precio, `SUM`, IVA sobre subtotal + addendum) |
+| Hoja de cálculo Excel con las mismas cantidades, editable | `test_excel_incluye_encabezado_materiales_en_orden_y_datos_bancarios`, `test_excel_subtotales_y_totales_son_formulas` (fórmulas, no valores fijos: cantidad × precio, `SUM`, IVA sobre el subtotal; sin addendum, SQ-213) |
 | Materiales en el orden de la proforma real, no alfabético | `test_materiales_en_el_orden_de_la_proforma_real`, `test_material_fuera_del_orden_conocido_cae_al_final` |
-| Ambos con datos del cliente, subtotal, addendum, IVA y total | mismas pruebas; `test_word_sin_proforma_ni_datos_opcionales_del_cliente_no_falla` cubre los campos opcionales |
+| Ambos con datos del cliente, subtotal, IVA y total (sin addendum ni empresa, SQ-213) | mismas pruebas; `test_word_sin_proforma_ni_datos_opcionales_del_cliente_no_falla` cubre los campos opcionales |
 | Datos del oferente, condiciones, pagos y banco sin romper si no están configurados | `test_word_sin_datos_del_oferente_no_falla_y_omite_las_secciones`, `test_excel_sin_datos_del_oferente_no_falla` |
 | Dinero en `Decimal`, formato de Ecuador ($ 5.025,60) | `test_moneda_formato_ecuador` |
 | El número de proforma se asigna al emitir | Ya cubierto (SQ-82): `test_confirmacion`: `siguiente_numero_proforma` |
 | Los archivos se descargan desde la interfaz | `test_proforma_documentos`: `test_descarga_responde_el_archivo_con_su_tipo_y_nombre`; botón en `CotizacionDetallePage` (`cotizacion-detalle.test.tsx`) |
 | Documento de cotización en menos de 10 s (RNF-03) | `test_rnf`: `test_rnf03_documento_de_cotizacion_en_menos_de_10_s` |
 
-Evidencia: PR de SQ-79/SQ-80/SQ-81/SQ-83/SQ-84.
+Evidencia: PR de SQ-79/SQ-80/SQ-81/SQ-83/SQ-84 y el de SQ-213 (quita el addendum y el campo Empresa).
 
 ### RF-08 Lista de referencia de inversores
 
@@ -168,9 +171,9 @@ Evidencia: PR de SQ-79/SQ-80/SQ-81/SQ-83/SQ-84.
 | Solo con permiso de parametrización | `test_api_administracion`: `test_inversores_por_permiso`; `test_seguridad`: `test_generar_layout_puede_leer_inversores_pero_no_administrarlos` |
 | Selector en RF-02 | `inversores.test.tsx` |
 | Catálogo inicial según Producción: Huawei SUN2000-100KTL-M2, 330KTL-H1 y 506KTL-H1 | `test_catalogo_produccion`: `test_cada_inversor_nuevo_pasa_las_validaciones_de_la_api` |
-| Error de validación (propio o del backend, por `loc`) junto al campo correspondiente | `inversores-catalogo.test.tsx` ("Configuración, Inversores: alta con error por campo", 5 pruebas); `erroresDeCampo` en `services/api.ts` |
+| Error de validación (propio o del backend, por `loc`) junto al campo correspondiente; en el mensaje general (pantallas que todavía no muestran el error por campo) se antepone el campo solo si no es un `value_error` propio — esos ya lo mencionan en el texto —, legible en vez de `snake_case` | `inversores-catalogo.test.tsx` ("Configuración, Inversores: alta con error por campo", 5 pruebas); `api.test.tsx` (`mensajeDeError`/`erroresDeCampo`, 9 pruebas) |
 
-Evidencia: PR #37, el PR de SQ-135 y el PR de SQ-209.
+Evidencia: PR #37, el PR de SQ-135, el PR de SQ-209 y su corrección (SQ-210).
 
 ### RF-09 Materiales y precios
 
@@ -178,11 +181,12 @@ Evidencia: PR #37, el PR de SQ-135 y el PR de SQ-209.
 |---|---|
 | Precio con fecha de vigencia e historial | `test_material_administracion`: `test_actualizar_precio_cierra_el_anterior_y_crea_uno_nuevo`, `test_historial_queda_ordenado_*`; `test_api_administracion`: `test_material_ciclo_completo` |
 | Las cotizaciones emitidas conservan sus precios | `test_cotizacion_servicio`: `test_persiste_la_cantidad_y_precio_unitario_de_cada_material` |
-| Los materiales de las fórmulas no se desactivan | `test_material_administracion`: `test_desactivar_un_codigo_de_formula_*`; `test_api_administracion` (409) |
+| Cualquier material se puede desactivar, incluido uno de las fórmulas; una cotización nueva simplemente lo excluye (pedido de Santi en la reunión del 17 de noviembre) | `test_material_administracion`: `test_se_puede_desactivar_un_codigo_de_formula`; `test_cotizacion_servicio`: `test_material_de_formula_desactivado_se_excluye_de_la_cotizacion`; `test_api_administracion`; calc-service `test_endpoint_cotizacion`: `test_material_sin_precio_se_excluye_de_la_cotizacion`, `test_cargo_fijo_sin_precio_se_excluye_de_la_cotizacion` |
 | Precio mayor o igual a cero | `test_material_administracion`: `test_acepta_cero`, `test_rechaza_negativo`; `test_api_administracion` (422) |
 | Precios y catálogo con permisos separados | `test_api_administracion`: `test_precios_y_materiales_por_permiso`; `test_seguridad`: `test_ver_materiales_no_permite_cambiar_precios` |
+| Error de validación (propio o del backend, por `loc`) junto al campo correspondiente, en Materiales y en Precios | `catalogoMateriales.test.tsx` (5 pruebas) |
 
-Evidencia: PR #23 a #25, #35 y el PR de SQ-135.
+Evidencia: PR #23 a #25, #35, el PR de SQ-135, el PR de SQ-211 y el PR de SQ-212.
 
 ### RF-10 Historial de cotizaciones
 
@@ -219,6 +223,7 @@ Evidencia: PR #30 a #33, #36 y el PR de SQ-135.
 | La baja conserva las cotizaciones | `test_cliente_servicio`: `test_marca_inactivo`; `test_cotizacion_servicio`: `test_snapshot_del_cliente_viene_de_la_base_y_no_del_request` |
 | Solo con permiso | `test_api_administracion`: `test_clientes_lectura_y_administracion_por_permiso` |
 | Crear el cliente desde el Paso 1 (Lenin): el alta también la puede hacer quien tiene permiso de generar layout, no solo quien administra clientes | `test_api_administracion`: `test_crear_cliente_desde_el_proyecto` |
+| Pantalla: botón «Nuevo cliente» en el Paso 1 que registra y deja elegido al cliente sin salir del asistente | `pasos12Revision.test.tsx` (Paso 1) |
 
 Evidencia: PR #17, #18, #22, el PR de SQ-135 y el de crear cliente desde el proyecto.
 

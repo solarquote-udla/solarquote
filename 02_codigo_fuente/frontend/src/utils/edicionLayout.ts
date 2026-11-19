@@ -27,8 +27,10 @@ export interface BloqueEdicion {
 export interface GeometriaLayout {
   /** Largo del bloque en planta (dirección de L), en metros */
   largo_m: number;
-  /** Lo que suma cada panel de A, en metros */
+  /** Lado menor del panel, en metros */
   lado_menor_m: number;
+  /** Separación entre paneles en A, en metros (0 en layouts anteriores) */
+  separacion_ancho_m?: number;
   /** Grados del norte en sentido horario desde +Y */
   angulo_norte: number;
 }
@@ -59,7 +61,13 @@ export const aTerreno = (p: Punto, angulo: number) => girar(p, -angulo);
 
 function cajaLocal(b: BloqueEdicion, g: GeometriaLayout): Caja {
   const [x, y] = aLocal(b.origen, g.angulo_norte);
-  return { x0: x, y0: y, x1: x + g.largo_m, y1: y + b.paneles_ancho * g.lado_menor_m };
+  return { x0: x, y0: y, x1: x + g.largo_m, y1: y + anchoBloque(b.paneles_ancho, g) };
+}
+
+/** Ancho del bloque en A, con la separación entre paneles (igual que `medida_fila` del backend). */
+export function anchoBloque(paneles: number, g: GeometriaLayout): number {
+  const separacion = g.separacion_ancho_m ?? 0;
+  return paneles * g.lado_menor_m + Math.max(0, paneles - 1) * separacion;
 }
 
 /**
