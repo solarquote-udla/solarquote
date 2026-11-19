@@ -237,6 +237,7 @@ Evidencia: PR #17, #18, #22, el PR de SQ-135 y el de crear cliente desde el proy
 | Solo con permiso | `test_seguridad`: `test_tablero_lo_lee_quien_tiene_*` |
 | Bocetos procesados | `test_tablero`: `test_resumen_cuenta_los_bocetos_procesados_en_el_rango`; `tablero.test.tsx` |
 | Lotes despachados y recibidos | `test_validacion`: `test_tablero_cuenta_lotes_despachados_y_recibidos`; `tablero.test.tsx` |
+| Accesos según el perfil y proyectos recientes para retomar | `inicio.test.tsx` (8 pruebas) |
 
 Evidencia: PR #40 y #43.
 
