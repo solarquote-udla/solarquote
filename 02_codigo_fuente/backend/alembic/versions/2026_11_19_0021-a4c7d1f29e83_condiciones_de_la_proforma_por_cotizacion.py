@@ -1,7 +1,7 @@
 """condiciones de la proforma editables por cotizacion (SQ-213)
 
 Revision ID: a4c7d1f29e83
-Revises: e7b2a9c41d06
+Revises: f3a1c8d92b47
 Create Date: 2026-11-19 00:21:00.000000
 
 Acuerdo de la reunion con Santi: plazo de entrega, validez de la oferta
@@ -22,7 +22,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "a4c7d1f29e83"
-down_revision: str | None = "e7b2a9c41d06"
+down_revision: str | None = "f3a1c8d92b47"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
