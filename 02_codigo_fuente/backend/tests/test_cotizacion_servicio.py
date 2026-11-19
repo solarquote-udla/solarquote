@@ -166,6 +166,23 @@ def test_no_manda_cargo_fijo_de_logistica_si_no_esta_activo(
     assert "LOG" not in llamada["json"]["precios"]
 
 
+def test_material_de_formula_desactivado_se_excluye_de_la_cotizacion(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Pedido de Santi: cualquier material se puede desactivar (SQ-21x);
+    una cotización nueva simplemente no pide su precio ni lo incluye."""
+    _sembrar_materiales_de_formula(db)
+    db.query(Material).filter(Material.codigo == "SOP_A").update({"activo": False})
+    db.flush()
+    usuario = _crear_usuario(db)
+    llamada = _mock_calc_service_ok(monkeypatch)
+
+    crear_cotizacion(db, _datos_minimos(), usuario)
+
+    assert "SOP_A" not in llamada["json"]["precios"]
+    assert "VAR1650" in llamada["json"]["precios"]  # los demás códigos de fórmula siguen activos
+
+
 def test_lanza_si_falta_precio_vigente_de_un_material_activo(
     db: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -9,11 +9,13 @@
 
 import { useEffect, useState } from "react";
 
+import { Campo } from "@/components/Campo";
 import { useAccionUnica } from "@/hooks/useAccionUnica";
 import { useCambiosSinGuardar } from "@/hooks/useCambiosSinGuardar";
-import { mensajeDeError } from "@/services/api";
+import { erroresDeCampo, mensajeDeError } from "@/services/api";
 import { actualizarMaterial, crearMaterial, listarMateriales } from "@/services/materiales";
 import type { Material } from "@/types/api";
+import { bordeCampo } from "@/utils/campo";
 
 const CODIGO_VALIDO = /^[A-Z0-9_]{2,30}$/;
 
@@ -23,6 +25,35 @@ function codigoValido(valor: string): boolean {
 
 function nombreValido(valor: string): boolean {
   return valor.trim().replace(/\s+/g, " ").length >= 2;
+}
+
+type CampoMaterial = "codigo" | "nombre" | "unidad";
+type ErroresMaterial = Partial<Record<CampoMaterial, string>>;
+const CAMPOS_MATERIAL = new Set<CampoMaterial>(["codigo", "nombre", "unidad"]);
+
+/** Igual que MaterialCrear en el backend (el código es obligatorio solo al crear). */
+function erroresCrear(codigo: string, nombre: string): ErroresMaterial {
+  const errores: ErroresMaterial = {};
+  if (!codigoValido(codigo)) errores.codigo = "Debe tener de 2 a 30 caracteres: solo letras, números y guion bajo.";
+  if (!nombreValido(nombre)) errores.nombre = "Debe tener al menos 2 caracteres.";
+  return errores;
+}
+
+/** Igual que MaterialActualizar: el código no se puede cambiar, así que no se valida aquí. */
+function erroresEditar(nombre: string, unidad: string): ErroresMaterial {
+  const errores: ErroresMaterial = {};
+  if (!nombreValido(nombre)) errores.nombre = "Debe tener al menos 2 caracteres.";
+  if (unidad.trim() === "") errores.unidad = "No puede quedar en blanco.";
+  return errores;
+}
+
+/** Errores del backend (422, por `loc`) que caen en un campo de este formulario. */
+function erroresServidorPorCampo(error: unknown): ErroresMaterial {
+  const errores: ErroresMaterial = {};
+  for (const [campo, msg] of Object.entries(erroresDeCampo(error))) {
+    if (CAMPOS_MATERIAL.has(campo as CampoMaterial)) errores[campo as CampoMaterial] = msg;
+  }
+  return errores;
 }
 
 export function MaterialesPage() {
@@ -36,6 +67,8 @@ export function MaterialesPage() {
   const [nuevoCodigo, setNuevoCodigo] = useState("");
   const [nuevoNombre, setNuevoNombre] = useState("");
   const [nuevaUnidad, setNuevaUnidad] = useState("unidad");
+  const [intentoCrear, setIntentoCrear] = useState(false);
+  const [erroresServidorNuevo, setErroresServidorNuevo] = useState<ErroresMaterial>({});
   const [creando, setCreando] = useState(false);
 
   const [editandoId, setEditandoId] = useState<number | null>(null);
@@ -43,6 +76,8 @@ export function MaterialesPage() {
   const [unidadOriginal, setUnidadOriginal] = useState("");
   const [nombreEditado, setNombreEditado] = useState("");
   const [unidadEditada, setUnidadEditada] = useState("");
+  const [intentoEditar, setIntentoEditar] = useState(false);
+  const [erroresServidorEdicion, setErroresServidorEdicion] = useState<ErroresMaterial>({});
   const [guardando, setGuardando] = useState(false);
 
   const unaVez = useAccionUnica();
@@ -50,6 +85,12 @@ export function MaterialesPage() {
   const edicionSucia =
     editandoId !== null && (nombreEditado !== nombreOriginal || unidadEditada !== unidadOriginal);
   useCambiosSinGuardar(nuevoSucio || edicionSucia);
+
+  const erroresNuevo = { ...(intentoCrear ? erroresCrear(nuevoCodigo, nuevoNombre) : {}), ...erroresServidorNuevo };
+  const erroresEdicion = {
+    ...(intentoEditar ? erroresEditar(nombreEditado, unidadEditada) : {}),
+    ...erroresServidorEdicion,
+  };
 
   useEffect(() => {
     let cancelado = false;
@@ -69,14 +110,8 @@ export function MaterialesPage() {
   }, [incluirInactivos]);
 
   async function crear() {
-    if (!codigoValido(nuevoCodigo)) {
-      setError("El código debe tener de 2 a 30 caracteres: solo letras, números y guion bajo.");
-      return;
-    }
-    if (!nombreValido(nuevoNombre)) {
-      setError("El nombre debe tener al menos 2 caracteres.");
-      return;
-    }
+    setIntentoCrear(true);
+    if (Object.keys(erroresCrear(nuevoCodigo, nuevoNombre)).length > 0) return;
     setError(null);
     setCreando(true);
     try {
@@ -91,8 +126,14 @@ export function MaterialesPage() {
       setNuevoCodigo("");
       setNuevoNombre("");
       setNuevaUnidad("unidad");
+      setIntentoCrear(false);
     } catch (e) {
-      setError(mensajeDeError(e, "No se pudo crear el material"));
+      const campos = erroresServidorPorCampo(e);
+      if (Object.keys(campos).length > 0) {
+        setErroresServidorNuevo(campos);
+      } else {
+        setError(mensajeDeError(e, "No se pudo crear el material"));
+      }
     } finally {
       setCreando(false);
     }
@@ -104,6 +145,8 @@ export function MaterialesPage() {
     }
     setAviso(null);
     setEditandoId(material.id);
+    setIntentoEditar(false);
+    setErroresServidorEdicion({});
     setNombreEditado(material.nombre);
     setUnidadEditada(material.unidad);
     setNombreOriginal(material.nombre);
@@ -118,14 +161,8 @@ export function MaterialesPage() {
   }
 
   async function guardarEdicion(material: Material) {
-    if (!nombreValido(nombreEditado)) {
-      setError("El nombre debe tener al menos 2 caracteres.");
-      return;
-    }
-    if (unidadEditada.trim() === "") {
-      setError("La unidad no puede quedar en blanco.");
-      return;
-    }
+    setIntentoEditar(true);
+    if (Object.keys(erroresEditar(nombreEditado, unidadEditada)).length > 0) return;
     setError(null);
     setGuardando(true);
     try {
@@ -137,7 +174,12 @@ export function MaterialesPage() {
       setAviso(`${actualizado.nombre} actualizado.`);
       setEditandoId(null);
     } catch (e) {
-      setError(mensajeDeError(e, "No se pudo actualizar el material"));
+      const campos = erroresServidorPorCampo(e);
+      if (Object.keys(campos).length > 0) {
+        setErroresServidorEdicion(campos);
+      } else {
+        setError(mensajeDeError(e, "No se pudo actualizar el material"));
+      }
     } finally {
       setGuardando(false);
     }
@@ -189,6 +231,8 @@ export function MaterialesPage() {
             setNuevoCodigo("");
             setNuevoNombre("");
             setNuevaUnidad("unidad");
+            setIntentoCrear(false);
+            setErroresServidorNuevo({});
           }}
           className="rounded-lg bg-solar-500 px-4 py-2 text-sm font-semibold text-acero-50 transition hover:bg-solar-600"
         >
@@ -214,32 +258,38 @@ export function MaterialesPage() {
             calc-service.
           </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            <label className="text-sm">
-              <span className="mb-1 block text-acero-600">Código</span>
+            <Campo etiqueta="Código" obligatorio error={erroresNuevo.codigo} className="text-sm">
               <input
                 autoFocus
                 value={nuevoCodigo}
-                onChange={(e) => setNuevoCodigo(e.target.value.toUpperCase())}
+                onChange={(e) => {
+                  setNuevoCodigo(e.target.value.toUpperCase());
+                  setErroresServidorNuevo({});
+                }}
                 placeholder="VAR1650"
-                className="w-full rounded-md border border-acero-300 px-2 py-1.5 font-mono text-sm uppercase focus:border-solar-500 focus:outline-none focus:ring-1 focus:ring-solar-500"
+                className={`mt-1 w-full rounded-md border px-2 py-1.5 font-mono text-sm uppercase placeholder:text-acero-300 focus:outline-none focus:ring-1 ${bordeCampo(erroresNuevo.codigo)}`}
               />
-            </label>
-            <label className="text-sm">
-              <span className="mb-1 block text-acero-600">Nombre</span>
+            </Campo>
+            <Campo etiqueta="Nombre" obligatorio error={erroresNuevo.nombre} className="text-sm">
               <input
                 value={nuevoNombre}
-                onChange={(e) => setNuevoNombre(e.target.value)}
-                className="w-full rounded-md border border-acero-300 px-2 py-1.5 text-sm focus:border-solar-500 focus:outline-none focus:ring-1 focus:ring-solar-500"
+                onChange={(e) => {
+                  setNuevoNombre(e.target.value);
+                  setErroresServidorNuevo({});
+                }}
+                className={`mt-1 w-full rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:ring-1 ${bordeCampo(erroresNuevo.nombre)}`}
               />
-            </label>
-            <label className="text-sm">
-              <span className="mb-1 block text-acero-600">Unidad</span>
+            </Campo>
+            <Campo etiqueta="Unidad" error={erroresNuevo.unidad} className="text-sm">
               <input
                 value={nuevaUnidad}
-                onChange={(e) => setNuevaUnidad(e.target.value)}
-                className="w-full rounded-md border border-acero-300 px-2 py-1.5 text-sm focus:border-solar-500 focus:outline-none focus:ring-1 focus:ring-solar-500"
+                onChange={(e) => {
+                  setNuevaUnidad(e.target.value);
+                  setErroresServidorNuevo({});
+                }}
+                className={`mt-1 w-full rounded-md border px-2 py-1.5 text-sm focus:outline-none focus:ring-1 ${bordeCampo(erroresNuevo.unidad)}`}
               />
-            </label>
+            </Campo>
           </div>
           <div className="mt-3 flex justify-end">
             <button
@@ -289,12 +339,17 @@ export function MaterialesPage() {
                   <td className="px-4 py-3 font-mono text-xs text-acero-500">{material.codigo}</td>
                   <td className="px-4 py-3">
                     {editandoId === material.id ? (
-                      <input
-                        autoFocus
-                        value={nombreEditado}
-                        onChange={(e) => setNombreEditado(e.target.value)}
-                        className="w-full rounded-md border border-acero-300 px-2 py-1 text-sm focus:border-solar-500 focus:outline-none focus:ring-1 focus:ring-solar-500"
-                      />
+                      <Campo etiqueta="Nombre" error={erroresEdicion.nombre} className="text-sm">
+                        <input
+                          autoFocus
+                          value={nombreEditado}
+                          onChange={(e) => {
+                            setNombreEditado(e.target.value);
+                            setErroresServidorEdicion({});
+                          }}
+                          className={`mt-1 w-full rounded-md border px-2 py-1 text-sm focus:outline-none focus:ring-1 ${bordeCampo(erroresEdicion.nombre)}`}
+                        />
+                      </Campo>
                     ) : (
                       <span className={material.activo ? "font-medium text-acero-800" : "text-acero-400"}>
                         {material.nombre}
@@ -303,11 +358,16 @@ export function MaterialesPage() {
                   </td>
                   <td className="px-4 py-3 text-acero-500">
                     {editandoId === material.id ? (
-                      <input
-                        value={unidadEditada}
-                        onChange={(e) => setUnidadEditada(e.target.value)}
-                        className="w-20 rounded-md border border-acero-300 px-2 py-1 text-sm focus:border-solar-500 focus:outline-none focus:ring-1 focus:ring-solar-500"
-                      />
+                      <Campo etiqueta="Unidad" error={erroresEdicion.unidad} className="text-sm">
+                        <input
+                          value={unidadEditada}
+                          onChange={(e) => {
+                            setUnidadEditada(e.target.value);
+                            setErroresServidorEdicion({});
+                          }}
+                          className={`mt-1 w-20 rounded-md border px-2 py-1 text-sm focus:outline-none focus:ring-1 ${bordeCampo(erroresEdicion.unidad)}`}
+                        />
+                      </Campo>
                     ) : (
                       material.unidad
                     )}

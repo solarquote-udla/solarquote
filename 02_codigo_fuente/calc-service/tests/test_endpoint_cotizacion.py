@@ -119,7 +119,8 @@ def test_rechaza_lista_de_items_vacia():
     assert respuesta.status_code == 422
 
 
-def test_rechaza_precios_incompletos():
+def test_material_sin_precio_se_excluye_de_la_cotizacion():
+    """Un material de fórmula sin precio (desactivado) no bloquea: se excluye del todo."""
     respuesta = client.post(
         "/api/cotizacion/calcular",
         json={
@@ -129,8 +130,11 @@ def test_rechaza_precios_incompletos():
         },
     )
 
-    assert respuesta.status_code == 422
-    assert "VAR1350" in respuesta.json()["detail"]
+    assert respuesta.status_code == 200
+    cuerpo = respuesta.json()
+    assert cuerpo["cantidades_totales"] == {"VAR1650": 8}
+    assert "VAR1350" not in cuerpo["items"][0]["cantidades"]
+    assert Decimal(cuerpo["subtotal"]) == (Decimal("7.20") * 8).quantize(Decimal("0.01"))
 
 
 def test_rechaza_si_falta_el_porcentaje_de_iva():
@@ -219,7 +223,8 @@ def test_cargo_fijo_sin_items_de_logistica_no_escala_con_bloques():
     assert respuesta.json()["cantidades_totales"]["LOG"] == 1
 
 
-def test_rechaza_precio_faltante_para_cargo_fijo():
+def test_cargo_fijo_sin_precio_se_excluye_de_la_cotizacion():
+    """Igual que un material de fórmula: sin precio vigente, se excluye en vez de bloquear."""
     respuesta = client.post(
         "/api/cotizacion/calcular",
         json={
@@ -230,5 +235,5 @@ def test_rechaza_precio_faltante_para_cargo_fijo():
         },
     )
 
-    assert respuesta.status_code == 422
-    assert "LOG" in respuesta.json()["detail"]
+    assert respuesta.status_code == 200
+    assert "LOG" not in respuesta.json()["cantidades_totales"]
