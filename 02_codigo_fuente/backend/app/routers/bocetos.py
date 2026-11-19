@@ -144,7 +144,6 @@ def confirmar_y_cotizar(
             proyecto_id,
             usuario,
             acepta_fuera_de_proporcion=datos.acepta_fuera_de_proporcion,
-            addendum_porcentaje=datos.addendum_porcentaje,
             condiciones=datos.condiciones,
         )
     except NoSePuedeCotizar as error:

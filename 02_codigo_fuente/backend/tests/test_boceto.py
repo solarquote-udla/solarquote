@@ -123,7 +123,7 @@ def test_cargar_guarda_el_archivo_y_los_bloques(api, db, h, pid, ia):
     assert boceto["panel"] == {"largo_mm": 2278, "ancho_mm": 1134, "potencia_wp": None, "origen": "referencia"}
     assert boceto["potencia_kwp"] is None
     # 4 × 24 queda en proporción (2,99); 4 × 10 no (1,24)
-    assert [b["en_proporcion"] for b in boceto["bloques"]] == [True, False]
+    assert [b["en_proporcion"] for b in boceto["bloques"]] == [False, True]  # 4 × 24 no es compacto; 4 × 10 sí
 
     proyecto = api.get(f"/api/proyectos/{pid}", headers=h).json()
     assert proyecto["tiene_boceto"] is True
@@ -293,7 +293,7 @@ def test_fuera_de_proporcion_exige_aceptarlos(api, db, h, pid, ia):
     subir(api, h, pid)
     r = cotizar(api, h, pid)
     assert r.status_code == 409
-    assert "2 bloque(s)" in r.json()["detail"]  # el tipo B se repite 2 veces
+    assert "30 bloque(s)" in r.json()["detail"]  # el tipo A (4 × 24) se repite 30 veces
     assert db.query(Cotizacion).count() == 0
 
 

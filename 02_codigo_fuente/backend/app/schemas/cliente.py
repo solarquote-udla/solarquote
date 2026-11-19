@@ -31,7 +31,6 @@ class ClienteLeer(BaseModel):
     nombre: str
     tipo_identificacion: TipoIdentificacion
     identificacion: str
-    empresa: str | None
     email: str | None
     telefono: str | None
     direccion: str | None
@@ -45,7 +44,6 @@ class ClienteCrear(BaseModel):
     nombre: str = Field(min_length=3, max_length=150)
     tipo_identificacion: TipoIdentificacion
     identificacion: str = Field(min_length=1, max_length=20)
-    empresa: str | None = Field(default=None, max_length=150)
     email: EmailStr | None = None
     telefono: str | None = Field(default=None, max_length=30)
     direccion: str | None = Field(default=None, max_length=255)
@@ -55,7 +53,7 @@ class ClienteCrear(BaseModel):
     def _trim_nombre(cls, valor: str) -> str:
         return valor.strip() if isinstance(valor, str) else valor
 
-    @field_validator("empresa", "direccion", mode="before")
+    @field_validator("direccion", mode="before")
     @classmethod
     def _vacio_a_none_campo(cls, valor: str | None) -> str | None:
         return _vacio_a_none(valor)
@@ -82,7 +80,6 @@ class ClienteActualizar(BaseModel):
     nombre: str | None = Field(default=None, min_length=3, max_length=150)
     tipo_identificacion: TipoIdentificacion | None = None
     identificacion: str | None = Field(default=None, min_length=1, max_length=20)
-    empresa: str | None = None
     email: EmailStr | None = None
     telefono: str | None = None
     direccion: str | None = None
@@ -93,7 +90,7 @@ class ClienteActualizar(BaseModel):
     def _trim_nombre(cls, valor: str | None) -> str | None:
         return valor.strip() if isinstance(valor, str) else valor
 
-    @field_validator("empresa", "direccion", mode="before")
+    @field_validator("direccion", mode="before")
     @classmethod
     def _vacio_a_none_campo(cls, valor: str | None) -> str | None:
         return _vacio_a_none(valor)

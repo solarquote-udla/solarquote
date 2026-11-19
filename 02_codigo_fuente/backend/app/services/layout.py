@@ -38,6 +38,7 @@ from app.services.calculo_layout import (
     cumple_proporcion,
     electrica_inversor,
     generar_layout,
+    medida_fila,
     proporcion_bloque,
     validar_bloques,
     vertices_de,
@@ -151,6 +152,9 @@ def generar(db: Session, proyecto: Proyecto, datos: LayoutGenerar) -> Layout:
             tolerancia_proporcion=datos.tolerancia_proporcion,
             capacidad_deseada_kwp=datos.capacidad_deseada_kwp,
             paneles_ancho_minimo=datos.paneles_ancho_minimo,
+            paneles_ancho=datos.paneles_ancho,
+            separacion_largo_m=datos.separacion_paneles_largo_m,
+            separacion_ancho_m=datos.separacion_paneles_ancho_m,
         ),
         orientacion_norte=terreno.orientacion_norte,
         latitud=float(proyecto.latitud) if proyecto.latitud is not None else None,
@@ -171,6 +175,9 @@ def generar(db: Session, proyecto: Proyecto, datos: LayoutGenerar) -> Layout:
     layout.tolerancia_proporcion = datos.tolerancia_proporcion
     layout.capacidad_deseada_kwp = datos.capacidad_deseada_kwp
     layout.paneles_ancho_minimo = datos.paneles_ancho_minimo
+    layout.paneles_ancho = datos.paneles_ancho
+    layout.separacion_paneles_largo_m = datos.separacion_paneles_largo_m
+    layout.separacion_paneles_ancho_m = datos.separacion_paneles_ancho_m
     layout.total_paneles = resultado.total_paneles
     layout.potencia_kwp = resultado.potencia_kwp
     layout.resumen = {
@@ -185,6 +192,8 @@ def generar(db: Session, proyecto: Proyecto, datos: LayoutGenerar) -> Layout:
         "advertencias": resultado.advertencias,
         "angulo_norte": resultado.angulo_norte,
         "lado_menor_m": resultado.lado_menor_m,
+        "separacion_paneles_ancho_m": resultado.separacion_ancho_m,
+        "bloque_compacto": resultado.bloque_compacto,
         # Advertencias que no dependen de qué bloques hay (latitud,
         # orientación, sombra). Al editar se conservan y las de los
         # bloques se recalculan.
@@ -236,6 +245,11 @@ def _angulo_del_layout(layout: Layout) -> float:
     return -math.degrees(math.atan2(se[1] - so[1], se[0] - so[0]))
 
 
+def _separacion_ancho_del_layout(layout: Layout) -> float:
+    """Separación entre paneles en A. Los layouts anteriores no la tenían: 0."""
+    return layout.resumen.get("separacion_paneles_ancho_m", 0.0)
+
+
 def _lado_menor_del_layout(layout: Layout) -> float:
     if "lado_menor_m" in layout.resumen:
         return layout.resumen["lado_menor_m"]
@@ -265,7 +279,6 @@ def editar_bloques(db: Session, proyecto: Proyecto, datos: LayoutEditar) -> Layo
     equipo = obtener_configuracion(db, proyecto.id)
 
     L = layout.paneles_largo
-    lado_mayor = max(equipo.panel_largo_mm, equipo.panel_ancho_mm) / 1000
     # La geometría se arma con los MISMOS valores que entrega la API
     # (largo_bloque_m, lado_menor_m, angulo_norte), no recalculados. La
     # pantalla valida con esos valores; si aquí se recalculara el largo a
@@ -274,10 +287,13 @@ def editar_bloques(db: Session, proyecto: Proyecto, datos: LayoutEditar) -> Layo
     # la revisión del PR #27.
     largo_planta = layout.resumen["largo_bloque_m"]
     lado_menor = _lado_menor_del_layout(layout)
+    separacion_ancho = _separacion_ancho_del_layout(layout)
     angulo = _angulo_del_layout(layout)
 
     poligonos = [
-        construir_bloque(tuple(b.origen), largo_planta, b.paneles_ancho * lado_menor, angulo)
+        construir_bloque(
+            tuple(b.origen), largo_planta, medida_fila(b.paneles_ancho, lado_menor, separacion_ancho), angulo
+        )
         for b in datos.bloques
     ]
     advertencias_pasillo = validar_bloques(
@@ -299,7 +315,7 @@ def editar_bloques(db: Session, proyecto: Proyecto, datos: LayoutEditar) -> Layo
     # ─── Recalcular ─────────────────────────────────────────────
     bloques = []
     for poligono, b in zip(poligonos, datos.bloques):
-        prop = proporcion_bloque(L, b.paneles_ancho, lado_mayor, lado_menor)
+        prop = proporcion_bloque(L, b.paneles_ancho)
         bloques.append(
             Bloque(
                 vertices=vertices_de(poligono),
@@ -480,14 +496,19 @@ def a_respuesta(layout: Layout, huella: str, equipo: ConfiguracionEquipo | None)
     editarlos. Los strings de cada inversor se calculan con el equipo
     actual.
     """
+    # La proporción se recalcula al leer: así un layout guardado antes de
+    # que la regla pasara a contarse en paneles (A = 3 · L) se muestra
+    # con el criterio actual.
     bloques, tipos = agrupar_por_tipo(
         [
             Bloque(
                 vertices=b.vertices,
                 paneles_largo=b.paneles_largo,
                 paneles_ancho=b.paneles_ancho,
-                proporcion=b.proporcion,
-                en_proporcion=b.en_proporcion,
+                proporcion=round(proporcion_bloque(b.paneles_largo, b.paneles_ancho), 3),
+                en_proporcion=cumple_proporcion(
+                    proporcion_bloque(b.paneles_largo, b.paneles_ancho), layout.tolerancia_proporcion
+                ),
             )
             for b in layout.bloques
         ]
@@ -502,6 +523,9 @@ def a_respuesta(layout: Layout, huella: str, equipo: ConfiguracionEquipo | None)
             tolerancia_proporcion=layout.tolerancia_proporcion,
             capacidad_deseada_kwp=layout.capacidad_deseada_kwp,
             paneles_ancho_minimo=layout.paneles_ancho_minimo,
+            paneles_ancho=layout.paneles_ancho,
+            separacion_paneles_largo_m=layout.separacion_paneles_largo_m,
+            separacion_paneles_ancho_m=layout.separacion_paneles_ancho_m,
         ),
         bloques=[
             BloqueLeer(
@@ -543,6 +567,10 @@ def a_respuesta(layout: Layout, huella: str, equipo: ConfiguracionEquipo | None)
         advertencias=resumen["advertencias"],
         angulo_norte=_angulo_del_layout(layout),
         lado_menor_m=_lado_menor_del_layout(layout),
+        separacion_paneles_ancho_m=_separacion_ancho_del_layout(layout),
+        bloque_compacto=cumple_proporcion(
+            proporcion_bloque(layout.paneles_largo, resumen["paneles_ancho_ideal"]), layout.tolerancia_proporcion
+        ),
         ediciones_manuales=resumen.get("ediciones_manuales", 0),
         desactualizado=layout.huella != huella,
         created_at=layout.created_at,

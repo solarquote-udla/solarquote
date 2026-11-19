@@ -58,7 +58,7 @@ def test_cliente_errores_traducidos(api, h):
     assert api.post("/api/clientes", headers=h, json={**CLIENTE, "identificacion": "1791234567001", "email": "sin-arroba"}).status_code == 422
 
     assert api.get(f"/api/clientes/{INEXISTENTE}", headers=h).status_code == 404
-    assert api.patch(f"/api/clientes/{INEXISTENTE}", headers=h, json={"empresa": "X"}).status_code == 404
+    assert api.patch(f"/api/clientes/{INEXISTENTE}", headers=h, json={"telefono": "0991234567"}).status_code == 404
     assert api.delete(f"/api/clientes/{INEXISTENTE}", headers=h).status_code == 404
 
 
@@ -122,11 +122,13 @@ def test_material_errores_traducidos(api, db, h):
     api.post("/api/materiales", headers=h, json={"codigo": "TORNILLO_M8", "nombre": "Tornillo M8"})
     assert api.post("/api/materiales", headers=h, json={"codigo": "TORNILLO_M8", "nombre": "Otro"}).status_code == 409
 
-    # Un material de las fórmulas no se desactiva: dejaría sin cotizar
+    # Cualquier material se puede desactivar, incluido uno de las fórmulas
+    # (pedido de Santi): una cotización nueva simplemente lo excluye.
     var = Material(codigo="VAR1650", nombre="Varilla 1650", unidad="u")
     db.add(var)
     db.flush()
-    assert api.patch(f"/api/materiales/{var.id}", headers=h, json={"activo": False}).status_code == 409
+    r = api.patch(f"/api/materiales/{var.id}", headers=h, json={"activo": False})
+    assert r.status_code == 200 and r.json()["activo"] is False
 
     assert api.patch(f"/api/materiales/{var.id}/precio", headers=h, json={"precio": "-1"}).status_code == 422
     for metodo, ruta, cuerpo in [

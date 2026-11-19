@@ -74,3 +74,10 @@ def crear_usuario(db: Session, perfil: Perfil | None = None, **campos) -> Usuari
     db.add(usuario)
     db.flush()
     return usuario
+
+
+# Bloque de las pruebas escritas antes de la revisión del 17 de noviembre
+# de 2026: L = 4, A = 24 y sin separación entre paneles. Con estos datos
+# los resultados de esas pruebas (1764 paneles en 100 × 60, etc.) siguen
+# siendo los calculados a mano.
+LAYOUT_CLASICO = {"paneles_ancho": 24, "separacion_paneles_largo_m": 0, "separacion_paneles_ancho_m": 0}

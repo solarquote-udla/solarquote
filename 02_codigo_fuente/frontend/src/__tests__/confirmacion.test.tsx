@@ -93,8 +93,8 @@ describe("Diagrama de confirmación", () => {
   it("muestra los bloques en notación L, A, B, el estado de cada tipo y el equipo", async () => {
     await abrir();
     const filas = screen.getAllByRole("row").map((f) => f.textContent);
-    expect(filas).toContain("A4242OK");
-    expect(filas).toContain("B4161Revisar");
+    expect(filas).toContain("A4242Compacto");
+    expect(filas).toContain("B4161No compacto");
     expect(screen.getByText("Canadian Solar 550 Wp")).toBeTruthy();
     expect(screen.getByText("Inv. 2")).toBeTruthy();
     expect(screen.getByText("En revisión")).toBeTruthy();

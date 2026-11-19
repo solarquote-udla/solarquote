@@ -114,9 +114,9 @@ export interface RespuestaToken {
   usuario: UsuarioSesion;
 }
 
-/** Forma de los errores que devuelve FastAPI */
+/** Forma de los errores que devuelve FastAPI (ver app/core/errores.py en el backend) */
 export interface ErrorApi {
-  detail: string | { msg: string; loc: (string | number)[] }[];
+  detail: string | { msg: string; loc: (string | number)[]; type: string }[];
 }
 
 // ─── Clientes ───────────────────────────────────────────
@@ -155,7 +155,6 @@ export interface Cliente {
   nombre: string;
   tipo_identificacion: TipoIdentificacion;
   identificacion: string;
-  empresa: string | null;
   email: string | null;
   telefono: string | null;
   direccion: string | null;
@@ -171,7 +170,6 @@ export interface ClienteCrear {
   nombre: string;
   tipo_identificacion: TipoIdentificacion;
   identificacion: string;
-  empresa: string | null;
   email: string | null;
   telefono: string | null;
   direccion: string | null;
@@ -470,11 +468,17 @@ export interface LayoutGenerar {
   /** L: paneles en la dirección de la pendiente. Siempre par. */
   paneles_largo: number;
   pasillo_m: number;
-  /** 0.2 = ±20 % respecto a ancho = 3 × largo */
+  /** 0.2 = ±20 % respecto al bloque compacto A = 3 × L */
   tolerancia_proporcion: number;
   capacidad_deseada_kwp: number | null;
   /** A mínimo de los bloques cortos (SQ-170). 1 = sin mínimo. */
   paneles_ancho_minimo: number;
+  /** A del bloque. Null = bloque compacto (A = 3 × L). */
+  paneles_ancho: number | null;
+  /** Separación entre paneles a lo largo (entre filas de la pendiente), en metros */
+  separacion_paneles_largo_m: number;
+  /** Separación entre paneles a lo ancho (clamp intermedio), en metros */
+  separacion_paneles_ancho_m: number;
 }
 
 /** Espejo de `BloqueLeer`. Vértices en metros, coordenadas del terreno. */
@@ -565,7 +569,6 @@ export interface CondicionesProforma {
 export interface ConfirmarLayout {
   /** Acepta bajo su responsabilidad los bloques fuera de proporción */
   acepta_fuera_de_proporcion: boolean;
-  addendum_porcentaje?: number;
   condiciones?: CondicionesProforma;
 }
 
@@ -598,8 +601,12 @@ export interface Layout {
   advertencias: string[];
   /** Grados del norte usados al generar; la edición arma los bloques con este ángulo */
   angulo_norte: number;
-  /** Lo que suma cada panel de A al bloque, en metros */
+  /** Lado menor del panel, en metros */
   lado_menor_m: number;
+  /** El bloque mide A · lado_menor_m + (A − 1) · separacion_paneles_ancho_m */
+  separacion_paneles_ancho_m: number;
+  /** El bloque completo cumple A = 3 × L dentro de la tolerancia */
+  bloque_compacto: boolean;
   /** Cambios hechos a mano desde la última generación (SQ-64) */
   ediciones_manuales: number;
   /** Terreno, caminos, equipo o latitud cambiaron después de generar */
@@ -633,7 +640,6 @@ export interface CotizacionResumen {
   numero_proforma: string | null;
   estado: EstadoCotizacion;
   cliente_nombre: string;
-  cliente_empresa: string | null;
   proyecto_id: number | null;
   proyecto_nombre: string | null;
   total: string | null;
@@ -674,16 +680,13 @@ export interface CotizacionDetalle {
 
   cliente_id: number | null;
   cliente_nombre: string;
-  cliente_empresa: string | null;
   cliente_email: string | null;
   cliente_telefono: string | null;
 
   proyecto_id: number | null;
   proyecto_nombre: string | null;
 
-  addendum_porcentaje: string;
   subtotal: string | null;
-  addendum_monto: string | null;
   iva_porcentaje: string | null;
   iva_monto: string | null;
   total: string | null;
@@ -890,7 +893,6 @@ export interface Validacion {
   cotizacion_id: number;
   numero_proforma: string | null;
   cliente_nombre: string;
-  cliente_empresa: string | null;
   proyecto_nombre: string | null;
   estado: EstadoCotizacion;
   created_at: string;

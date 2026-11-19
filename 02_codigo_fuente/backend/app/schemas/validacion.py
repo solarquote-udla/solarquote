@@ -171,7 +171,6 @@ class ValidacionLeer(BaseModel):
     cotizacion_id: int
     numero_proforma: str | None
     cliente_nombre: str
-    cliente_empresa: str | None
     proyecto_nombre: str | None
     estado: EstadoCotizacion
     created_at: datetime

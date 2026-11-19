@@ -41,7 +41,6 @@ def _respuesta(cliente: Cliente, total_proyectos: int) -> ClienteLeer:
         nombre=cliente.nombre,
         tipo_identificacion=cliente.tipo_identificacion,
         identificacion=cliente.identificacion,
-        empresa=cliente.empresa,
         email=cliente.email,
         telefono=cliente.telefono,
         direccion=cliente.direccion,

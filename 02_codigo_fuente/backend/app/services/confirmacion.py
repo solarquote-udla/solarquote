@@ -21,7 +21,6 @@ los tipos L, A, B que el Gerente revisó.
 """
 
 from collections import Counter
-from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
@@ -79,7 +78,6 @@ def cotizar_layout(
     usuario: Usuario,
     *,
     acepta_fuera_de_proporcion: bool,
-    addendum_porcentaje: Decimal = Decimal("0"),
     condiciones: CondicionesProforma | None = None,
 ) -> Cotizacion:
     """
@@ -103,7 +101,7 @@ def cotizar_layout(
     fuera = sum(1 for b in layout.bloques if not b.en_proporcion)
     if fuera and not acepta_fuera_de_proporcion:
         raise NoSePuedeCotizar(
-            f"{fuera} bloque(s) están fuera de la proporción antisísmica. Ajústalos o "
+            f"{fuera} bloque(s) no son compactos (A distinto de 3 × L). Ajústalos o "
             f"confírmalos bajo tu responsabilidad."
         )
 
@@ -111,7 +109,6 @@ def cotizar_layout(
         cliente_id=proyecto.cliente_id,
         proyecto_id=proyecto.id,
         proyecto_nombre=proyecto.nombre,
-        addendum_porcentaje=addendum_porcentaje,
         condiciones=condiciones,
         items=items_del_layout(layout),
     )
@@ -145,7 +142,6 @@ def cotizar_boceto(
     usuario: Usuario,
     *,
     acepta_fuera_de_proporcion: bool,
-    addendum_porcentaje: Decimal = Decimal("0"),
     condiciones: CondicionesProforma | None = None,
 ) -> Cotizacion:
     """
@@ -172,7 +168,7 @@ def cotizar_boceto(
     fuera = sum(b.repeticiones for b in leido.bloques if not b.en_proporcion)
     if fuera and not acepta_fuera_de_proporcion:
         raise NoSePuedeCotizar(
-            f"{fuera} bloque(s) están fuera de la proporción antisísmica. Ajústalos o "
+            f"{fuera} bloque(s) no son compactos (A distinto de 3 × L). Ajústalos o "
             f"confírmalos bajo tu responsabilidad."
         )
 
@@ -180,7 +176,6 @@ def cotizar_boceto(
         cliente_id=proyecto.cliente_id,
         proyecto_id=proyecto.id,
         proyecto_nombre=proyecto.nombre,
-        addendum_porcentaje=addendum_porcentaje,
         condiciones=condiciones,
         items=items_del_boceto(boceto),
     )

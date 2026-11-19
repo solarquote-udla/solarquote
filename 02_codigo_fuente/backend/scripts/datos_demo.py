@@ -113,7 +113,6 @@ def _cliente_demo(db: Session) -> Cliente:
         nombre=NOMBRE_CLIENTE,
         tipo_identificacion=TipoIdentificacion.RUC,
         identificacion=IDENTIFICACION_CLIENTE,
-        empresa=NOMBRE_CLIENTE,
         email="proyectos@solarandes.ec",
         telefono="099 123 4567",
         direccion="Ibarra, Imbabura",

@@ -53,6 +53,12 @@ class Layout(Base):
     capacidad_deseada_kwp: Mapped[float | None] = mapped_column(nullable=True)
     # A mínimo de los bloques cortos (SQ-170); 1 = sin mínimo
     paneles_ancho_minimo: Mapped[int] = mapped_column(nullable=False, server_default="1", default=1)
+    # A del bloque elegido por el Gerente. Null = bloque compacto (3 · L).
+    paneles_ancho: Mapped[int | None] = mapped_column(nullable=True)
+    # Separación entre paneles dentro del bloque. Los layouts anteriores
+    # se generaron sin separación: quedan en 0.
+    separacion_paneles_largo_m: Mapped[float] = mapped_column(nullable=False, server_default="0", default=0.0)
+    separacion_paneles_ancho_m: Mapped[float] = mapped_column(nullable=False, server_default="0", default=0.0)
 
     # ─── Resultados ─────────────────────────────────────────────
     # Columnas propias para lo que el tablero (RF-13) va a consultar;

@@ -70,13 +70,16 @@ def crear_cotizacion(
         if proyecto is None:
             raise ProyectoNoDisponible(f"No existe el proyecto {datos.proyecto_id}")
 
-    # Los precios se piden solo de los códigos que usan las fórmulas (+ LOG),
-    # no de "todo material activo": un material nuevo sin precio todavía, o
-    # uno que no participa del cálculo, no debe bloquear ninguna cotización.
-    filas = db.query(Material.id, Material.codigo).all()
+    # Los precios se piden solo de los códigos de fórmula que siguen
+    # activos (+ LOG): un material de fórmula desactivado queda fuera de
+    # las cotizaciones nuevas, igual que uno que no participa del cálculo
+    # o uno nuevo sin precio todavía — ninguno de esos casos debe bloquear
+    # una cotización.
+    filas = db.query(Material.id, Material.codigo, Material.activo).all()
     material_id_por_codigo = {fila.codigo: fila.id for fila in filas}
+    codigos_formula_activos = {fila.codigo for fila in filas if fila.activo and fila.codigo in CODIGOS_FORMULA}
 
-    precios = obtener_precios_vigentes(db, sorted(CODIGOS_FORMULA))
+    precios = obtener_precios_vigentes(db, sorted(codigos_formula_activos))
     precios.update(obtener_precios_vigentes_opcionales(db, [CODIGO_LOGISTICA]))
 
     cargos_fijos = {CODIGO_LOGISTICA: CANTIDAD_LOGISTICA} if CODIGO_LOGISTICA in precios else {}
@@ -92,18 +95,15 @@ def crear_cotizacion(
         ],
         precios=precios,
         cargos_fijos=cargos_fijos,
-        addendum_porcentaje=datos.addendum_porcentaje,
         iva_porcentaje=settings.IVA_PORCENTAJE,
     )
 
     if cliente is not None:
         cliente_nombre = cliente.nombre
-        cliente_empresa = cliente.empresa
         cliente_email = cliente.email
         cliente_telefono = cliente.telefono
     else:
         cliente_nombre = datos.cliente_nombre
-        cliente_empresa = datos.cliente_empresa
         cliente_email = datos.cliente_email
         cliente_telefono = datos.cliente_telefono
 
@@ -139,13 +139,10 @@ def crear_cotizacion(
         cliente_id=datos.cliente_id,
         proyecto_id=datos.proyecto_id,
         cliente_nombre=cliente_nombre,
-        cliente_empresa=cliente_empresa,
         cliente_email=cliente_email,
         cliente_telefono=cliente_telefono,
         proyecto_nombre=datos.proyecto_nombre,
-        addendum_porcentaje=datos.addendum_porcentaje,
         subtotal=resultado.subtotal,
-        addendum_monto=resultado.addendum_monto,
         iva_porcentaje=resultado.iva_porcentaje,
         iva_monto=resultado.iva_monto,
         total=resultado.total,

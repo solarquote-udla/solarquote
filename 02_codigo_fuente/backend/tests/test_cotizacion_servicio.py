@@ -40,8 +40,6 @@ def _respuesta_calc_service(cargos_fijos: dict[str, int]) -> dict:
         ],
         "cantidades_totales": {"VAR1650": 8, **cargos_fijos},
         "subtotal": "93.60",
-        "addendum_porcentaje": "0",
-        "addendum_monto": "0.00",
         "iva_porcentaje": "15",
         "iva_monto": "14.04",
         "total": "107.64",
@@ -133,7 +131,6 @@ def test_persiste_el_desglose_en_la_cotizacion(db: Session, monkeypatch: pytest.
     cotizacion, calculo = crear_cotizacion(db, _datos_minimos(), usuario)
 
     assert cotizacion.subtotal == calculo.subtotal
-    assert cotizacion.addendum_monto == calculo.addendum_monto
     assert cotizacion.iva_porcentaje == calculo.iva_porcentaje
     assert cotizacion.iva_monto == calculo.iva_monto
     assert cotizacion.total == calculo.total
@@ -244,6 +241,23 @@ def test_no_manda_cargo_fijo_de_logistica_si_no_esta_activo(
 
     assert llamada["json"]["cargos_fijos"] == {}
     assert "LOG" not in llamada["json"]["precios"]
+
+
+def test_material_de_formula_desactivado_se_excluye_de_la_cotizacion(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Pedido de Santi: cualquier material se puede desactivar (SQ-21x);
+    una cotización nueva simplemente no pide su precio ni lo incluye."""
+    _sembrar_materiales_de_formula(db)
+    db.query(Material).filter(Material.codigo == "SOP_A").update({"activo": False})
+    db.flush()
+    usuario = _crear_usuario(db)
+    llamada = _mock_calc_service_ok(monkeypatch)
+
+    crear_cotizacion(db, _datos_minimos(), usuario)
+
+    assert "SOP_A" not in llamada["json"]["precios"]
+    assert "VAR1650" in llamada["json"]["precios"]  # los demás códigos de fórmula siguen activos
 
 
 def test_lanza_si_falta_precio_vigente_de_un_material_activo(
