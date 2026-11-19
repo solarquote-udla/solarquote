@@ -73,8 +73,8 @@ async function intentarSalir(salir: () => void) {
 
 function llenarEquipo() {
   const textos = screen.getAllByRole("textbox");
-  // Panel (8 campos), potencia objetivo (vacía) e Inversor 1
-  ["A", "B", "580", "2278", "1134", "52", "43", "15", "", "H", "M", "160"].forEach((v, i) =>
+  // Potencia objetivo (vacía, va primero y aparte), panel (8 campos) e Inversor 1
+  ["", "A", "B", "580", "2278", "1134", "52", "43", "15", "H", "M", "160"].forEach((v, i) =>
     fireEvent.change(textos[i], { target: { value: v } }),
   );
 }
@@ -84,7 +84,7 @@ describe("Paso 2", () => {
     it(`primera vez con datos escritos + ${salida}: pregunta`, async () => {
       paso2();
       await screen.findByText("Panel solar");
-      fireEvent.change(screen.getAllByRole("textbox")[0], { target: { value: "Canadian" } });
+      fireEvent.change(screen.getAllByRole("textbox")[1], { target: { value: "Canadian" } });
       await intentarSalir(salir);
     });
 

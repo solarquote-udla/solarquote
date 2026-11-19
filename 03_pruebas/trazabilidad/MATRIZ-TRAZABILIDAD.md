@@ -71,6 +71,7 @@ Evidencia: PR #1, #20, #34 y el PR de SQ-135.
 | El Paso 2 elige el panel del catálogo, con búsqueda por marca, modelo o potencia; pantalla Configuración, Paneles con el error de cada dato junto a su campo | `catalogoPaneles.test.tsx` |
 | Catálogo inicial según Producción: paneles de más de 600 W de LONGi, Jinko, JA Solar y Canadian Solar; los demás quedan desactivados | `test_catalogo_produccion`: cada panel pasa las validaciones de la API y es compatible con cada inversor (migración `e7b2a9c41d06`) |
 | Mensajes de validación en español, con el campo (`loc`) correcto — tanto en las restricciones de Pydantic (rango, obligatorio, tipo) como en las reglas entre dos campos (Voc/Vmp, largo/ancho, Vmax/Vmin) | `test_errores_validacion` (11 pruebas) |
+| Paso 2: cada error junto a su campo (panel, ángulo, potencia objetivo e inversores), también los del servidor por su `loc`; la potencia objetivo (kWp de paneles) va aparte de los inversores (kW) | `pasos12Revision.test.tsx` (Paso 2); `inversores.test.tsx` |
 
 Evidencia: PR #2, #38 y los del catálogo de paneles y los mensajes de validación.
 
@@ -222,6 +223,7 @@ Evidencia: PR #30 a #33, #36 y el PR de SQ-135.
 | La baja conserva las cotizaciones | `test_cliente_servicio`: `test_marca_inactivo`; `test_cotizacion_servicio`: `test_snapshot_del_cliente_viene_de_la_base_y_no_del_request` |
 | Solo con permiso | `test_api_administracion`: `test_clientes_lectura_y_administracion_por_permiso` |
 | Crear el cliente desde el Paso 1 (Lenin): el alta también la puede hacer quien tiene permiso de generar layout, no solo quien administra clientes | `test_api_administracion`: `test_crear_cliente_desde_el_proyecto` |
+| Pantalla: botón «Nuevo cliente» en el Paso 1 que registra y deja elegido al cliente sin salir del asistente | `pasos12Revision.test.tsx` (Paso 1) |
 
 Evidencia: PR #17, #18, #22, el PR de SQ-135 y el de crear cliente desde el proyecto.
 

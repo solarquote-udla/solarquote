@@ -28,6 +28,7 @@ import { EditorPoligonos, type CaminoDibujo } from "@/components/EditorPoligonos
 import { EncabezadoProyecto } from "@/components/EncabezadoProyecto";
 import { rutaPaso } from "@/components/asistente";
 import { Campo } from "@/components/Campo";
+import { FormularioCliente } from "@/components/FormularioCliente";
 import { MapaUbicacion } from "@/components/MapaUbicacion";
 import { useCambiosSinGuardar } from "@/hooks/useCambiosSinGuardar";
 import { useAccionUnica } from "@/hooks/useAccionUnica";
@@ -182,6 +183,9 @@ export function TerrenoPage() {
   const [proyecto, setProyecto] = useState<Proyecto | null>(null);
   const [guardado, setGuardado] = useState<Terreno | null>(null);
   const [clientes, setClientes] = useState<ClienteListado[]>([]);
+  // Alta del cliente sin salir del Paso 1 (Lenin, 16 nov; backend en SQ-208)
+  const [nuevoCliente, setNuevoCliente] = useState(false);
+  const [clienteSinGuardar, setClienteSinGuardar] = useState(false);
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
 
@@ -331,7 +335,8 @@ export function TerrenoPage() {
     JSON.stringify(datos) !== JSON.stringify(proyecto ? datosDe(proyecto) : DATOS_VACIOS) ||
     terrenoCambio ||
     dimensionesPendientes ||
-    (dibujando && borrador.length > 0);
+    (dibujando && borrador.length > 0) ||
+    (nuevoCliente && clienteSinGuardar);
   const permitirSalida = useCambiosSinGuardar(sinGuardar);
   const unaVez = useAccionUnica();
 
@@ -674,9 +679,14 @@ export function TerrenoPage() {
                 )}
                 {visible("cliente") && <span className="mt-1 block font-normal text-red-600">{visible("cliente")}</span>}
                 {esNuevo && !proyecto && clientes.length === 0 && (
-                  <span className="mt-1 block font-normal text-acero-500">No hay clientes activos. Regístralo primero en Operaciones, Clientes.</span>
+                  <span className="mt-1 block font-normal text-acero-500">Todavía no hay clientes: regístralo con «Nuevo cliente».</span>
                 )}
               </label>
+              {esNuevo && !proyecto && (
+                <button type="button" className="text-xs font-medium text-solar-700 hover:underline" onClick={() => setNuevoCliente(true)}>
+                  + Nuevo cliente
+                </button>
+              )}
               <label className={ETIQUETA}>
                 Fecha
                 <input className={`mt-1 ${CAMPO}`} value={fecha} disabled />
@@ -866,6 +876,36 @@ export function TerrenoPage() {
           </div>
         </aside>
       </div>
+
+      {nuevoCliente && (
+        <div
+          className="fixed inset-0 z-[1000] flex items-start justify-center overflow-y-auto bg-acero-900/50 p-4 sm:p-10"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Nuevo cliente"
+        >
+          <div className="w-full max-w-2xl">
+            <FormularioCliente
+              cliente={null}
+              onCambiosSinGuardar={setClienteSinGuardar}
+              onCancelar={() => {
+                setNuevoCliente(false);
+                setClienteSinGuardar(false);
+              }}
+              onGuardado={(c) => {
+                setClientes((lista) =>
+                  [...lista.filter((x) => x.id !== c.id), { id: c.id, nombre: c.nombre, identificacion: c.identificacion, activo: c.activo }].sort((a, b) =>
+                    a.nombre.localeCompare(b.nombre),
+                  ),
+                );
+                setDatos((d) => ({ ...d, clienteId: String(c.id) }));
+                setNuevoCliente(false);
+                setClienteSinGuardar(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
 
       <BarraPaso
         atras={{
