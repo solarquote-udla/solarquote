@@ -19,7 +19,6 @@ def _cliente(db: Session, nombre: str, identificacion: str = "0000000000") -> Cl
         nombre=nombre,
         tipo_identificacion=TipoIdentificacion.RUC,
         identificacion=identificacion,
-        empresa=nombre,
     )
     db.add(cliente)
     db.flush()
@@ -34,7 +33,7 @@ def _proyecto(db: Session, cliente: Cliente, nombre: str) -> Proyecto:
     return proyecto
 
 
-def test_clientes_de_prueba_encuentra_por_nombre_identificacion_o_empresa(db: Session) -> None:
+def test_clientes_de_prueba_encuentra_por_nombre_o_identificacion(db: Session) -> None:
     prueba = _cliente(db, "Cliente de PRUEBA")
     demo = _cliente(db, "SolarAndes Instalaciones", identificacion="1091234567001")
     por_identificacion = _cliente(db, "Alguien", identificacion="TEST-001")

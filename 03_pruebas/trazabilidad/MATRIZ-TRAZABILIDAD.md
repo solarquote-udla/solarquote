@@ -21,8 +21,8 @@ requisito es la corrida verde del PR indicado.
 | Backend (API principal) | 593 | 96 % | `pytest` en `02_codigo_fuente/backend` |
 | calc-service | 32 | 100 % | `pytest` en `02_codigo_fuente/calc-service` |
 | ia-service | 96 | 94 % | `pytest` en `02_codigo_fuente/ia-service` |
-| Frontend (interfaz) | 232 | — | `npm test` en `02_codigo_fuente/frontend` |
-| **Total** | **953** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
+| Frontend (interfaz) | 237 | — | `npm test` en `02_codigo_fuente/frontend` |
+| **Total** | **958** | | Las cuatro suites en cada PR (jobs `backend`, `calc-service`, `ia-service`, `frontend`) |
 
 La cobertura se midió con `pytest --cov=app`. RNF-02 pide al menos 60 %
 en el backend.
@@ -127,12 +127,12 @@ Evidencia: PR #42 y #44.
 |---|---|
 | Las diez fórmulas f(L, A, B) | `calc: test_calculo_materiales` (13 pruebas, casos a mano y EMIHANA) |
 | Varios ítems; total = suma | `calc: test_endpoint_cotizacion`; `test_confirmacion`: `test_items_del_layout_agrupa_bloques_iguales` |
-| Addendum e IVA | `calc: test_endpoint_cotizacion`; `test_cotizacion_servicio`: `test_persiste_el_desglose_en_la_cotizacion` |
+| Subtotal e IVA (sin addendum, decisión de reunión con Santi: SQ-213) | `calc: test_endpoint_cotizacion`; `test_cotizacion_servicio`: `test_persiste_el_desglose_en_la_cotizacion` |
 | L par | `calc: test_calculo_materiales` |
 | Precios vigentes; material nuevo sin precio no bloquea | `test_cotizacion_servicio`: `test_lanza_si_falta_precio_vigente_*`, `test_un_material_nuevo_sin_precio_no_bloquea_la_cotizacion` |
 | Comunicación segura con calc-service | `calc: test_autenticacion`; `test_calc_service` |
 
-Evidencia: PR #5, #10 a #13, #16, #19, #28.
+Evidencia: PR #5, #10 a #13, #16, #19, #28, y el de SQ-213 (quita el addendum).
 
 ### RF-07 Documento de cotización
 
@@ -148,16 +148,16 @@ público.
 | Regla del requisito | Pruebas |
 |---|---|
 | Documento Word con el detalle de materiales | `test_proforma_documentos`: `test_word_materiales_en_orden_con_moneda_ecuador`, `test_word_totales_notas_condiciones_y_pagos` |
-| Hoja de cálculo Excel con las mismas cantidades, editable | `test_excel_incluye_encabezado_materiales_en_orden_y_datos_bancarios`, `test_excel_subtotales_y_totales_son_formulas` (fórmulas, no valores fijos: cantidad × precio, `SUM`, IVA sobre subtotal + addendum) |
+| Hoja de cálculo Excel con las mismas cantidades, editable | `test_excel_incluye_encabezado_materiales_en_orden_y_datos_bancarios`, `test_excel_subtotales_y_totales_son_formulas` (fórmulas, no valores fijos: cantidad × precio, `SUM`, IVA sobre el subtotal; sin addendum, SQ-213) |
 | Materiales en el orden de la proforma real, no alfabético | `test_materiales_en_el_orden_de_la_proforma_real`, `test_material_fuera_del_orden_conocido_cae_al_final` |
-| Ambos con datos del cliente, subtotal, addendum, IVA y total | mismas pruebas; `test_word_sin_proforma_ni_datos_opcionales_del_cliente_no_falla` cubre los campos opcionales |
+| Ambos con datos del cliente, subtotal, IVA y total (sin addendum ni empresa, SQ-213) | mismas pruebas; `test_word_sin_proforma_ni_datos_opcionales_del_cliente_no_falla` cubre los campos opcionales |
 | Datos del oferente, condiciones, pagos y banco sin romper si no están configurados | `test_word_sin_datos_del_oferente_no_falla_y_omite_las_secciones`, `test_excel_sin_datos_del_oferente_no_falla` |
 | Dinero en `Decimal`, formato de Ecuador ($ 5.025,60) | `test_moneda_formato_ecuador` |
 | El número de proforma se asigna al emitir | Ya cubierto (SQ-82): `test_confirmacion`: `siguiente_numero_proforma` |
 | Los archivos se descargan desde la interfaz | `test_proforma_documentos`: `test_descarga_responde_el_archivo_con_su_tipo_y_nombre`; botón en `CotizacionDetallePage` (`cotizacion-detalle.test.tsx`) |
 | Documento de cotización en menos de 10 s (RNF-03) | `test_rnf`: `test_rnf03_documento_de_cotizacion_en_menos_de_10_s` |
 
-Evidencia: PR de SQ-79/SQ-80/SQ-81/SQ-83/SQ-84.
+Evidencia: PR de SQ-79/SQ-80/SQ-81/SQ-83/SQ-84 y el de SQ-213 (quita el addendum y el campo Empresa).
 
 ### RF-08 Lista de referencia de inversores
 
@@ -170,9 +170,9 @@ Evidencia: PR de SQ-79/SQ-80/SQ-81/SQ-83/SQ-84.
 | Solo con permiso de parametrización | `test_api_administracion`: `test_inversores_por_permiso`; `test_seguridad`: `test_generar_layout_puede_leer_inversores_pero_no_administrarlos` |
 | Selector en RF-02 | `inversores.test.tsx` |
 | Catálogo inicial según Producción: Huawei SUN2000-100KTL-M2, 330KTL-H1 y 506KTL-H1 | `test_catalogo_produccion`: `test_cada_inversor_nuevo_pasa_las_validaciones_de_la_api` |
-| Error de validación (propio o del backend, por `loc`) junto al campo correspondiente | `inversores-catalogo.test.tsx` ("Configuración, Inversores: alta con error por campo", 5 pruebas); `erroresDeCampo` en `services/api.ts` |
+| Error de validación (propio o del backend, por `loc`) junto al campo correspondiente; en el mensaje general (pantallas que todavía no muestran el error por campo) se antepone el campo solo si no es un `value_error` propio — esos ya lo mencionan en el texto —, legible en vez de `snake_case` | `inversores-catalogo.test.tsx` ("Configuración, Inversores: alta con error por campo", 5 pruebas); `api.test.tsx` (`mensajeDeError`/`erroresDeCampo`, 9 pruebas) |
 
-Evidencia: PR #37, el PR de SQ-135 y el PR de SQ-209.
+Evidencia: PR #37, el PR de SQ-135, el PR de SQ-209 y su corrección (SQ-210).
 
 ### RF-09 Materiales y precios
 
@@ -180,11 +180,12 @@ Evidencia: PR #37, el PR de SQ-135 y el PR de SQ-209.
 |---|---|
 | Precio con fecha de vigencia e historial | `test_material_administracion`: `test_actualizar_precio_cierra_el_anterior_y_crea_uno_nuevo`, `test_historial_queda_ordenado_*`; `test_api_administracion`: `test_material_ciclo_completo` |
 | Las cotizaciones emitidas conservan sus precios | `test_cotizacion_servicio`: `test_persiste_la_cantidad_y_precio_unitario_de_cada_material` |
-| Los materiales de las fórmulas no se desactivan | `test_material_administracion`: `test_desactivar_un_codigo_de_formula_*`; `test_api_administracion` (409) |
+| Cualquier material se puede desactivar, incluido uno de las fórmulas; una cotización nueva simplemente lo excluye (pedido de Santi en la reunión del 17 de noviembre) | `test_material_administracion`: `test_se_puede_desactivar_un_codigo_de_formula`; `test_cotizacion_servicio`: `test_material_de_formula_desactivado_se_excluye_de_la_cotizacion`; `test_api_administracion`; calc-service `test_endpoint_cotizacion`: `test_material_sin_precio_se_excluye_de_la_cotizacion`, `test_cargo_fijo_sin_precio_se_excluye_de_la_cotizacion` |
 | Precio mayor o igual a cero | `test_material_administracion`: `test_acepta_cero`, `test_rechaza_negativo`; `test_api_administracion` (422) |
 | Precios y catálogo con permisos separados | `test_api_administracion`: `test_precios_y_materiales_por_permiso`; `test_seguridad`: `test_ver_materiales_no_permite_cambiar_precios` |
+| Error de validación (propio o del backend, por `loc`) junto al campo correspondiente, en Materiales y en Precios | `catalogoMateriales.test.tsx` (5 pruebas) |
 
-Evidencia: PR #23 a #25, #35 y el PR de SQ-135.
+Evidencia: PR #23 a #25, #35, el PR de SQ-135, el PR de SQ-211 y el PR de SQ-212.
 
 ### RF-10 Historial de cotizaciones
 

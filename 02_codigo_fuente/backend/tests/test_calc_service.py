@@ -24,8 +24,6 @@ RESPUESTA_OK = {
     ],
     "cantidades_totales": {"VAR1650": 8, "LOG": 1},
     "subtotal": "93.60",
-    "addendum_porcentaje": "0",
-    "addendum_monto": "0.00",
     "iva_porcentaje": "15",
     "iva_monto": "14.04",
     "total": "107.64",
@@ -48,7 +46,6 @@ def test_arma_el_payload_y_mapea_la_respuesta(monkeypatch: pytest.MonkeyPatch) -
         items=ITEMS,
         precios=PRECIOS,
         cargos_fijos={"LOG": 1},
-        addendum_porcentaje=Decimal("0"),
         iva_porcentaje=Decimal("15"),
     )
 
@@ -74,7 +71,6 @@ def test_lanza_calc_service_error_si_no_hay_conexion(monkeypatch: pytest.MonkeyP
             items=ITEMS,
             precios=PRECIOS,
             cargos_fijos={},
-            addendum_porcentaje=Decimal("0"),
             iva_porcentaje=Decimal("15"),
         )
 
@@ -90,7 +86,6 @@ def test_lanza_calc_service_error_si_la_respuesta_no_es_200(monkeypatch: pytest.
             items=ITEMS,
             precios=PRECIOS,
             cargos_fijos={"LOG": 1},
-            addendum_porcentaje=Decimal("0"),
             iva_porcentaje=Decimal("15"),
         )
 

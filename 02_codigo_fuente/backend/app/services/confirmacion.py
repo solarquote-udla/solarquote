@@ -21,7 +21,6 @@ los tipos L, A, B que el Gerente revisó.
 """
 
 from collections import Counter
-from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
@@ -79,7 +78,6 @@ def cotizar_layout(
     usuario: Usuario,
     *,
     acepta_fuera_de_proporcion: bool,
-    addendum_porcentaje: Decimal = Decimal("0"),
 ) -> Cotizacion:
     """
     Confirma el layout del proyecto y emite su cotización.
@@ -110,7 +108,6 @@ def cotizar_layout(
         cliente_id=proyecto.cliente_id,
         proyecto_id=proyecto.id,
         proyecto_nombre=proyecto.nombre,
-        addendum_porcentaje=addendum_porcentaje,
         items=items_del_layout(layout),
     )
     cotizacion, _ = crear_cotizacion(
@@ -143,7 +140,6 @@ def cotizar_boceto(
     usuario: Usuario,
     *,
     acepta_fuera_de_proporcion: bool,
-    addendum_porcentaje: Decimal = Decimal("0"),
 ) -> Cotizacion:
     """
     Confirma los bloques del boceto (RF-05) y emite su cotización (RF-06).
@@ -177,7 +173,6 @@ def cotizar_boceto(
         cliente_id=proyecto.cliente_id,
         proyecto_id=proyecto.id,
         proyecto_nombre=proyecto.nombre,
-        addendum_porcentaje=addendum_porcentaje,
         items=items_del_boceto(boceto),
     )
     cotizacion, _ = crear_cotizacion(

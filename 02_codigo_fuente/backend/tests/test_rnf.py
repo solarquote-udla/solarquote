@@ -109,11 +109,9 @@ def test_rnf03_documento_de_cotizacion_en_menos_de_10_s(db):
         cliente_nombre="Cliente RNF documento",
         numero_proforma="CT-999-2026",
         subtotal=Decimal("10000.00"),
-        addendum_porcentaje=Decimal("5.00"),
-        addendum_monto=Decimal("500.00"),
         iva_porcentaje=Decimal("15.00"),
-        iva_monto=Decimal("1575.00"),
-        total=Decimal("12075.00"),
+        iva_monto=Decimal("1500.00"),
+        total=Decimal("11500.00"),
         created_at=datetime.now(timezone.utc),
         items=[ItemCotizacion(paneles_largo=4, paneles_ancho=3, bloques=10)],
         materiales=[

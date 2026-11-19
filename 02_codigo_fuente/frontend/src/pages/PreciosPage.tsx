@@ -9,11 +9,13 @@
 
 import { Fragment, useEffect, useState } from "react";
 
+import { Campo } from "@/components/Campo";
 import { useAccionUnica } from "@/hooks/useAccionUnica";
 import { useCambiosSinGuardar } from "@/hooks/useCambiosSinGuardar";
-import { mensajeDeError } from "@/services/api";
+import { erroresDeCampo, mensajeDeError } from "@/services/api";
 import { actualizarPrecio, listarMateriales, obtenerHistorialPrecios } from "@/services/materiales";
 import type { Material, PrecioMaterial } from "@/types/api";
+import { bordeCampo } from "@/utils/campo";
 
 function formatearFecha(iso: string): string {
   return new Date(iso).toLocaleDateString("es-EC", { year: "numeric", month: "short", day: "numeric" });
@@ -24,6 +26,12 @@ function precioValido(valor: string): boolean {
   return /^\d+(\.\d{1,2})?$/.test(valor.trim()) && Number(valor) >= 0;
 }
 
+/** El único campo de PrecioActualizar en el backend es "precio". */
+function erroresServidorPorCampo(error: unknown): { precio?: string } {
+  const campos = erroresDeCampo(error);
+  return campos.precio ? { precio: campos.precio } : {};
+}
+
 export function PreciosPage() {
   const [materiales, setMateriales] = useState<Material[]>([]);
   const [cargando, setCargando] = useState(true);
@@ -32,6 +40,8 @@ export function PreciosPage() {
 
   const [editandoId, setEditandoId] = useState<number | null>(null);
   const [nuevoPrecio, setNuevoPrecio] = useState("");
+  const [intentoGuardar, setIntentoGuardar] = useState(false);
+  const [errorServidorPrecio, setErrorServidorPrecio] = useState<string | undefined>(undefined);
   const [guardando, setGuardando] = useState(false);
 
   const [historialAbiertoId, setHistorialAbiertoId] = useState<number | null>(null);
@@ -43,6 +53,12 @@ export function PreciosPage() {
   const enEdicion = materiales.find((m) => m.id === editandoId) ?? null;
   const precioSinGuardar = enEdicion !== null && nuevoPrecio.trim() !== (enEdicion.precio_vigente ?? "");
   useCambiosSinGuardar(precioSinGuardar);
+
+  const errorPrecio =
+    errorServidorPrecio ??
+    (intentoGuardar && !precioValido(nuevoPrecio)
+      ? "Debe ser un número mayor o igual a cero, con hasta dos decimales."
+      : undefined);
 
   useEffect(() => {
     listarMateriales()
@@ -60,14 +76,14 @@ export function PreciosPage() {
     }
     setAviso(null);
     setEditandoId(material.id);
+    setIntentoGuardar(false);
+    setErrorServidorPrecio(undefined);
     setNuevoPrecio(material.precio_vigente ?? "");
   }
 
   async function guardarPrecio(material: Material) {
-    if (!precioValido(nuevoPrecio)) {
-      setError("El precio debe ser un número mayor o igual a cero, con hasta dos decimales.");
-      return;
-    }
+    setIntentoGuardar(true);
+    if (!precioValido(nuevoPrecio)) return;
     setError(null);
     setGuardando(true);
     try {
@@ -79,7 +95,12 @@ export function PreciosPage() {
         setHistorial(await obtenerHistorialPrecios(material.id));
       }
     } catch (e) {
-      setError(mensajeDeError(e, "No se pudo actualizar el precio"));
+      const campos = erroresServidorPorCampo(e);
+      if (campos.precio) {
+        setErrorServidorPrecio(campos.precio);
+      } else {
+        setError(mensajeDeError(e, "No se pudo actualizar el precio"));
+      }
     } finally {
       setGuardando(false);
     }
@@ -157,13 +178,18 @@ export function PreciosPage() {
                       {editandoId === material.id ? (
                         <div className="flex items-center justify-end gap-2">
                           <span className="text-acero-400">$</span>
-                          <input
-                            autoFocus
-                            inputMode="decimal"
-                            className="w-24 rounded-md border border-acero-300 px-2 py-1 text-right text-sm focus:border-solar-500 focus:outline-none focus:ring-1 focus:ring-solar-500"
-                            value={nuevoPrecio}
-                            onChange={(e) => setNuevoPrecio(e.target.value)}
-                          />
+                          <Campo etiqueta="Precio" error={errorPrecio} className="text-sm">
+                            <input
+                              autoFocus
+                              inputMode="decimal"
+                              className={`mt-1 w-24 rounded-md border px-2 py-1 text-right text-sm focus:outline-none focus:ring-1 ${bordeCampo(errorPrecio)}`}
+                              value={nuevoPrecio}
+                              onChange={(e) => {
+                                setNuevoPrecio(e.target.value);
+                                setErrorServidorPrecio(undefined);
+                              }}
+                            />
+                          </Campo>
                         </div>
                       ) : material.precio_vigente == null ? (
                         <span className="text-amber-700">Sin precio</span>

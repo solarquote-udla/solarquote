@@ -114,9 +114,9 @@ export interface RespuestaToken {
   usuario: UsuarioSesion;
 }
 
-/** Forma de los errores que devuelve FastAPI */
+/** Forma de los errores que devuelve FastAPI (ver app/core/errores.py en el backend) */
 export interface ErrorApi {
-  detail: string | { msg: string; loc: (string | number)[] }[];
+  detail: string | { msg: string; loc: (string | number)[]; type: string }[];
 }
 
 // ─── Clientes ───────────────────────────────────────────
@@ -155,7 +155,6 @@ export interface Cliente {
   nombre: string;
   tipo_identificacion: TipoIdentificacion;
   identificacion: string;
-  empresa: string | null;
   email: string | null;
   telefono: string | null;
   direccion: string | null;
@@ -171,7 +170,6 @@ export interface ClienteCrear {
   nombre: string;
   tipo_identificacion: TipoIdentificacion;
   identificacion: string;
-  empresa: string | null;
   email: string | null;
   telefono: string | null;
   direccion: string | null;
@@ -545,7 +543,6 @@ export interface InversorLayout {
 export interface ConfirmarLayout {
   /** Acepta bajo su responsabilidad los bloques fuera de proporción */
   acepta_fuera_de_proporcion: boolean;
-  addendum_porcentaje?: number;
 }
 
 /** Espejo de `CotizacionEmitidaLeer` */
@@ -616,7 +613,6 @@ export interface CotizacionResumen {
   numero_proforma: string | null;
   estado: EstadoCotizacion;
   cliente_nombre: string;
-  cliente_empresa: string | null;
   proyecto_id: number | null;
   proyecto_nombre: string | null;
   total: string | null;
@@ -657,16 +653,13 @@ export interface CotizacionDetalle {
 
   cliente_id: number | null;
   cliente_nombre: string;
-  cliente_empresa: string | null;
   cliente_email: string | null;
   cliente_telefono: string | null;
 
   proyecto_id: number | null;
   proyecto_nombre: string | null;
 
-  addendum_porcentaje: string;
   subtotal: string | null;
-  addendum_monto: string | null;
   iva_porcentaje: string | null;
   iva_monto: string | null;
   total: string | null;
@@ -865,7 +858,6 @@ export interface Validacion {
   cotizacion_id: number;
   numero_proforma: string | null;
   cliente_nombre: string;
-  cliente_empresa: string | null;
   proyecto_nombre: string | null;
   estado: EstadoCotizacion;
   created_at: string;

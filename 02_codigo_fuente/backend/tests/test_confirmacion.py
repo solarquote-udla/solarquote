@@ -55,8 +55,6 @@ def calc(monkeypatch) -> dict:
                 "items": [{**i, "cantidades": {c: i["bloques"] for c in cantidades}} for i in json["items"]],
                 "cantidades_totales": cantidades,
                 "subtotal": str(subtotal),
-                "addendum_porcentaje": "0",
-                "addendum_monto": "0.00",
                 "iva_porcentaje": "15",
                 "iva_monto": str(subtotal * Decimal("0.15")),
                 "total": str(subtotal * Decimal("1.15")),
