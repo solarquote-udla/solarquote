@@ -39,7 +39,7 @@ describe("mensajeDeError", () => {
 
   it("un campo anidado antepone la ruta completa, cada nivel legible", () => {
     const error = errorConDetail(422, [{ msg: "Debe ser un número entero.", loc: ["body", "inversores", 0, "strings_por_mppt"], type: "int_type" }]);
-    expect(mensajeDeError(error)).toBe("Inversores › 0 › Strings Por Mppt: Debe ser un número entero.");
+    expect(mensajeDeError(error)).toBe("Inversores › 1 › Strings Por Mppt: Debe ser un número entero.");
   });
 
   it("une varios mensajes de validación con un punto", () => {

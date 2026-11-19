@@ -135,7 +135,9 @@ function traducirErrorValidacion(error: { msg: string; loc: (string | number)[];
 
   const campo = error.loc
     .filter((parte) => parte !== "body")
-    .map((parte) => (typeof parte === "number" ? parte : etiquetaDeCampo(parte)))
+    // Los índices de lista (inversores.0, .1, ...) son internos y empiezan
+    // en 0; para quien lee el mensaje, el primer inversor es el 1.
+    .map((parte) => (typeof parte === "number" ? parte + 1 : etiquetaDeCampo(parte)))
     .join(" › ");
   return campo ? `${campo}: ${error.msg}` : error.msg;
 }
