@@ -17,6 +17,7 @@ import { LineaTiempoPropuesta } from "@/components/LineaTiempoPropuesta";
 import { mensajeDeError } from "@/services/api";
 import { obtenerCotizacion, obtenerProformaExcel, obtenerProformaWord } from "@/services/cotizaciones";
 import { obtenerValidacion } from "@/services/validacion";
+import { CondicionesCotizacion } from "@/components/CondicionesCotizacion";
 import type { CotizacionDetalle, EventoEstado } from "@/types/api";
 import { formatoMoneda } from "@/utils/dinero";
 import { fechaHora } from "@/utils/fechas";
@@ -262,6 +263,8 @@ export function CotizacionDetallePage() {
               </div>
             </dl>
           </section>
+
+          <CondicionesCotizacion cotizacion={cotizacion} />
         </>
       ) : null}
     </div>

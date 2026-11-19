@@ -18,6 +18,7 @@ from app.routers import (
     auth,
     bocetos,
     cliente,
+    condiciones,
     cotizacion,
     equipo,
     health,
@@ -83,6 +84,9 @@ app.include_router(layout.router)
 
 # Módulo 2 — Bocetos del cliente (RF-04 y RF-05)
 app.include_router(bocetos.router)
+
+# Condiciones de la proforma por defecto, para la confirmación del Paso 3 y del boceto
+app.include_router(condiciones.router)
 
 # Módulo 3 — Cotización
 app.include_router(cotizacion.router)

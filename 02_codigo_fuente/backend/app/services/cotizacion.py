@@ -41,6 +41,15 @@ class ProyectoNoDisponible(ValueError):
     """El proyecto indicado no existe."""
 
 
+def tramos_pago_por_defecto() -> list[tuple[str, Decimal]]:
+    """Forma de pago de la configuración, cuando la cotización no trae la suya."""
+    return [
+        ("Anticipo", settings.PROFORMA_PAGO_ANTICIPO_PCT),
+        ("Entrega", settings.PROFORMA_PAGO_ENTREGA_PCT),
+        ("A 60 días de la entrega", settings.PROFORMA_PAGO_60_DIAS_PCT),
+    ]
+
+
 def crear_cotizacion(
     db: Session,
     datos: CotizacionCrear,
@@ -116,11 +125,7 @@ def crear_cotizacion(
     if condiciones.pagos is not None:
         tramos_pago = [(tramo.nombre, tramo.porcentaje) for tramo in condiciones.pagos]
     else:
-        tramos_pago = [
-            ("Anticipo", settings.PROFORMA_PAGO_ANTICIPO_PCT),
-            ("Entrega", settings.PROFORMA_PAGO_ENTREGA_PCT),
-            ("A 60 días de la entrega", settings.PROFORMA_PAGO_60_DIAS_PCT),
-        ]
+        tramos_pago = tramos_pago_por_defecto()
 
     # Informativo: el precio por Wp que el cliente compara contra el de
     # referencia del mercado. Se calcula, no se edita (SQ-213/Joseph) —

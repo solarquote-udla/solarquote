@@ -19,7 +19,9 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { EstadoProyectoBadge } from "@/components/EstadoProyectoBadge";
 import { VistaLayout } from "@/components/VistaLayout";
 import { rutaPaso } from "@/components/asistente";
+import { FormularioCondiciones } from "@/components/FormularioCondiciones";
 import { useAccionUnica } from "@/hooks/useAccionUnica";
+import { useCondicionesProforma } from "@/hooks/useCondicionesProforma";
 import { mensajeDeError } from "@/services/api";
 import { obtenerEquipo } from "@/services/equipo";
 import { confirmarYCotizar, obtenerLayout } from "@/services/layout";
@@ -46,6 +48,8 @@ export function ConfirmacionPage() {
   const idValido = Number.isInteger(proyectoId) && proyectoId > 0;
   const navegar = useNavigate();
   const unaVez = useAccionUnica();
+  // Plazo, validez, garantía y forma de pago de esta proforma (Santi, 17 nov)
+  const condiciones = useCondicionesProforma();
 
   const [proyecto, setProyecto] = useState<Proyecto | null>(null);
   const [terreno, setTerreno] = useState<Terreno | null>(null);
@@ -112,13 +116,15 @@ export function ConfirmacionPage() {
         ? "El terreno, los caminos, el panel o la latitud cambiaron después de generar el layout. Vuelve a generarlo en el Paso 3."
         : bloquesFuera > 0 && !acepta
           ? "Ajusta los bloques no compactos o acéptalos bajo tu responsabilidad."
-          : null;
+          : Object.keys(condiciones.errores).length > 0
+            ? "Revisa las condiciones de la proforma."
+            : null;
 
   async function confirmar() {
     setError(null);
     setConfirmando(true);
     try {
-      const emitida = await confirmarYCotizar(proyectoId, { acepta_fuera_de_proporcion: acepta });
+      const emitida = await confirmarYCotizar(proyectoId, { acepta_fuera_de_proporcion: acepta, condiciones: condiciones.condiciones });
       void navegar(`/cotizaciones/${emitida.id}`);
     } catch (e) {
       setError(mensajeDeError(e, "No se pudo generar la cotización"));
@@ -292,6 +298,9 @@ export function ConfirmacionPage() {
               </dl>
             </div>
           )}
+
+          {/* ─── Condiciones de la proforma ──────────── */}
+          {!cotizado && <FormularioCondiciones estado={condiciones} deshabilitado={confirmando} />}
 
           {/* ─── Confirmación ────────────────────────── */}
           {!cotizado && (

@@ -17,7 +17,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { EstadoProyectoBadge } from "@/components/EstadoProyectoBadge";
+import { FormularioCondiciones } from "@/components/FormularioCondiciones";
 import { useAccionUnica } from "@/hooks/useAccionUnica";
+import { useCondicionesProforma } from "@/hooks/useCondicionesProforma";
 import { useCambiosSinGuardar } from "@/hooks/useCambiosSinGuardar";
 import { mensajeDeError } from "@/services/api";
 import { confirmarYCotizarBoceto, guardarBloquesBoceto, obtenerArchivoBoceto, obtenerBoceto } from "@/services/bocetos";
@@ -195,6 +197,8 @@ export function ConfirmacionBocetoPage() {
   const idValido = Number.isInteger(proyectoId) && proyectoId > 0;
   const navegar = useNavigate();
   const unaVez = useAccionUnica();
+  // Plazo, validez, garantía y forma de pago de esta proforma (Santi, 17 nov)
+  const condiciones = useCondicionesProforma();
 
   const [proyecto, setProyecto] = useState<Proyecto | null>(null);
   const [boceto, setBoceto] = useState<Boceto | null>(null);
@@ -304,7 +308,9 @@ export function ConfirmacionBocetoPage() {
           ? "Guarda los cambios antes de confirmar."
           : bloquesFuera > 0 && !acepta
             ? "Ajusta los bloques no compactos o acéptalos bajo tu responsabilidad."
-            : null;
+            : Object.keys(condiciones.errores).length > 0
+              ? "Revisa las condiciones de la proforma."
+              : null;
 
   const cambiar = (clave: number, cambio: Partial<FilaBoceto>) =>
     setFilas((actuales) => actuales.map((f) => (f.clave === clave ? { ...f, ...cambio } : f)));
@@ -342,7 +348,7 @@ export function ConfirmacionBocetoPage() {
     setError(null);
     setConfirmando(true);
     try {
-      const emitida = await confirmarYCotizarBoceto(proyectoId, { acepta_fuera_de_proporcion: acepta });
+      const emitida = await confirmarYCotizarBoceto(proyectoId, { acepta_fuera_de_proporcion: acepta, condiciones: condiciones.condiciones });
       permitirSalida();
       void navegar(`/cotizaciones/${emitida.id}`);
     } catch (e) {
@@ -584,6 +590,9 @@ export function ConfirmacionBocetoPage() {
               </p>
             </div>
           ))}
+
+          {/* ─── Condiciones de la proforma ──────────── */}
+          {!cotizado && <FormularioCondiciones estado={condiciones} deshabilitado={confirmando} />}
 
           {/* ─── Confirmación ────────────────────────── */}
           {!cotizado && (
