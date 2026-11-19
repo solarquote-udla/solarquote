@@ -14,7 +14,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
-import { RUTA_PROYECTO_NUEVO, rutaPaso, type NumeroPaso } from "@/components/asistente";
+import { RUTA_PROYECTO_NUEVO, rutaPaso } from "@/components/asistente";
 import { EstadoCotizacionBadge } from "@/components/EstadoCotizacionBadge";
 import { EstadoProyectoBadge } from "@/components/EstadoProyectoBadge";
 import { useAuth } from "@/hooks/useAuth";
@@ -32,6 +32,7 @@ import {
 import { formatoMoneda } from "@/utils/dinero";
 import { rutaConfirmacionBoceto } from "@/utils/bocetos";
 import { fechaHora } from "@/utils/fechas";
+import { etiquetaRetomar, pasoParaRetomar } from "@/utils/proyectos";
 
 type Vista = "en-curso" | "cotizaciones";
 
@@ -79,23 +80,6 @@ export function HistorialPage() {
       <div className="mt-6">{vista === "en-curso" ? <ProyectosEnCurso /> : <CotizacionesHistorial />}</div>
     </div>
   );
-}
-
-/**
- * Paso en el que conviene retomar el proyecto: el primero que falta.
- * No se usa el estado: "en diseño" no distingue si falta el equipo o el
- * layout (lo marca el backend en cuanto hay terreno o equipo).
- */
-function pasoParaRetomar(p: Proyecto): NumeroPaso {
-  if (!p.tiene_terreno) return 1;
-  if (!p.tiene_equipo) return 2;
-  return 3;
-}
-
-function etiquetaRetomar(p: Proyecto, paso: NumeroPaso): string {
-  if (paso === 1) return "Continuar en Terreno";
-  if (paso === 2) return "Continuar en Panel + Inversor";
-  return p.tiene_layout ? "Abrir Caminos + Layout" : "Continuar en Caminos + Layout";
 }
 
 function ProyectosEnCurso() {

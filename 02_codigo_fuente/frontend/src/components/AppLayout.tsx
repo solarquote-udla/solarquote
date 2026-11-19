@@ -4,6 +4,10 @@
  * El menú (components/menu.ts) sigue la estructura del prototipo y se
  * filtra por los permisos del perfil: cada usuario ve solo las opciones
  * que su perfil permite (RF-11).
+ *
+ * La barra lateral queda fija y compacta: con todas las opciones entra en
+ * una pantalla de 768 px de alto sin desplazarse (revisión del 16 de
+ * noviembre). Solo el contenido se desplaza.
  */
 
 import { Link, NavLink, Outlet } from "react-router-dom";
@@ -31,24 +35,24 @@ export function AppLayout() {
     <div className="flex h-screen bg-acero-50 print:block print:h-auto">
       {/* ─── Barra lateral ─────────────────────────────── */}
       <aside className="flex w-64 shrink-0 flex-col border-r border-acero-200 bg-superficie print:hidden">
-        <div className="border-b border-acero-200 px-6 py-5">
+        <div className="flex h-16 shrink-0 items-center border-b border-acero-200 px-6">
           <span className="text-xl font-bold tracking-tight text-acero-900">
             Solar<span className="text-solar-500">Quote</span>
           </span>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-4">
+        <nav className="flex-1 overflow-y-auto px-3 py-3" aria-label="Menú principal">
           {grupos.map((grupo) => (
-            <div key={grupo.titulo ?? "inicio"} className="mb-4">
+            <div key={grupo.titulo ?? "inicio"} className="mb-2.5">
               {grupo.titulo && (
-                <p className="px-3 pb-1 text-[11px] font-semibold tracking-wider text-acero-400">
+                <p className="px-3 pb-0.5 text-[11px] font-semibold tracking-wider text-acero-400">
                   {grupo.titulo}
                 </p>
               )}
               {grupo.secciones.map((seccion, i) => (
-                <div key={seccion.titulo ?? i} className="space-y-0.5">
+                <div key={seccion.titulo ?? i}>
                   {seccion.titulo && (
-                    <p className="px-3 pt-1 text-xs font-medium text-acero-500">{seccion.titulo}</p>
+                    <p className="px-3 pt-0.5 text-xs font-medium text-acero-500">{seccion.titulo}</p>
                   )}
                   {seccion.opciones.map((opcion) => (
                     <NavLink
@@ -57,7 +61,7 @@ export function AppLayout() {
                       end={opcion.ruta === "/"}
                       className={({ isActive }) =>
                         [
-                          "block rounded-lg py-1.5 text-sm transition",
+                          "block rounded-lg py-1 text-sm transition",
                           seccion.titulo ? "pl-6 pr-3" : "px-3",
                           isActive
                             ? "bg-solar-50 font-semibold text-solar-700"
@@ -74,7 +78,7 @@ export function AppLayout() {
           ))}
         </nav>
 
-        <div className="border-t border-acero-200 p-4">
+        <div className="shrink-0 border-t border-acero-200 px-4 py-2.5">
           <p className="text-xs text-acero-400">HEXtructure S.A.S.</p>
         </div>
       </aside>

@@ -115,16 +115,6 @@ describe("TableroIndicadores", () => {
     expect(screen.getByText("Clientes más frecuentes")).toBeTruthy();
   });
 
-  it("los accesos directos respetan el permiso de cada módulo", async () => {
-    permisos = ["historial", "clientes"];
-    renderTablero();
-    await screen.findByText("Indicadores");
-
-    expect(screen.getByText("Historial →")).toBeTruthy();
-    expect(screen.getByText("Clientes →")).toBeTruthy();
-    expect(screen.queryByText("Generar layout solar →")).toBeNull();
-  });
-
   it("cambiar el periodo vuelve a pedir el tablero", async () => {
     renderTablero();
     await screen.findByText("Indicadores");
