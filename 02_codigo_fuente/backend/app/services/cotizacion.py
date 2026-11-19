@@ -21,7 +21,7 @@ from app.models.cotizacion import Cotizacion, EstadoCotizacion, ItemCotizacion, 
 from app.models.material import Material
 from app.models.proyecto import Proyecto
 from app.models.usuario import Usuario
-from app.schemas.cotizacion import CotizacionCrear, ItemCalculoEntrada, ResultadoCalculoCotizacion
+from app.schemas.cotizacion import CondicionesProforma, CotizacionCrear, ItemCalculoEntrada, ResultadoCalculoCotizacion
 from app.services.calc_service import calcular_via_calc_service
 from app.services.material import (
     CODIGOS_FORMULA,
@@ -106,6 +106,21 @@ def crear_cotizacion(
         cliente_email = datos.cliente_email
         cliente_telefono = datos.cliente_telefono
 
+    condiciones = datos.condiciones or CondicionesProforma()
+    plazo_dias = condiciones.plazo_dias if condiciones.plazo_dias is not None else settings.PROFORMA_PLAZO_DIAS
+    validez_dias = condiciones.validez_dias if condiciones.validez_dias is not None else settings.PROFORMA_VALIDEZ_DIAS
+    garantia_anios = (
+        condiciones.garantia_anios if condiciones.garantia_anios is not None else settings.PROFORMA_GARANTIA_ANIOS
+    )
+    if condiciones.pago_anticipo_pct is not None:
+        pago_anticipo_pct = condiciones.pago_anticipo_pct
+        pago_entrega_pct = condiciones.pago_entrega_pct
+        pago_60_dias_pct = condiciones.pago_60_dias_pct
+    else:
+        pago_anticipo_pct = settings.PROFORMA_PAGO_ANTICIPO_PCT
+        pago_entrega_pct = settings.PROFORMA_PAGO_ENTREGA_PCT
+        pago_60_dias_pct = settings.PROFORMA_PAGO_60_DIAS_PCT
+
     cotizacion = Cotizacion(
         numero_proforma=siguiente_numero_proforma(db),
         potencia_kwp=potencia_kwp,
@@ -124,6 +139,13 @@ def crear_cotizacion(
         iva_porcentaje=resultado.iva_porcentaje,
         iva_monto=resultado.iva_monto,
         total=resultado.total,
+        plazo_dias=plazo_dias,
+        validez_dias=validez_dias,
+        garantia_anios=garantia_anios,
+        pago_anticipo_pct=pago_anticipo_pct,
+        pago_entrega_pct=pago_entrega_pct,
+        pago_60_dias_pct=pago_60_dias_pct,
+        precio_wp=condiciones.precio_wp,
         items=[
             ItemCotizacion(
                 paneles_largo=item.paneles_largo,

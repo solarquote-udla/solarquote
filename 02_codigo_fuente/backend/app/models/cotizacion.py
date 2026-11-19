@@ -115,6 +115,21 @@ class Cotizacion(Base):
     potencia_kwp: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     total_paneles: Mapped[int | None] = mapped_column(nullable=True)
 
+    # ─── Condiciones de la proforma, editables por cotización (SQ-213) ──
+    # Antes fijas en `settings` para todas las cotizaciones; ahora cada
+    # una puede pisarlas al confirmarse (ver schemas.cotizacion.CondicionesProforma).
+    # Nullable por lo mismo que el desglose de arriba: las cotizaciones de
+    # antes de este campo no tienen cómo reconstruirlo retroactivamente.
+    plazo_dias: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    validez_dias: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    garantia_anios: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    pago_anticipo_pct: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    pago_entrega_pct: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    pago_60_dias_pct: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    # Informativo (precio por Wp, ej. 0,038 USD/Wp): se muestra en la
+    # proforma pero no participa del cálculo de materiales ni del total.
+    precio_wp: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+
     estado: Mapped[EstadoCotizacion] = mapped_column(
         SAEnum(EstadoCotizacion, name="estado_cotizacion", values_callable=lambda e: [i.value for i in e]),
         default=EstadoCotizacion.COTIZADA,

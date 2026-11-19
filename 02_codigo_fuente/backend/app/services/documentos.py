@@ -3,10 +3,15 @@ Documentos de la proforma en Word y Excel — RF-07.
 
 Formato institucional, calcado de la proforma real de HEXtructure
 (CT-129-2025, proyecto EMIHANA, 10/01/2026): encabezado del oferente,
-concepto, potencia en kWp si la cotización la tiene, notas con la
-configuración L/A/bloques de cada ítem, materiales en el orden de esa
-proforma (no alfabético), condiciones comerciales, tabla de pagos y
-datos bancarios con la firma del representante legal.
+concepto, potencia en kWp y precio por Wp si la cotización los tiene,
+notas con la configuración L/A/bloques de cada ítem, materiales en el
+orden de esa proforma (no alfabético), condiciones comerciales, tabla
+de pagos y datos bancarios con la firma del representante legal.
+
+Las condiciones (plazo, validez, garantía, forma de pago) y el precio
+por Wp son editables por cotización (SQ-213, acuerdo de la reunión con
+Santi): lo que no se edita al confirmar usa el valor de `settings`,
+igual que antes.
 
 El Word es un documento fijo. El Excel es editable: los subtotales por
 material, el subtotal general, el addendum, el IVA, el total y la tabla
@@ -103,6 +108,16 @@ def _porcentaje(valor: Decimal | None) -> str:
     return f"{texto.replace('.', ',')}%"
 
 
+def _precio_wp(valor: Decimal | None) -> str:
+    """
+    $/Wp con 4 decimales fijos (ej. "$ 0,0380"): a diferencia de `_moneda`,
+    que usa dos, un precio típico como 0,038 USD/Wp redondearía a $0,00.
+    """
+    if valor is None:
+        return "—"
+    return f"$ {valor.quantize(Decimal('0.0001')):.4f}".replace(".", ",")
+
+
 def _pluralizar(cantidad: int, singular: str, plural: str) -> str:
     return f"{cantidad} {singular if cantidad == 1 else plural}"
 
@@ -126,15 +141,21 @@ def _notas(cotizacion: Cotizacion) -> list[str]:
     return [notas[0], *configuraciones, *notas[1:]]
 
 
-def _pagos(total: Decimal | None) -> list[tuple[str, Decimal, Decimal | None]]:
-    """(etiqueta, porcentaje, monto) para cada tramo de la forma de pago."""
+def _pagos(cotizacion: Cotizacion) -> list[tuple[str, Decimal | None, Decimal | None]]:
+    """
+    (etiqueta, porcentaje, monto) para cada tramo de la forma de pago, con
+    los porcentajes de esta cotización (editables por cotización, SQ-213).
+    Nullable: una cotización de antes de este campo no los tiene.
+    """
     tramos = [
-        ("Anticipo", settings.PROFORMA_PAGO_ANTICIPO_PCT),
-        ("Entrega", settings.PROFORMA_PAGO_ENTREGA_PCT),
-        ("A 60 días de la entrega", settings.PROFORMA_PAGO_60_DIAS_PCT),
+        ("Anticipo", cotizacion.pago_anticipo_pct),
+        ("Entrega", cotizacion.pago_entrega_pct),
+        ("A 60 días de la entrega", cotizacion.pago_60_dias_pct),
     ]
+    total = cotizacion.total
     return [
-        (etiqueta, pct, (total * pct / Decimal("100")) if total is not None else None) for etiqueta, pct in tramos
+        (etiqueta, pct, (total * pct / Decimal("100")) if total is not None and pct is not None else None)
+        for etiqueta, pct in tramos
     ]
 
 
@@ -174,6 +195,8 @@ def generar_word(cotizacion: Cotizacion) -> bytes:
     documento.add_paragraph(f"Concepto: {settings.PROFORMA_CONCEPTO}").alignment = WD_ALIGN_PARAGRAPH.CENTER
     if cotizacion.potencia_kwp is not None:
         documento.add_paragraph(f"Potencia: {_numero(cotizacion.potencia_kwp)} kWp").alignment = WD_ALIGN_PARAGRAPH.CENTER
+    if cotizacion.precio_wp is not None:
+        documento.add_paragraph(f"Precio: {_precio_wp(cotizacion.precio_wp)} por Wp").alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     documento.add_heading("Cliente", level=2)
     datos_cliente = [("Nombre", cotizacion.cliente_nombre)]
@@ -229,9 +252,19 @@ def generar_word(cotizacion: Cotizacion) -> bytes:
             corrida.bold = True
 
     documento.add_heading("Condiciones", level=2)
-    documento.add_paragraph(f"Plazo de entrega: {settings.PROFORMA_PLAZO_DIAS} días.")
-    documento.add_paragraph(f"Validez de la oferta: {settings.PROFORMA_VALIDEZ_DIAS} días.")
-    documento.add_paragraph(f"Garantía: {_pluralizar(settings.PROFORMA_GARANTIA_ANIOS, 'año', 'años')}.")
+    documento.add_paragraph(
+        f"Plazo de entrega: {cotizacion.plazo_dias} días." if cotizacion.plazo_dias is not None else "Plazo de entrega: —"
+    )
+    documento.add_paragraph(
+        f"Validez de la oferta: {cotizacion.validez_dias} días."
+        if cotizacion.validez_dias is not None
+        else "Validez de la oferta: —"
+    )
+    documento.add_paragraph(
+        f"Garantía: {_pluralizar(cotizacion.garantia_anios, 'año', 'años')}."
+        if cotizacion.garantia_anios is not None
+        else "Garantía: —"
+    )
 
     documento.add_heading("Forma de pago", level=2)
     tabla_pagos = documento.add_table(rows=1, cols=3)
@@ -241,7 +274,7 @@ def generar_word(cotizacion: Cotizacion) -> bytes:
         for parrafo in celda.paragraphs:
             for corrida in parrafo.runs:
                 corrida.bold = True
-    for etiqueta, pct, monto in _pagos(cotizacion.total):
+    for etiqueta, pct, monto in _pagos(cotizacion):
         fila = tabla_pagos.add_row().cells
         for celda, texto in zip(fila, [etiqueta, _porcentaje(pct), _moneda(monto)]):
             celda.text = texto
@@ -307,6 +340,9 @@ def generar_excel(cotizacion: Cotizacion) -> bytes:
     fila += 1
     if cotizacion.potencia_kwp is not None:
         hoja.cell(row=fila, column=1, value=f"Potencia: {_numero(cotizacion.potencia_kwp)} kWp")
+        fila += 1
+    if cotizacion.precio_wp is not None:
+        hoja.cell(row=fila, column=1, value=f"Precio: {_precio_wp(cotizacion.precio_wp)} por Wp")
         fila += 1
 
     fila += 1
@@ -388,11 +424,31 @@ def generar_excel(cotizacion: Cotizacion) -> bytes:
         fila += 1
 
     fila += 1
-    hoja.cell(row=fila, column=1, value=f"Plazo de entrega: {settings.PROFORMA_PLAZO_DIAS} días.")
+    hoja.cell(
+        row=fila,
+        column=1,
+        value=f"Plazo de entrega: {cotizacion.plazo_dias} días." if cotizacion.plazo_dias is not None else "Plazo de entrega: —",
+    )
     fila += 1
-    hoja.cell(row=fila, column=1, value=f"Validez de la oferta: {settings.PROFORMA_VALIDEZ_DIAS} días.")
+    hoja.cell(
+        row=fila,
+        column=1,
+        value=(
+            f"Validez de la oferta: {cotizacion.validez_dias} días."
+            if cotizacion.validez_dias is not None
+            else "Validez de la oferta: —"
+        ),
+    )
     fila += 1
-    hoja.cell(row=fila, column=1, value=f"Garantía: {_pluralizar(settings.PROFORMA_GARANTIA_ANIOS, 'año', 'años')}.")
+    hoja.cell(
+        row=fila,
+        column=1,
+        value=(
+            f"Garantía: {_pluralizar(cotizacion.garantia_anios, 'año', 'años')}."
+            if cotizacion.garantia_anios is not None
+            else "Garantía: —"
+        ),
+    )
     fila += 2
 
     hoja.cell(row=fila, column=1, value="Forma de pago").font = negrita
@@ -400,12 +456,15 @@ def generar_excel(cotizacion: Cotizacion) -> bytes:
     for columna, texto in enumerate(["Tramo", "Porcentaje", "Monto"], start=1):
         hoja.cell(row=fila, column=columna, value=texto).font = negrita
     fila += 1
-    for etiqueta, pct, _ in _pagos(cotizacion.total):
+    for etiqueta, pct, _ in _pagos(cotizacion):
         hoja.cell(row=fila, column=1, value=etiqueta)
         hoja.cell(row=fila, column=2, value=_porcentaje(pct))
-        # También fórmula, sobre la celda del total: cambia si cambia una cantidad.
-        celda_pago = hoja.cell(row=fila, column=3, value=f"=E{fila_total}*{pct}/100")
-        celda_pago.number_format = FORMATO_MONEDA_EXCEL
+        if pct is not None:
+            # También fórmula, sobre la celda del total: cambia si cambia una cantidad.
+            celda_pago = hoja.cell(row=fila, column=3, value=f"=E{fila_total}*{pct}/100")
+            celda_pago.number_format = FORMATO_MONEDA_EXCEL
+        else:
+            hoja.cell(row=fila, column=3, value="—")
         fila += 1
 
     if settings.HEXTRUCTURE_BANCO:

@@ -535,11 +535,29 @@ export interface InversorLayout {
   motivo: string | null;
 }
 
+/**
+ * Espejo de `CondicionesProforma`: condiciones comerciales editables por
+ * cotización (SQ-213). Lo que no se manda usa el valor de settings, como
+ * antes de este campo.
+ */
+export interface CondicionesProforma {
+  plazo_dias?: number;
+  validez_dias?: number;
+  garantia_anios?: number;
+  /** Si se edita la forma de pago, los tres porcentajes van juntos y deben sumar 100 */
+  pago_anticipo_pct?: number;
+  pago_entrega_pct?: number;
+  pago_60_dias_pct?: number;
+  /** Informativo (USD/Wp): no afecta el cálculo de materiales ni el total */
+  precio_wp?: number;
+}
+
 /** Espejo de `ConfirmarLayout`: confirmación explícita del diseño (RF-05) */
 export interface ConfirmarLayout {
   /** Acepta bajo su responsabilidad los bloques fuera de proporción */
   acepta_fuera_de_proporcion: boolean;
   addendum_porcentaje?: number;
+  condiciones?: CondicionesProforma;
 }
 
 /** Espejo de `CotizacionEmitidaLeer` */
@@ -660,6 +678,16 @@ export interface CotizacionDetalle {
   iva_porcentaje: string | null;
   iva_monto: string | null;
   total: string | null;
+
+  /** Condiciones de la proforma, editables por cotización (SQ-213). Null en cotizaciones de antes de este campo. */
+  plazo_dias: number | null;
+  validez_dias: number | null;
+  garantia_anios: number | null;
+  pago_anticipo_pct: string | null;
+  pago_entrega_pct: string | null;
+  pago_60_dias_pct: string | null;
+  /** Informativo (USD/Wp): no afecta el cálculo de materiales ni el total */
+  precio_wp: string | null;
 
   created_at: string;
   updated_at: string;

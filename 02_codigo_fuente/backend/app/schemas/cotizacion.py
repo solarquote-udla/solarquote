@@ -64,6 +64,40 @@ class ResultadoCalculoCotizacion(BaseModel):
     total: Decimal
 
 
+class CondicionesProforma(BaseModel):
+    """
+    Condiciones comerciales de la proforma, editables por cotización
+    (antes fijas en `settings` para todas: acuerdo de la reunión con
+    Santi, SQ-213). Lo que no se manda usa el valor de `settings` como
+    antes — ver `services/cotizacion.py`.
+    """
+
+    plazo_dias: int | None = Field(default=None, ge=1)
+    validez_dias: int | None = Field(default=None, ge=1)
+    garantia_anios: int | None = Field(default=None, ge=1)
+    pago_anticipo_pct: Decimal | None = Field(default=None, ge=0, le=100)
+    pago_entrega_pct: Decimal | None = Field(default=None, ge=0, le=100)
+    pago_60_dias_pct: Decimal | None = Field(default=None, ge=0, le=100)
+    precio_wp: Decimal | None = Field(
+        default=None, gt=0, description="Informativo (USD/Wp): no afecta el cálculo de materiales ni el total"
+    )
+
+    @model_validator(mode="after")
+    def validar_forma_de_pago(self) -> "CondicionesProforma":
+        pagos = (self.pago_anticipo_pct, self.pago_entrega_pct, self.pago_60_dias_pct)
+        if any(p is not None for p in pagos):
+            if any(p is None for p in pagos):
+                raise ValueError(
+                    "Si editas la forma de pago, manda los tres porcentajes (anticipo, entrega, 60 días)."
+                )
+            if pagos[0] + pagos[1] + pagos[2] != 100:
+                raise ValueError(
+                    f"Los porcentajes de pago deben sumar 100 (anticipo {pagos[0]} + entrega {pagos[1]} "
+                    f"+ 60 días {pagos[2]})"
+                )
+        return self
+
+
 class CotizacionCrear(BaseModel):
     # Nullable a propósito, igual que en el modelo: permite cotizar a un
     # cliente que todavía no está en el catálogo (RF-12). Si se manda
@@ -83,6 +117,10 @@ class CotizacionCrear(BaseModel):
     addendum_porcentaje: Decimal = Field(default=Decimal("0"), ge=0, le=100)
 
     items: list[ItemCalculoEntrada] = Field(min_length=1)
+
+    condiciones: CondicionesProforma | None = Field(
+        default=None, description="Lo que no se manda usa el valor de settings, igual que antes"
+    )
 
     @model_validator(mode="after")
     def validar_cliente(self) -> "CotizacionCrear":
@@ -182,6 +220,16 @@ class CotizacionDetalleLeer(BaseModel):
     iva_porcentaje: Decimal | None
     iva_monto: Decimal | None
     total: Decimal | None
+
+    # Condiciones de la proforma, editables por cotización (SQ-213).
+    # Nullable: las cotizaciones de antes de este campo no lo tienen.
+    plazo_dias: int | None
+    validez_dias: int | None
+    garantia_anios: int | None
+    pago_anticipo_pct: Decimal | None
+    pago_entrega_pct: Decimal | None
+    pago_60_dias_pct: Decimal | None
+    precio_wp: Decimal | None
 
     created_at: datetime
     updated_at: datetime

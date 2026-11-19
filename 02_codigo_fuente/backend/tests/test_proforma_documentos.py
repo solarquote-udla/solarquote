@@ -121,6 +121,13 @@ def _cotizacion_con_materiales(db: Session, **campos) -> Cotizacion:
         iva_porcentaje=Decimal("15.00"),
         iva_monto=Decimal("69.30"),
         total=Decimal("531.30"),
+        plazo_dias=campos.pop("plazo_dias", settings.PROFORMA_PLAZO_DIAS),
+        validez_dias=campos.pop("validez_dias", settings.PROFORMA_VALIDEZ_DIAS),
+        garantia_anios=campos.pop("garantia_anios", settings.PROFORMA_GARANTIA_ANIOS),
+        pago_anticipo_pct=campos.pop("pago_anticipo_pct", settings.PROFORMA_PAGO_ANTICIPO_PCT),
+        pago_entrega_pct=campos.pop("pago_entrega_pct", settings.PROFORMA_PAGO_ENTREGA_PCT),
+        pago_60_dias_pct=campos.pop("pago_60_dias_pct", settings.PROFORMA_PAGO_60_DIAS_PCT),
+        precio_wp=campos.pop("precio_wp", None),
         created_at=HOY,
         items=[ItemCotizacion(paneles_largo=4, paneles_ancho=28, bloques=12)],
         materiales=[
@@ -368,7 +375,7 @@ def test_excel_subtotales_y_totales_son_formulas(db: Session, datos_oferente) ->
     fila_total = _fila_con_etiqueta(hoja, "Total")
     assert hoja[f"E{fila_total}"].value == f"=E{fila_subtotal}+E{fila_addendum}+E{fila_iva}"
 
-    for etiqueta, pct in [("Anticipo", "30"), ("Entrega", "40"), ("A 60 días de la entrega", "30")]:
+    for etiqueta, pct in [("Anticipo", "30.00"), ("Entrega", "40.00"), ("A 60 días de la entrega", "30.00")]:
         fila_pago = _fila_con_etiqueta(hoja, etiqueta, columna="A")
         assert hoja[f"C{fila_pago}"].value == f"=E{fila_total}*{pct}/100", etiqueta
 
