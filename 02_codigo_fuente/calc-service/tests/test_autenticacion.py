@@ -21,7 +21,6 @@ PAYLOAD = {
         "CLAMP_F": "1.00",
         "CLAMP_I": "1.00",
     },
-    "addendum_porcentaje": "0",
     "iva_porcentaje": "15",
 }
 

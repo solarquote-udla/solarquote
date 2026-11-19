@@ -205,7 +205,6 @@ persona retoma sus propios proyectos desde ahí.
 {
   "cliente_id": 7,
   "proyecto_id": 15,
-  "addendum_porcentaje": 5,
   "items": [
     { "paneles_largo": 12, "paneles_ancho": 4, "bloques": 3 }
   ]
@@ -216,10 +215,9 @@ persona retoma sus propios proyectos desde ahí.
 |---|---|---|
 | `cliente_id` | No | Si se envía, el snapshot (`cliente_nombre`, etc.) se toma del registro de `Cliente` y los campos de abajo se ignoran |
 | `cliente_nombre` | Solo si no hay `cliente_id` | 1 a 150 caracteres |
-| `cliente_empresa` / `cliente_email` / `cliente_telefono` | No | — |
+| `cliente_email` / `cliente_telefono` | No | — |
 | `proyecto_id` | No | — |
 | `proyecto_nombre` | No | — |
-| `addendum_porcentaje` | No (`0` por defecto) | 0 a 100 |
 | `items` | Sí, mínimo 1 | Ver `ItemCalculoEntrada` |
 
 `ItemCalculoEntrada`: `paneles_largo` (L, **par**, > 0), `paneles_ancho`
@@ -243,12 +241,10 @@ calcular (`calculo`), además de los datos ya persistidos:
   "estado": "cotizada",
   "cliente_id": 7,
   "cliente_nombre": "Energy Control Cía. Ltda.",
-  "cliente_empresa": "Energy Control",
   "cliente_email": "compras@energycontrol.ec",
   "cliente_telefono": "+593 99 123 4567",
   "proyecto_id": 15,
   "proyecto_nombre": "Planta Yaruquí",
-  "addendum_porcentaje": "5",
   "created_at": "2026-10-18T15:04:05Z",
   "updated_at": "2026-10-18T15:04:05Z",
   "calculo": {
@@ -257,11 +253,9 @@ calcular (`calculo`), además de los datos ya persistidos:
     ],
     "cantidades_totales": { "HEX_V18MM": 36 },
     "subtotal": "1620.00",
-    "addendum_porcentaje": "5",
-    "addendum_monto": "81.00",
     "iva_porcentaje": "15",
-    "iva_monto": "255.15",
-    "total": "1956.15"
+    "iva_monto": "243.00",
+    "total": "1863.00"
   }
 }
 ```
@@ -291,10 +285,9 @@ Respuesta — `CotizacionesPaginaLeer`:
       "numero_proforma": "SQ-0042",
       "estado": "cotizada",
       "cliente_nombre": "Energy Control Cía. Ltda.",
-      "cliente_empresa": "Energy Control",
       "proyecto_id": 15,
       "proyecto_nombre": "Planta Yaruquí",
-      "total": "1956.15",
+      "total": "1863.00",
       "created_at": "2026-10-18T15:04:05Z"
     }
   ],
@@ -308,7 +301,7 @@ Respuesta — `CotizacionesPaginaLeer`:
 ### `GET /api/cotizaciones/{id}` — detalle (RF-10)
 
 `CotizacionDetalleLeer` agrega al resumen el desglose financiero completo
-(`subtotal`, `addendum_monto`, `iva_porcentaje`, `iva_monto`, `total`), los
+(`subtotal`, `iva_porcentaje`, `iva_monto`, `total`), los
 ítems (`items: ItemCotizacionLeer[]`, con `paneles_largo`/`paneles_ancho`/
 `bloques`) y los materiales totales de la cotización
 (`materiales: MaterialCotizadoLeer[]`, con `codigo`, `nombre`, `unidad`,
@@ -352,10 +345,10 @@ bancarios y la firma del representante legal.
 
 El dinero se maneja en `Decimal` y se imprime con el formato de Ecuador
 ($ 5.025,60), distinto al de la interfaz a propósito. El Excel es
-editable: los subtotales por material, el subtotal general, el
-addendum, el IVA y la tabla de pagos son fórmulas (`=C9*D9`, `=SUM(...)`,
-IVA sobre subtotal + addendum), no valores fijos — cambiar una cantidad
-recalcula todo lo demás.
+editable: los subtotales por material, el subtotal general, el IVA y
+la tabla de pagos son fórmulas (`=C9*D9`, `=SUM(...)`, IVA sobre el
+subtotal), no valores fijos — cambiar una cantidad recalcula todo lo
+demás.
 
 Los datos del oferente (RUC, teléfono, correo, dirección, representante,
 cuenta bancaria) viven en `settings` (`HEXTRUCTURE_*`), cargados del

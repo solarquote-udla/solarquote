@@ -109,18 +109,15 @@ def _cotizacion_con_materiales(db: Session, **campos) -> Cotizacion:
     cotizacion = Cotizacion(
         usuario_id=usuario.id,
         cliente_nombre=campos.pop("cliente_nombre", "SolarAndes Instalaciones"),
-        cliente_empresa=campos.pop("cliente_empresa", "SolarAndes S.A."),
         cliente_email=campos.pop("cliente_email", "proyectos@solarandes.ec"),
         cliente_telefono=campos.pop("cliente_telefono", "099 123 4567"),
         proyecto_nombre=campos.pop("proyecto_nombre", "Planta El Carmen"),
         numero_proforma=campos.pop("numero_proforma", "CT-130-2026"),
         potencia_kwp=campos.pop("potencia_kwp", Decimal("45.20")),
         subtotal=Decimal("440.00"),
-        addendum_porcentaje=Decimal("5.00"),
-        addendum_monto=Decimal("22.00"),
         iva_porcentaje=Decimal("15.00"),
-        iva_monto=Decimal("69.30"),
-        total=Decimal("531.30"),
+        iva_monto=Decimal("66.00"),
+        total=Decimal("506.00"),
         created_at=HOY,
         items=[ItemCotizacion(paneles_largo=4, paneles_ancho=28, bloques=12)],
         materiales=[
@@ -143,7 +140,7 @@ def _cotizacion_con_materiales(db: Session, **campos) -> Cotizacion:
 @pytest.mark.parametrize(
     "valor,esperado",
     [
-        (Decimal("531.30"), "$ 531,30"),
+        (Decimal("506.00"), "$ 506,00"),
         (Decimal("5025.60"), "$ 5.025,60"),
         (Decimal("1234567.89"), "$ 1.234.567,89"),
         (Decimal("0"), "$ 0,00"),
@@ -206,7 +203,6 @@ def test_material_fuera_del_orden_conocido_cae_al_final(db: Session) -> None:
         usuario_id=usuario.id,
         cliente_nombre="Cliente",
         subtotal=Decimal("1"),
-        addendum_monto=Decimal("0"),
         iva_monto=Decimal("0"),
         total=Decimal("1"),
         materiales=[
@@ -240,7 +236,6 @@ def test_word_incluye_encabezado_concepto_potencia_y_cliente(db: Session, datos_
     assert "Concepto: Estructura de soporte reusable para la instalación en piso de módulos fotovoltaicos" in texto
     assert "Potencia: 45,20 kWp" in texto
     assert "SolarAndes Instalaciones" in texto
-    assert "SolarAndes S.A." in texto
     assert "Planta El Carmen" in texto
 
 
@@ -266,9 +261,8 @@ def test_word_totales_notas_condiciones_y_pagos(db: Session, datos_oferente) -> 
     filas = [[c.text for c in fila.cells] for tabla in documento.tables for fila in tabla.rows]
 
     assert "Subtotal: $ 440,00" in texto
-    assert "Addendum (5%): $ 22,00" in texto
-    assert "IVA (15%): $ 69,30" in texto
-    assert "Total: $ 531,30" in texto
+    assert "IVA (15%): $ 66,00" in texto
+    assert "Total: $ 506,00" in texto
 
     # Notas fijas + configuración del ítem debajo de la primera
     assert "Las cantidades se calcularon en base al diseño de bloques configurados por el cliente." in texto
@@ -280,9 +274,9 @@ def test_word_totales_notas_condiciones_y_pagos(db: Session, datos_oferente) -> 
     assert "Garantía: 1 año." in texto
 
     assert ["Tramo", "Porcentaje", "Monto"] in filas
-    assert ["Anticipo", "30%", "$ 159,39"] in filas
-    assert ["Entrega", "40%", "$ 212,52"] in filas
-    assert ["A 60 días de la entrega", "30%", "$ 159,39"] in filas
+    assert ["Anticipo", "30%", "$ 151,80"] in filas
+    assert ["Entrega", "40%", "$ 202,40"] in filas
+    assert ["A 60 días de la entrega", "30%", "$ 151,80"] in filas
 
     assert "Banco: Banco de Prueba" in texto
     assert "Número de cuenta: 0000000000" in texto
@@ -303,20 +297,19 @@ def test_word_sin_datos_del_oferente_no_falla_y_omite_las_secciones(db: Session,
     assert "Representante legal" not in texto
     # El resto del documento se genera de todas formas
     assert "Proforma CT-130-2026" in texto
-    assert "Total: $ 531,30" in texto
+    assert "Total: $ 506,00" in texto
 
 
 def test_word_sin_proforma_ni_datos_opcionales_del_cliente_no_falla(db: Session, sin_datos_oferente) -> None:
-    """Una cotización al vuelo: sin número de proforma, empresa, correo ni teléfono."""
+    """Una cotización al vuelo: sin número de proforma, correo ni teléfono."""
     cotizacion = _cotizacion_con_materiales(
-        db, numero_proforma=None, cliente_empresa=None, cliente_email=None, cliente_telefono=None, proyecto_nombre=None
+        db, numero_proforma=None, cliente_email=None, cliente_telefono=None, proyecto_nombre=None
     )
 
     documento = Document(io.BytesIO(documentos.generar_word(cotizacion)))
     texto = "\n".join(p.text for p in documento.paragraphs)
 
     assert "Proforma (borrador)" in texto
-    assert "Empresa" not in texto
     assert "Proyecto" not in texto
 
 
@@ -358,15 +351,11 @@ def test_excel_subtotales_y_totales_son_formulas(db: Session, datos_oferente) ->
     fila_subtotal = _fila_con_etiqueta(hoja, "Subtotal")
     assert hoja[f"E{fila_subtotal}"].value == f"=SUM(E{min(fila_hex, fila_var)}:E{max(fila_hex, fila_var)})"
 
-    fila_addendum = _fila_con_etiqueta(hoja, "Addendum (5%)")
-    assert hoja[f"E{fila_addendum}"].value == f"=E{fila_subtotal}*5.00/100"
-
     fila_iva = _fila_con_etiqueta(hoja, "IVA (15%)")
-    # Sobre subtotal + addendum, no solo sobre el subtotal.
-    assert hoja[f"E{fila_iva}"].value == f"=(E{fila_subtotal}+E{fila_addendum})*15.00/100"
+    assert hoja[f"E{fila_iva}"].value == f"=E{fila_subtotal}*15.00/100"
 
     fila_total = _fila_con_etiqueta(hoja, "Total")
-    assert hoja[f"E{fila_total}"].value == f"=E{fila_subtotal}+E{fila_addendum}+E{fila_iva}"
+    assert hoja[f"E{fila_total}"].value == f"=E{fila_subtotal}+E{fila_iva}"
 
     for etiqueta, pct in [("Anticipo", "30"), ("Entrega", "40"), ("A 60 días de la entrega", "30")]:
         fila_pago = _fila_con_etiqueta(hoja, etiqueta, columna="A")

@@ -197,7 +197,6 @@ class ConfirmarLayout(BaseModel):
         default=False,
         description="El Gerente acepta bajo su responsabilidad los bloques fuera de proporción",
     )
-    addendum_porcentaje: Decimal = Field(default=Decimal("0"), ge=0, le=100)
 
 
 class CotizacionEmitidaLeer(BaseModel):

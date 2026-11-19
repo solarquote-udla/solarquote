@@ -39,8 +39,6 @@ def _respuesta_calc_service(cargos_fijos: dict[str, int]) -> dict:
         ],
         "cantidades_totales": {"VAR1650": 8, **cargos_fijos},
         "subtotal": "93.60",
-        "addendum_porcentaje": "0",
-        "addendum_monto": "0.00",
         "iva_porcentaje": "15",
         "iva_monto": "14.04",
         "total": "107.64",
@@ -132,7 +130,6 @@ def test_persiste_el_desglose_en_la_cotizacion(db: Session, monkeypatch: pytest.
     cotizacion, calculo = crear_cotizacion(db, _datos_minimos(), usuario)
 
     assert cotizacion.subtotal == calculo.subtotal
-    assert cotizacion.addendum_monto == calculo.addendum_monto
     assert cotizacion.iva_porcentaje == calculo.iva_porcentaje
     assert cotizacion.iva_monto == calculo.iva_monto
     assert cotizacion.total == calculo.total

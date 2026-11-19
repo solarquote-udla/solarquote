@@ -125,12 +125,12 @@ Evidencia: PR #42 y #44.
 |---|---|
 | Las diez fórmulas f(L, A, B) | `calc: test_calculo_materiales` (13 pruebas, casos a mano y EMIHANA) |
 | Varios ítems; total = suma | `calc: test_endpoint_cotizacion`; `test_confirmacion`: `test_items_del_layout_agrupa_bloques_iguales` |
-| Addendum e IVA | `calc: test_endpoint_cotizacion`; `test_cotizacion_servicio`: `test_persiste_el_desglose_en_la_cotizacion` |
+| Subtotal e IVA (sin addendum, decisión de reunión con Santi: SQ-213) | `calc: test_endpoint_cotizacion`; `test_cotizacion_servicio`: `test_persiste_el_desglose_en_la_cotizacion` |
 | L par | `calc: test_calculo_materiales` |
 | Precios vigentes; material nuevo sin precio no bloquea | `test_cotizacion_servicio`: `test_lanza_si_falta_precio_vigente_*`, `test_un_material_nuevo_sin_precio_no_bloquea_la_cotizacion` |
 | Comunicación segura con calc-service | `calc: test_autenticacion`; `test_calc_service` |
 
-Evidencia: PR #5, #10 a #13, #16, #19, #28.
+Evidencia: PR #5, #10 a #13, #16, #19, #28, y el de SQ-213 (quita el addendum).
 
 ### RF-07 Documento de cotización
 
@@ -146,16 +146,16 @@ público.
 | Regla del requisito | Pruebas |
 |---|---|
 | Documento Word con el detalle de materiales | `test_proforma_documentos`: `test_word_materiales_en_orden_con_moneda_ecuador`, `test_word_totales_notas_condiciones_y_pagos` |
-| Hoja de cálculo Excel con las mismas cantidades, editable | `test_excel_incluye_encabezado_materiales_en_orden_y_datos_bancarios`, `test_excel_subtotales_y_totales_son_formulas` (fórmulas, no valores fijos: cantidad × precio, `SUM`, IVA sobre subtotal + addendum) |
+| Hoja de cálculo Excel con las mismas cantidades, editable | `test_excel_incluye_encabezado_materiales_en_orden_y_datos_bancarios`, `test_excel_subtotales_y_totales_son_formulas` (fórmulas, no valores fijos: cantidad × precio, `SUM`, IVA sobre el subtotal; sin addendum, SQ-213) |
 | Materiales en el orden de la proforma real, no alfabético | `test_materiales_en_el_orden_de_la_proforma_real`, `test_material_fuera_del_orden_conocido_cae_al_final` |
-| Ambos con datos del cliente, subtotal, addendum, IVA y total | mismas pruebas; `test_word_sin_proforma_ni_datos_opcionales_del_cliente_no_falla` cubre los campos opcionales |
+| Ambos con datos del cliente, subtotal, IVA y total (sin addendum ni empresa, SQ-213) | mismas pruebas; `test_word_sin_proforma_ni_datos_opcionales_del_cliente_no_falla` cubre los campos opcionales |
 | Datos del oferente, condiciones, pagos y banco sin romper si no están configurados | `test_word_sin_datos_del_oferente_no_falla_y_omite_las_secciones`, `test_excel_sin_datos_del_oferente_no_falla` |
 | Dinero en `Decimal`, formato de Ecuador ($ 5.025,60) | `test_moneda_formato_ecuador` |
 | El número de proforma se asigna al emitir | Ya cubierto (SQ-82): `test_confirmacion`: `siguiente_numero_proforma` |
 | Los archivos se descargan desde la interfaz | `test_proforma_documentos`: `test_descarga_responde_el_archivo_con_su_tipo_y_nombre`; botón en `CotizacionDetallePage` (`cotizacion-detalle.test.tsx`) |
 | Documento de cotización en menos de 10 s (RNF-03) | `test_rnf`: `test_rnf03_documento_de_cotizacion_en_menos_de_10_s` |
 
-Evidencia: PR de SQ-79/SQ-80/SQ-81/SQ-83/SQ-84.
+Evidencia: PR de SQ-79/SQ-80/SQ-81/SQ-83/SQ-84 y el de SQ-213 (quita el addendum y el campo Empresa).
 
 ### RF-08 Lista de referencia de inversores
 

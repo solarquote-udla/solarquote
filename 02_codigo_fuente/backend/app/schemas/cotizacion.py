@@ -55,9 +55,6 @@ class ResultadoCalculoCotizacion(BaseModel):
 
     subtotal: Decimal
 
-    addendum_porcentaje: Decimal
-    addendum_monto: Decimal
-
     iva_porcentaje: Decimal
     iva_monto: Decimal
 
@@ -67,20 +64,17 @@ class ResultadoCalculoCotizacion(BaseModel):
 class CotizacionCrear(BaseModel):
     # Nullable a propósito, igual que en el modelo: permite cotizar a un
     # cliente que todavía no está en el catálogo (RF-12). Si se manda
-    # cliente_id, el snapshot (nombre, empresa, email, teléfono) se toma
-    # del registro de Cliente y estos campos se ignoran — no tendría
-    # sentido que el cliente #7 quede guardado con el nombre que alguien
-    # tipeó en el formulario. Solo se usan cuando NO hay cliente_id.
+    # cliente_id, el snapshot (nombre, email, teléfono) se toma del
+    # registro de Cliente y estos campos se ignoran — no tendría sentido
+    # que el cliente #7 quede guardado con el nombre que alguien tipeó
+    # en el formulario. Solo se usan cuando NO hay cliente_id.
     cliente_id: int | None = Field(default=None, gt=0)
     cliente_nombre: str | None = Field(default=None, min_length=1, max_length=150)
-    cliente_empresa: str | None = Field(default=None, max_length=150)
     cliente_email: EmailStr | None = None
     cliente_telefono: str | None = Field(default=None, max_length=30)
 
     proyecto_id: int | None = Field(default=None, gt=0)
     proyecto_nombre: str | None = Field(default=None, max_length=150)
-
-    addendum_porcentaje: Decimal = Field(default=Decimal("0"), ge=0, le=100)
 
     items: list[ItemCalculoEntrada] = Field(min_length=1)
 
@@ -103,14 +97,11 @@ class CotizacionLeer(BaseModel):
 
     cliente_id: int | None
     cliente_nombre: str
-    cliente_empresa: str | None
     cliente_email: str | None
     cliente_telefono: str | None
 
     proyecto_id: int | None
     proyecto_nombre: str | None
-
-    addendum_porcentaje: Decimal
 
     created_at: datetime
     updated_at: datetime
@@ -134,7 +125,6 @@ class CotizacionResumenLeer(BaseModel):
     numero_proforma: str | None
     estado: EstadoCotizacion
     cliente_nombre: str
-    cliente_empresa: str | None
     proyecto_id: int | None
     proyecto_nombre: str | None
     total: Decimal | None
@@ -169,16 +159,13 @@ class CotizacionDetalleLeer(BaseModel):
 
     cliente_id: int | None
     cliente_nombre: str
-    cliente_empresa: str | None
     cliente_email: str | None
     cliente_telefono: str | None
 
     proyecto_id: int | None
     proyecto_nombre: str | None
 
-    addendum_porcentaje: Decimal
     subtotal: Decimal | None
-    addendum_monto: Decimal | None
     iva_porcentaje: Decimal | None
     iva_monto: Decimal | None
     total: Decimal | None

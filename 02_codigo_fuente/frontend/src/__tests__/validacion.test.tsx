@@ -157,7 +157,6 @@ const VALIDACION = (cambios: Partial<Validacion> = {}): Validacion => ({
   cotizacion_id: 1,
   numero_proforma: "CT-024-2026",
   cliente_nombre: "Hacienda San Pablo",
-  cliente_empresa: null,
   proyecto_nombre: "San Pablo",
   estado: "cotizada",
   created_at: "2026-10-20T10:00:00Z",

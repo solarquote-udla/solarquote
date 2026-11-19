@@ -33,8 +33,6 @@ class CalcularCotizacionEntrada(BaseModel):
     # un material más, usando su precio vigente igual que los demás.
     cargos_fijos: dict[str, PositiveInt] = Field(default_factory=dict)
 
-    addendum_porcentaje: Decimal = Field(default=Decimal("0"), ge=0, le=100)
-
     # Lo resuelve el backend (configurable, no hardcodeado acá): este
     # servicio no asume ninguna tasa por su cuenta.
     iva_porcentaje: Decimal = Field(ge=0, le=100)
@@ -52,9 +50,6 @@ class CalcularCotizacionSalida(BaseModel):
     cantidades_totales: dict[str, int]
 
     subtotal: Decimal
-
-    addendum_porcentaje: Decimal
-    addendum_monto: Decimal
 
     iva_porcentaje: Decimal
     iva_monto: Decimal
