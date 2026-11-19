@@ -114,9 +114,9 @@ export interface RespuestaToken {
   usuario: UsuarioSesion;
 }
 
-/** Forma de los errores que devuelve FastAPI */
+/** Forma de los errores que devuelve FastAPI (ver app/core/errores.py en el backend) */
 export interface ErrorApi {
-  detail: string | { msg: string; loc: (string | number)[] }[];
+  detail: string | { msg: string; loc: (string | number)[]; type: string }[];
 }
 
 // ─── Clientes ───────────────────────────────────────────
