@@ -110,18 +110,35 @@ export function mensajeDeError(error: unknown, porDefecto = "Ocurrió un error i
   return porDefecto;
 }
 
+/** "potencia_wp" → "Potencia Wp": legible, sin inventar un diccionario de campos. */
+function etiquetaDeCampo(segmento: string): string {
+  return segmento
+    .split("_")
+    .map((palabra) => palabra.charAt(0).toUpperCase() + palabra.slice(1))
+    .join(" ");
+}
+
 /**
  * El manejador global de 422 del backend (app/core/errores.py) ya entrega
- * el mensaje en español y sin el prefijo "Value error, " de Pydantic.
- * Esto queda como respaldo por si algún 422 no pasara por ese manejador.
+ * el mensaje en español, pero solo los `ValueError` que escribimos
+ * nosotros (`type: "value_error"`) mencionan el campo en el propio texto
+ * — las plantillas de las restricciones de Pydantic (`greater_than`,
+ * `missing`, etc.) no, así que ahí se antepone el campo usando el `loc`.
+ *
+ * Es la misma idea que `erroresDeCampo`, pero en una sola línea para las
+ * pantallas que todavía no muestran el error junto a cada campo.
  */
-function traducirErrorValidacion(error: { msg: string; loc: (string | number)[] }): string {
-  const propio = error.msg.replace(/^Value error, /, "");
-  if (propio !== error.msg) {
-    return propio;
+function traducirErrorValidacion(error: { msg: string; loc: (string | number)[]; type: string }): string {
+  if (error.type === "value_error") {
+    return error.msg;
   }
 
-  const campo = error.loc.filter((parte) => parte !== "body").join(" › ");
+  const campo = error.loc
+    .filter((parte) => parte !== "body")
+    // Los índices de lista (inversores.0, .1, ...) son internos y empiezan
+    // en 0; para quien lee el mensaje, el primer inversor es el 1.
+    .map((parte) => (typeof parte === "number" ? parte + 1 : etiquetaDeCampo(parte)))
+    .join(" › ");
   return campo ? `${campo}: ${error.msg}` : error.msg;
 }
 
