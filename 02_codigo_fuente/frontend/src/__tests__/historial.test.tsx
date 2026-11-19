@@ -14,6 +14,15 @@ vi.mock("@/hooks/useAuth", () => ({
     tienePermiso: () => true,
   }),
 }));
+vi.mock("@/services/planta", () => ({
+  obtenerPlanta: vi.fn().mockResolvedValue({
+    cotizacion_id: 7,
+    proyecto_id: null,
+    terreno: null,
+    layout: null,
+    cambio_despues_de_cotizar: false,
+  }),
+}));
 vi.mock("@/services/proyectos", () => ({
   listarProyectos: vi.fn(async () => [PROYECTO]),
 }));

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models.proyecto import Proyecto
 from app.models.terreno import Camino, Terreno
-from app.schemas.terreno import CaminoCrear, TerrenoActualizar, TerrenoCrear
+from app.schemas.terreno import CaminoCrear, CaminoLeer, TerrenoActualizar, TerrenoCrear, TerrenoLeer
 from app.services.geometria import calcular_areas
 from app.services.proyecto import avanzar_a_en_diseno
 from app.services.proyecto import obtener_proyecto  # noqa: F401 — lo usa el router
@@ -19,6 +19,26 @@ def obtener_terreno(db: Session, proyecto_id: int) -> Terreno | None:
         db.query(Terreno)
         .filter(Terreno.proyecto_id == proyecto_id)
         .one_or_none()
+    )
+
+
+def a_respuesta(terreno: Terreno) -> TerrenoLeer:
+    """
+    Terreno con sus caminos y las áreas calculadas.
+
+    Las áreas no son columnas: se derivan de la geometría en cada
+    lectura para que nunca queden desincronizadas con los caminos.
+    """
+    return TerrenoLeer(
+        id=terreno.id,
+        proyecto_id=terreno.proyecto_id,
+        vertices=terreno.vertices,
+        orientacion_norte=terreno.orientacion_norte,
+        notas=terreno.notas,
+        caminos=[CaminoLeer.model_validate(c) for c in terreno.caminos],
+        areas=areas_de(terreno),
+        created_at=terreno.created_at,
+        updated_at=terreno.updated_at,
     )
 
 

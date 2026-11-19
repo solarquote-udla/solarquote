@@ -26,6 +26,7 @@ from app.routers import (
     material,
     panel,
     perfiles,
+    planta,
     proyectos,
     tablero,
     terreno,
@@ -86,6 +87,7 @@ app.include_router(bocetos.router)
 
 # Módulo 3 — Cotización
 app.include_router(cotizacion.router)
+app.include_router(planta.router)
 
 # Módulo 4 — Administración: tablero de indicadores (RF-13)
 app.include_router(tablero.router)

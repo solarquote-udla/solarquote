@@ -196,6 +196,7 @@ Evidencia: PR #23 a #25, #35, el PR de SQ-135, el PR de SQ-211 y el PR de SQ-212
 | Detalle con materiales, cantidades y L/A/B | `test_cotizacion_historial`: `test_obtener_cotizacion_trae_items_y_materiales`; `historial.test.tsx` |
 | Solo con permiso | `test_seguridad`: `test_historial_lo_lee_quien_tiene_*`, `test_historial_no_lo_lee_cualquier_otro_permiso` |
 | Descargar de nuevo el documento | `test_proforma_documentos`: `test_descarga_responde_el_archivo_con_su_tipo_y_nombre` |
+| Ver la planta del proyecto desde el detalle (pedido de Santi): terreno, caminos y bloques con sus paneles, de solo lectura y con el permiso del historial; aviso si el plano cambió después de cotizar | `test_planta` (6 pruebas); `plantaCotizacion.test.tsx` (6 pruebas) |
 
 Evidencia: PR #39.
 

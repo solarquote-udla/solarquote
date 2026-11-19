@@ -34,23 +34,7 @@ router = APIRouter(
 
 
 def _respuesta(terreno) -> TerrenoLeer:
-    """
-    Arma la respuesta agregando las áreas calculadas.
-
-    Las áreas no son columnas: se derivan de la geometría en cada
-    lectura para que nunca queden desincronizadas con los caminos.
-    """
-    return TerrenoLeer(
-        id=terreno.id,
-        proyecto_id=terreno.proyecto_id,
-        vertices=terreno.vertices,
-        orientacion_norte=terreno.orientacion_norte,
-        notas=terreno.notas,
-        caminos=[CaminoLeer.model_validate(c) for c in terreno.caminos],
-        areas=servicio.areas_de(terreno),
-        created_at=terreno.created_at,
-        updated_at=terreno.updated_at,
-    )
+    return servicio.a_respuesta(terreno)
 
 
 def _proyecto_o_404(db: Session, proyecto_id: int):
