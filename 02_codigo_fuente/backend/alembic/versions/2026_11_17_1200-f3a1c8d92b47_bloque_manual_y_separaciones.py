@@ -10,7 +10,7 @@ Revisión con HEXtructure del 17 de noviembre de 2026:
   en 0.
 
 Revision ID: f3a1c8d92b47
-Revises: e7b2a9c41d06
+Revises: 5e2a2b0baecf
 Create Date: 2026-11-17 12:00:00
 """
 
@@ -20,7 +20,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "f3a1c8d92b47"
-down_revision: str | None = "e7b2a9c41d06"
+down_revision: str | None = "5e2a2b0baecf"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
