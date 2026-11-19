@@ -13,7 +13,7 @@ cardinalidad de las relaciones sale de si la FK admite null y de si es
 from app.core.database import Base
 from scripts.generar_diagrama_er import _entidad, _es_unica_una_sola_columna, _relaciones
 
-CANTIDAD_DE_TABLAS = 25
+CANTIDAD_DE_TABLAS = 26
 
 
 def test_el_esquema_tiene_las_25_tablas_conocidas() -> None:

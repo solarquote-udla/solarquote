@@ -124,6 +124,10 @@ erDiagram
         decimal total "nullable"
         decimal potencia_kwp "nullable"
         int total_paneles "nullable"
+        int plazo_dias "nullable"
+        int validez_dias "nullable"
+        int garantia_anios "nullable"
+        decimal precio_wp "nullable"
         string estado
         datetime instalada_at "nullable"
         int instalada_por_id FK "nullable"
@@ -327,6 +331,14 @@ erDiagram
         datetime updated_at
     }
 
+    TRAMOS_PAGO_COTIZACION {
+        int id PK
+        int cotizacion_id FK
+        int orden
+        string nombre
+        decimal porcentaje
+    }
+
     USUARIOS {
         int id PK
         string nombre
@@ -349,6 +361,7 @@ erDiagram
     CONFIGURACIONES_EQUIPO ||--o{ INVERSORES_EQUIPO : configuracion
     COTIZACIONES ||--o{ ITEMS_COTIZACION : cotizacion
     COTIZACIONES ||--o{ MATERIALES_COTIZADOS : cotizacion
+    COTIZACIONES ||--o{ TRAMOS_PAGO_COTIZACION : cotizacion
     COTIZACIONES ||--o| DESPACHOS : cotizacion
     COTIZACIONES ||--o| RECEPCIONES : cotizacion
     DESPACHOS o|--o{ FOTOS_VALIDACION : despacho

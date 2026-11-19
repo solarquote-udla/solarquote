@@ -119,9 +119,12 @@ class Settings(BaseSettings):
     PROFORMA_CONCEPTO: str = "Estructura de soporte reusable para la instalación en piso de módulos fotovoltaicos"
     PROFORMA_PLAZO_DIAS: int = Field(default=20, ge=1)
     PROFORMA_VALIDEZ_DIAS: int = Field(default=90, ge=1)
-    PROFORMA_GARANTIA_ANIOS: int = Field(default=1, ge=1)
+    PROFORMA_GARANTIA_ANIOS: int = Field(default=10, ge=1)
 
-    # Forma de pago: tres porcentajes sobre el total que deben sumar 100.
+    # Forma de pago por defecto, cuando la cotización no edita sus propios
+    # tramos (SQ-213): tres porcentajes sobre el subtotal (sin IVA) que
+    # deben sumar 100. Cada cotización real suele tener su propia forma de
+    # pago (ver schemas.cotizacion.CondicionesProforma.pagos).
     PROFORMA_PAGO_ANTICIPO_PCT: Decimal = Field(default=Decimal("30"), ge=0, le=100)
     PROFORMA_PAGO_ENTREGA_PCT: Decimal = Field(default=Decimal("40"), ge=0, le=100)
     PROFORMA_PAGO_60_DIAS_PCT: Decimal = Field(default=Decimal("30"), ge=0, le=100)

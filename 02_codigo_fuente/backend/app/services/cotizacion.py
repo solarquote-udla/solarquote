@@ -9,6 +9,7 @@ ese momento — es un snapshot, no se recalcula después.
 """
 
 from datetime import date, datetime, time
+from decimal import Decimal
 
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, selectinload
@@ -17,11 +18,11 @@ from app.core.config import settings
 from app.core.fechas import ZONA_ECUADOR
 from app.core.texto import escapar_comodines_ilike
 from app.models.cliente import Cliente
-from app.models.cotizacion import Cotizacion, EstadoCotizacion, ItemCotizacion, MaterialCotizado
+from app.models.cotizacion import Cotizacion, EstadoCotizacion, ItemCotizacion, MaterialCotizado, TramoPagoCotizacion
 from app.models.material import Material
 from app.models.proyecto import Proyecto
 from app.models.usuario import Usuario
-from app.schemas.cotizacion import CotizacionCrear, ItemCalculoEntrada, ResultadoCalculoCotizacion
+from app.schemas.cotizacion import CondicionesProforma, CotizacionCrear, ItemCalculoEntrada, ResultadoCalculoCotizacion
 from app.services.calc_service import calcular_via_calc_service
 from app.services.material import (
     CODIGOS_FORMULA,
@@ -106,6 +107,30 @@ def crear_cotizacion(
         cliente_email = datos.cliente_email
         cliente_telefono = datos.cliente_telefono
 
+    condiciones = datos.condiciones or CondicionesProforma()
+    plazo_dias = condiciones.plazo_dias if condiciones.plazo_dias is not None else settings.PROFORMA_PLAZO_DIAS
+    validez_dias = condiciones.validez_dias if condiciones.validez_dias is not None else settings.PROFORMA_VALIDEZ_DIAS
+    garantia_anios = (
+        condiciones.garantia_anios if condiciones.garantia_anios is not None else settings.PROFORMA_GARANTIA_ANIOS
+    )
+    if condiciones.pagos is not None:
+        tramos_pago = [(tramo.nombre, tramo.porcentaje) for tramo in condiciones.pagos]
+    else:
+        tramos_pago = [
+            ("Anticipo", settings.PROFORMA_PAGO_ANTICIPO_PCT),
+            ("Entrega", settings.PROFORMA_PAGO_ENTREGA_PCT),
+            ("A 60 días de la entrega", settings.PROFORMA_PAGO_60_DIAS_PCT),
+        ]
+
+    # Informativo: el precio por Wp que el cliente compara contra el de
+    # referencia del mercado. Se calcula, no se edita (SQ-213/Joseph) —
+    # nulo si la cotización no tiene potencia (al vuelo, sin layout).
+    precio_wp = (
+        (resultado.subtotal / (Decimal(str(potencia_kwp)) * 1000)).quantize(Decimal("0.0001"))
+        if potencia_kwp is not None and potencia_kwp > 0
+        else None
+    )
+
     cotizacion = Cotizacion(
         numero_proforma=siguiente_numero_proforma(db),
         potencia_kwp=potencia_kwp,
@@ -121,6 +146,14 @@ def crear_cotizacion(
         iva_porcentaje=resultado.iva_porcentaje,
         iva_monto=resultado.iva_monto,
         total=resultado.total,
+        plazo_dias=plazo_dias,
+        validez_dias=validez_dias,
+        garantia_anios=garantia_anios,
+        precio_wp=precio_wp,
+        pagos=[
+            TramoPagoCotizacion(orden=orden, nombre=nombre, porcentaje=porcentaje)
+            for orden, (nombre, porcentaje) in enumerate(tramos_pago)
+        ],
         items=[
             ItemCotizacion(
                 paneles_largo=item.paneles_largo,
@@ -199,12 +232,13 @@ def listar_cotizaciones(
 
 
 def obtener_cotizacion(db: Session, cotizacion_id: int) -> Cotizacion | None:
-    """Detalle completo de una cotización, con sus ítems y materiales."""
+    """Detalle completo de una cotización, con sus ítems, materiales y tramos de pago."""
     return (
         db.query(Cotizacion)
         .options(
             selectinload(Cotizacion.items),
             selectinload(Cotizacion.materiales).selectinload(MaterialCotizado.material),
+            selectinload(Cotizacion.pagos),
         )
         .filter(Cotizacion.id == cotizacion_id)
         .one_or_none()
