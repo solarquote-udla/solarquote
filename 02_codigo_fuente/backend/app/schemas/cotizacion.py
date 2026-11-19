@@ -64,38 +64,46 @@ class ResultadoCalculoCotizacion(BaseModel):
     total: Decimal
 
 
+class TramoPago(BaseModel):
+    """Un tramo de la forma de pago (ej. "Anticipo", 40%)."""
+
+    nombre: str = Field(min_length=1, max_length=100)
+    porcentaje: Decimal = Field(gt=0, le=100)
+
+
 class CondicionesProforma(BaseModel):
     """
     Condiciones comerciales de la proforma, editables por cotización
     (antes fijas en `settings` para todas: acuerdo de la reunión con
     Santi, SQ-213). Lo que no se manda usa el valor de `settings` como
     antes — ver `services/cotizacion.py`.
+
+    El precio por Wp no está acá: se calcula solo (subtotal ÷ potencia
+    en Wp), no se edita — es el número que el cliente compara contra el
+    precio de referencia del mercado.
     """
 
     plazo_dias: int | None = Field(default=None, ge=1)
     validez_dias: int | None = Field(default=None, ge=1)
     garantia_anios: int | None = Field(default=None, ge=1)
-    pago_anticipo_pct: Decimal | None = Field(default=None, ge=0, le=100)
-    pago_entrega_pct: Decimal | None = Field(default=None, ge=0, le=100)
-    pago_60_dias_pct: Decimal | None = Field(default=None, ge=0, le=100)
-    precio_wp: Decimal | None = Field(
-        default=None, gt=0, description="Informativo (USD/Wp): no afecta el cálculo de materiales ni el total"
+    pagos: list[TramoPago] | None = Field(
+        default=None,
+        min_length=1,
+        description=(
+            "Tramos de la forma de pago (nombre y porcentaje), deben sumar 100. Las proformas reales "
+            "varían: CT519 es Anticipo 40 / Entrega 60; CT521A es Anticipo 30 / tres entregas de 25/25/20."
+        ),
     )
 
-    @model_validator(mode="after")
-    def validar_forma_de_pago(self) -> "CondicionesProforma":
-        pagos = (self.pago_anticipo_pct, self.pago_entrega_pct, self.pago_60_dias_pct)
-        if any(p is not None for p in pagos):
-            if any(p is None for p in pagos):
-                raise ValueError(
-                    "Si editas la forma de pago, manda los tres porcentajes (anticipo, entrega, 60 días)."
-                )
-            if pagos[0] + pagos[1] + pagos[2] != 100:
-                raise ValueError(
-                    f"Los porcentajes de pago deben sumar 100 (anticipo {pagos[0]} + entrega {pagos[1]} "
-                    f"+ 60 días {pagos[2]})"
-                )
-        return self
+    @field_validator("pagos")
+    @classmethod
+    def validar_forma_de_pago(cls, pagos: list["TramoPago"] | None) -> list["TramoPago"] | None:
+        if pagos is not None:
+            suma = sum((tramo.porcentaje for tramo in pagos), start=Decimal("0"))
+            if suma != 100:
+                partes = " + ".join(f"{t.nombre} {t.porcentaje}" for t in pagos)
+                raise ValueError(f"Los porcentajes de la forma de pago deben sumar 100 ({partes} = {suma})")
+        return pagos
 
 
 class CotizacionCrear(BaseModel):
@@ -198,6 +206,13 @@ class MaterialCotizadoLeer(BaseModel):
     precio_unitario: Decimal
 
 
+class TramoPagoLeer(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    nombre: str
+    porcentaje: Decimal
+
+
 class CotizacionDetalleLeer(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -222,13 +237,11 @@ class CotizacionDetalleLeer(BaseModel):
     total: Decimal | None
 
     # Condiciones de la proforma, editables por cotización (SQ-213).
-    # Nullable: las cotizaciones de antes de este campo no lo tienen.
+    # Nullable/vacío: las cotizaciones de antes de este campo no lo tienen.
     plazo_dias: int | None
     validez_dias: int | None
     garantia_anios: int | None
-    pago_anticipo_pct: Decimal | None
-    pago_entrega_pct: Decimal | None
-    pago_60_dias_pct: Decimal | None
+    pagos: list[TramoPagoLeer]
     precio_wp: Decimal | None
 
     created_at: datetime

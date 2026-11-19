@@ -15,7 +15,7 @@ from app.models.material import Material, PrecioMaterial
 from app.models.proyecto import EstadoProyecto, Proyecto
 from app.models.usuario import Usuario
 from tests.fabricas import perfil_gerente
-from app.schemas.cotizacion import CondicionesProforma, CotizacionCrear, ItemCalculoEntrada
+from app.schemas.cotizacion import CondicionesProforma, CotizacionCrear, ItemCalculoEntrada, TramoPago
 from app.services.cotizacion import ProyectoNoDisponible, crear_cotizacion
 from app.services.material import CODIGOS_FORMULA, PrecioVigenteFaltante
 from app.services.proyecto import ClienteNoDisponible
@@ -150,9 +150,12 @@ def test_sin_condiciones_usa_los_valores_de_settings(db: Session, monkeypatch: p
     assert cotizacion.plazo_dias == settings.PROFORMA_PLAZO_DIAS
     assert cotizacion.validez_dias == settings.PROFORMA_VALIDEZ_DIAS
     assert cotizacion.garantia_anios == settings.PROFORMA_GARANTIA_ANIOS
-    assert cotizacion.pago_anticipo_pct == settings.PROFORMA_PAGO_ANTICIPO_PCT
-    assert cotizacion.pago_entrega_pct == settings.PROFORMA_PAGO_ENTREGA_PCT
-    assert cotizacion.pago_60_dias_pct == settings.PROFORMA_PAGO_60_DIAS_PCT
+    assert [(t.nombre, t.porcentaje) for t in cotizacion.pagos] == [
+        ("Anticipo", settings.PROFORMA_PAGO_ANTICIPO_PCT),
+        ("Entrega", settings.PROFORMA_PAGO_ENTREGA_PCT),
+        ("A 60 días de la entrega", settings.PROFORMA_PAGO_60_DIAS_PCT),
+    ]
+    # Sin potencia (cotización al vuelo, sin layout): no hay precio por Wp que calcular.
     assert cotizacion.precio_wp is None
 
 
@@ -169,10 +172,12 @@ def test_condiciones_editadas_pisan_las_de_settings(db: Session, monkeypatch: py
             plazo_dias=45,
             validez_dias=30,
             garantia_anios=2,
-            pago_anticipo_pct=Decimal("50"),
-            pago_entrega_pct=Decimal("50"),
-            pago_60_dias_pct=Decimal("0"),
-            precio_wp=Decimal("0.038"),
+            pagos=[
+                TramoPago(nombre="Anticipo", porcentaje=Decimal("30")),
+                TramoPago(nombre="Entrega parcial 1", porcentaje=Decimal("25")),
+                TramoPago(nombre="Entrega parcial 2", porcentaje=Decimal("25")),
+                TramoPago(nombre="Entrega parcial 3", porcentaje=Decimal("20")),
+            ],
         ),
     )
     cotizacion, _ = crear_cotizacion(db, datos, usuario)
@@ -180,23 +185,33 @@ def test_condiciones_editadas_pisan_las_de_settings(db: Session, monkeypatch: py
     assert cotizacion.plazo_dias == 45
     assert cotizacion.validez_dias == 30
     assert cotizacion.garantia_anios == 2
-    assert cotizacion.pago_anticipo_pct == Decimal("50")
-    assert cotizacion.pago_entrega_pct == Decimal("50")
-    assert cotizacion.pago_60_dias_pct == Decimal("0")
-    assert cotizacion.precio_wp == Decimal("0.038")
+    assert [(t.nombre, t.porcentaje) for t in cotizacion.pagos] == [
+        ("Anticipo", Decimal("30")),
+        ("Entrega parcial 1", Decimal("25")),
+        ("Entrega parcial 2", Decimal("25")),
+        ("Entrega parcial 3", Decimal("20")),
+    ]
 
 
-def test_forma_de_pago_debe_mandar_los_tres_porcentajes_juntos() -> None:
-    with pytest.raises(ValidationError, match="los tres porcentajes"):
-        CondicionesProforma(pago_anticipo_pct=Decimal("50"))
+def test_precio_por_wp_se_calcula_del_subtotal_y_la_potencia(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    """No es editable: lo manda `potencia_kwp`, que solo se conoce al salir de un layout (RF-05)."""
+    _sembrar_materiales_de_formula(db)
+    usuario = _crear_usuario(db)
+    _mock_calc_service_ok(monkeypatch)
+
+    # subtotal del mock: 93.60. 9.36 kWp = 9360 Wp → 93.60 / 9360 = 0.01 exacto.
+    cotizacion, _ = crear_cotizacion(db, _datos_minimos(), usuario, potencia_kwp=9.36)
+
+    assert cotizacion.precio_wp == Decimal("0.0100")
 
 
 def test_forma_de_pago_debe_sumar_cien() -> None:
     with pytest.raises(ValidationError, match="deben sumar 100"):
         CondicionesProforma(
-            pago_anticipo_pct=Decimal("50"),
-            pago_entrega_pct=Decimal("50"),
-            pago_60_dias_pct=Decimal("10"),
+            pagos=[
+                TramoPago(nombre="Anticipo", porcentaje=Decimal("50")),
+                TramoPago(nombre="Entrega", porcentaje=Decimal("40")),
+            ]
         )
 
 

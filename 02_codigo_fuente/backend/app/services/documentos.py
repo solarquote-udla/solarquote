@@ -8,10 +8,12 @@ notas con la configuración L/A/bloques de cada ítem, materiales en el
 orden de esa proforma (no alfabético), condiciones comerciales, tabla
 de pagos y datos bancarios con la firma del representante legal.
 
-Las condiciones (plazo, validez, garantía, forma de pago) y el precio
-por Wp son editables por cotización (SQ-213, acuerdo de la reunión con
-Santi): lo que no se edita al confirmar usa el valor de `settings`,
-igual que antes.
+Las condiciones (plazo, validez, garantía, forma de pago) son editables
+por cotización (SQ-213, acuerdo de la reunión con Santi): lo que no se
+edita al confirmar usa el valor de `settings`, igual que antes. La
+forma de pago es una lista de tramos (nombre y porcentaje) sobre el
+subtotal — las proformas dicen "FORMA DE PAGO Y VALORES SIN IVA". El
+precio por Wp se calcula (subtotal ÷ potencia en Wp), no se edita.
 
 El Word es un documento fijo. El Excel es editable: los subtotales por
 material, el subtotal general, el addendum, el IVA, el total y la tabla
@@ -141,21 +143,18 @@ def _notas(cotizacion: Cotizacion) -> list[str]:
     return [notas[0], *configuraciones, *notas[1:]]
 
 
-def _pagos(cotizacion: Cotizacion) -> list[tuple[str, Decimal | None, Decimal | None]]:
+def _pagos(cotizacion: Cotizacion) -> list[tuple[str, Decimal, Decimal | None]]:
     """
     (etiqueta, porcentaje, monto) para cada tramo de la forma de pago, con
-    los porcentajes de esta cotización (editables por cotización, SQ-213).
-    Nullable: una cotización de antes de este campo no los tiene.
+    los tramos de esta cotización (editables por cotización, SQ-213) sobre
+    el **subtotal**, no el total: las proformas dicen "FORMA DE PAGO Y
+    VALORES SIN IVA". Vacío: una cotización de antes de este campo no
+    tiene tramos.
     """
-    tramos = [
-        ("Anticipo", cotizacion.pago_anticipo_pct),
-        ("Entrega", cotizacion.pago_entrega_pct),
-        ("A 60 días de la entrega", cotizacion.pago_60_dias_pct),
-    ]
-    total = cotizacion.total
+    subtotal = cotizacion.subtotal
     return [
-        (etiqueta, pct, (total * pct / Decimal("100")) if total is not None and pct is not None else None)
-        for etiqueta, pct in tramos
+        (tramo.nombre, tramo.porcentaje, (subtotal * tramo.porcentaje / Decimal("100")) if subtotal is not None else None)
+        for tramo in cotizacion.pagos
     ]
 
 
@@ -266,7 +265,7 @@ def generar_word(cotizacion: Cotizacion) -> bytes:
         else "Garantía: —"
     )
 
-    documento.add_heading("Forma de pago", level=2)
+    documento.add_heading("Forma de pago y valores sin IVA", level=2)
     tabla_pagos = documento.add_table(rows=1, cols=3)
     tabla_pagos.style = "Light Grid Accent 1"
     for celda, texto in zip(tabla_pagos.rows[0].cells, ["Tramo", "Porcentaje", "Monto"]):
@@ -451,7 +450,7 @@ def generar_excel(cotizacion: Cotizacion) -> bytes:
     )
     fila += 2
 
-    hoja.cell(row=fila, column=1, value="Forma de pago").font = negrita
+    hoja.cell(row=fila, column=1, value="Forma de pago y valores sin IVA").font = negrita
     fila += 1
     for columna, texto in enumerate(["Tramo", "Porcentaje", "Monto"], start=1):
         hoja.cell(row=fila, column=columna, value=texto).font = negrita
@@ -459,12 +458,9 @@ def generar_excel(cotizacion: Cotizacion) -> bytes:
     for etiqueta, pct, _ in _pagos(cotizacion):
         hoja.cell(row=fila, column=1, value=etiqueta)
         hoja.cell(row=fila, column=2, value=_porcentaje(pct))
-        if pct is not None:
-            # También fórmula, sobre la celda del total: cambia si cambia una cantidad.
-            celda_pago = hoja.cell(row=fila, column=3, value=f"=E{fila_total}*{pct}/100")
-            celda_pago.number_format = FORMATO_MONEDA_EXCEL
-        else:
-            hoja.cell(row=fila, column=3, value="—")
+        # También fórmula, sobre el subtotal (sin IVA): cambia si cambia una cantidad.
+        celda_pago = hoja.cell(row=fila, column=3, value=f"=E{fila_subtotal}*{pct}/100")
+        celda_pago.number_format = FORMATO_MONEDA_EXCEL
         fila += 1
 
     if settings.HEXTRUCTURE_BANCO:

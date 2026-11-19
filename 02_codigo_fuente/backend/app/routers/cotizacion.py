@@ -34,6 +34,7 @@ from app.schemas.cotizacion import (
     ItemCotizacionLeer,
     MaterialCotizadoLeer,
     ResultadoCalculoCotizacion,
+    TramoPagoLeer,
 )
 from app.services import cotizacion as servicio
 from app.services import documentos
@@ -95,9 +96,7 @@ def _detalle(cotizacion: Cotizacion) -> CotizacionDetalleLeer:
         plazo_dias=cotizacion.plazo_dias,
         validez_dias=cotizacion.validez_dias,
         garantia_anios=cotizacion.garantia_anios,
-        pago_anticipo_pct=cotizacion.pago_anticipo_pct,
-        pago_entrega_pct=cotizacion.pago_entrega_pct,
-        pago_60_dias_pct=cotizacion.pago_60_dias_pct,
+        pagos=[TramoPagoLeer.model_validate(tramo) for tramo in cotizacion.pagos],
         precio_wp=cotizacion.precio_wp,
         created_at=cotizacion.created_at,
         updated_at=cotizacion.updated_at,

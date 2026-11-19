@@ -535,21 +535,30 @@ export interface InversorLayout {
   motivo: string | null;
 }
 
+/** Un tramo de la forma de pago (ej. "Anticipo", 40%), al editarlo */
+export interface TramoPago {
+  nombre: string;
+  porcentaje: number;
+}
+
+/** Espejo de `TramoPagoLeer`: un tramo ya persistido, tal como se leyó */
+export interface TramoPagoLeer {
+  nombre: string;
+  porcentaje: string;
+}
+
 /**
  * Espejo de `CondicionesProforma`: condiciones comerciales editables por
  * cotización (SQ-213). Lo que no se manda usa el valor de settings, como
- * antes de este campo.
+ * antes de este campo. El precio por Wp no está acá: se calcula solo
+ * (subtotal ÷ potencia), no se edita.
  */
 export interface CondicionesProforma {
   plazo_dias?: number;
   validez_dias?: number;
   garantia_anios?: number;
-  /** Si se edita la forma de pago, los tres porcentajes van juntos y deben sumar 100 */
-  pago_anticipo_pct?: number;
-  pago_entrega_pct?: number;
-  pago_60_dias_pct?: number;
-  /** Informativo (USD/Wp): no afecta el cálculo de materiales ni el total */
-  precio_wp?: number;
+  /** Deben sumar 100. Las proformas reales varían cuántos tramos tienen. */
+  pagos?: TramoPago[];
 }
 
 /** Espejo de `ConfirmarLayout`: confirmación explícita del diseño (RF-05) */
@@ -679,14 +688,12 @@ export interface CotizacionDetalle {
   iva_monto: string | null;
   total: string | null;
 
-  /** Condiciones de la proforma, editables por cotización (SQ-213). Null en cotizaciones de antes de este campo. */
+  /** Condiciones de la proforma, editables por cotización (SQ-213). Vacío/null en cotizaciones de antes de este campo. */
   plazo_dias: number | null;
   validez_dias: number | null;
   garantia_anios: number | null;
-  pago_anticipo_pct: string | null;
-  pago_entrega_pct: string | null;
-  pago_60_dias_pct: string | null;
-  /** Informativo (USD/Wp): no afecta el cálculo de materiales ni el total */
+  pagos: TramoPagoLeer[];
+  /** Calculado (subtotal ÷ potencia), no editable */
   precio_wp: string | null;
 
   created_at: string;
