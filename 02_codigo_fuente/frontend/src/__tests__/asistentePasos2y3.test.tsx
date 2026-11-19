@@ -169,7 +169,7 @@ describe("Paso 3", () => {
     }],
     ["capacidad deseada sin volver a generar", () =>
       fireEvent.change(screen.getByPlaceholderText("Máxima"), { target: { value: "316" } })],
-    ["pasillo sin volver a generar", () => fireEvent.change(screen.getByDisplayValue("2"), { target: { value: "3" } })],
+    ["pasillo sin volver a generar", () => fireEvent.change(screen.getByLabelText(/^Pasillo/), { target: { value: "3" } })],
     ["Editar datos del encabezado", () => {
       fireEvent.click(screen.getByText("Editar datos"));
       fireEvent.change(screen.getByDisplayValue("San Pablo"), { target: { value: "Otro" } });

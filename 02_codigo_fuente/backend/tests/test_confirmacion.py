@@ -55,8 +55,6 @@ def calc(monkeypatch) -> dict:
                 "items": [{**i, "cantidades": {c: i["bloques"] for c in cantidades}} for i in json["items"]],
                 "cantidades_totales": cantidades,
                 "subtotal": str(subtotal),
-                "addendum_porcentaje": "0",
-                "addendum_monto": "0.00",
                 "iva_porcentaje": "15",
                 "iva_monto": str(subtotal * Decimal("0.15")),
                 "total": str(subtotal * Decimal("1.15")),
@@ -119,7 +117,7 @@ def test_un_proyecto_se_cotiza_una_sola_vez(api, h, listo, calc):
 def test_bloques_fuera_de_proporcion_exigen_aceptarlos(api, db, h, listo, calc):
     r = cotizar(api, h, listo)
     assert r.status_code == 409
-    assert "9 bloque(s)" in r.json()["detail"]
+    assert "27 bloque(s)" in r.json()["detail"]  # 18 de 4 × 24 y 9 de 4 × 1: ninguno es compacto
     assert "json" not in calc  # ni se llegó a calcular
     assert db.query(Cotizacion).count() == 0
 

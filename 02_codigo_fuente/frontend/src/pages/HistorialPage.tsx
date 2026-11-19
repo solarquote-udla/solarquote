@@ -406,7 +406,6 @@ function CotizacionesHistorial() {
                   <td className="px-4 py-3 font-mono text-xs text-acero-500">{c.numero_proforma ?? "—"}</td>
                   <td className="px-4 py-3">
                     <p className="font-medium text-acero-800">{c.cliente_nombre}</p>
-                    {c.cliente_empresa && <p className="text-xs text-acero-500">{c.cliente_empresa}</p>}
                   </td>
                   <td className="px-4 py-3 text-acero-600">{c.proyecto_nombre ?? "—"}</td>
                   <td className="px-4 py-3">

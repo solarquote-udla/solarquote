@@ -110,7 +110,6 @@ export function CotizacionDetallePage() {
           <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
             <div>
               <h1 className="text-2xl font-bold text-acero-900">{cotizacion.cliente_nombre}</h1>
-              {cotizacion.cliente_empresa && <p className="text-sm text-acero-500">{cotizacion.cliente_empresa}</p>}
             </div>
             <div className="text-right">
               <EstadoCotizacionBadge estado={cotizacion.estado} />
@@ -200,7 +199,7 @@ export function CotizacionDetallePage() {
                 <tr>
                   <th className="px-5 py-2 font-medium">Paneles en el largo (L)</th>
                   <th className="px-5 py-2 font-medium">Paneles en el ancho (A)</th>
-                  <th className="px-5 py-2 font-medium">Bloques (B)</th>
+                  <th className="px-5 py-2 font-medium">Bloques iguales (B)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-acero-100">
@@ -252,10 +251,6 @@ export function CotizacionDetallePage() {
               <div className="flex justify-between">
                 <dt className="text-acero-500">Subtotal</dt>
                 <dd className="text-acero-800">{formatoMoneda(cotizacion.subtotal)}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-acero-500">Addendum ({cotizacion.addendum_porcentaje}%)</dt>
-                <dd className="text-acero-800">{formatoMoneda(cotizacion.addendum_monto)}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-acero-500">IVA ({cotizacion.iva_porcentaje ?? "—"}%)</dt>

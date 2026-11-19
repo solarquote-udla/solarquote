@@ -26,8 +26,8 @@ vi.mock("@/hooks/useAuth", () => ({
 }));
 vi.mock("@/services/clientes", () => ({
   buscarClientes: vi.fn(async () => [
-    { id: 1, nombre: "Cliente A", tipo_identificacion: "ruc", identificacion: "1710034065001", empresa: null, email: null, telefono: null, direccion: null, activo: true, total_proyectos: 0 },
-    { id: 2, nombre: "Cliente B", tipo_identificacion: "ruc", identificacion: "1710034065002", empresa: null, email: null, telefono: null, direccion: null, activo: false, total_proyectos: 0 },
+    { id: 1, nombre: "Cliente A", tipo_identificacion: "ruc", identificacion: "1710034065001", email: null, telefono: null, direccion: null, activo: true, total_proyectos: 0 },
+    { id: 2, nombre: "Cliente B", tipo_identificacion: "ruc", identificacion: "1710034065002", email: null, telefono: null, direccion: null, activo: false, total_proyectos: 0 },
   ]),
   darDeBajaCliente: vi.fn(),
   reactivarCliente: vi.fn(async () => ({})),
@@ -160,8 +160,8 @@ describe("Reemplazos dentro de la misma pantalla", () => {
   it("Clientes: editar otro cliente con el formulario a medio llenar pregunta", async () => {
     const confirmar = vi.spyOn(window, "confirm").mockReturnValue(false);
     vi.mocked(clientes.buscarClientes).mockResolvedValueOnce([
-      { id: 1, nombre: "Cliente A", tipo_identificacion: "ruc", identificacion: "1710034065001", empresa: null, email: null, telefono: null, direccion: null, activo: true, total_proyectos: 0 },
-      { id: 3, nombre: "Cliente C", tipo_identificacion: "ruc", identificacion: "1710034065001", empresa: null, email: null, telefono: null, direccion: null, activo: true, total_proyectos: 0 },
+      { id: 1, nombre: "Cliente A", tipo_identificacion: "ruc", identificacion: "1710034065001", email: null, telefono: null, direccion: null, activo: true, total_proyectos: 0 },
+      { id: 3, nombre: "Cliente C", tipo_identificacion: "ruc", identificacion: "1710034065001", email: null, telefono: null, direccion: null, activo: true, total_proyectos: 0 },
     ] as never);
     montar(<ClientesPage />, "/clientes", ["/clientes"]);
     const filaA = (await screen.findByText("Cliente A")).closest("tr")!;

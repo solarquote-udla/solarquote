@@ -9,9 +9,9 @@ proforma (no alfabético), condiciones comerciales, tabla de pagos y
 datos bancarios con la firma del representante legal.
 
 El Word es un documento fijo. El Excel es editable: los subtotales por
-material, el subtotal general, el addendum, el IVA, el total y la tabla
-de pagos son fórmulas, no valores — si Santiago cambia una cantidad, todo
-lo demás se recalcula solo.
+material, el subtotal general, el IVA, el total y la tabla de pagos son
+fórmulas, no valores — si Santiago cambia una cantidad, todo lo demás se
+recalcula solo.
 
 El dinero se maneja en `Decimal` y se imprime con el formato de Ecuador
 ($ 5.025,60), el mismo de la proforma real — distinto a como se ve en la
@@ -177,8 +177,6 @@ def generar_word(cotizacion: Cotizacion) -> bytes:
 
     documento.add_heading("Cliente", level=2)
     datos_cliente = [("Nombre", cotizacion.cliente_nombre)]
-    if cotizacion.cliente_empresa:
-        datos_cliente.append(("Empresa", cotizacion.cliente_empresa))
     if cotizacion.cliente_email:
         datos_cliente.append(("Correo", cotizacion.cliente_email))
     if cotizacion.cliente_telefono:
@@ -217,7 +215,6 @@ def generar_word(cotizacion: Cotizacion) -> bytes:
     documento.add_heading("Totales", level=2)
     filas_totales = [
         ("Subtotal", cotizacion.subtotal),
-        (f"Addendum ({_porcentaje(cotizacion.addendum_porcentaje)})", cotizacion.addendum_monto),
         (f"IVA ({_porcentaje(cotizacion.iva_porcentaje)})" if cotizacion.iva_porcentaje is not None else "IVA", cotizacion.iva_monto),
         ("Total", cotizacion.total),
     ]
@@ -277,8 +274,8 @@ FORMATO_MONEDA_EXCEL = '"$" #,##0.00'
 def generar_excel(cotizacion: Cotizacion) -> bytes:
     """
     Igual que el Word, pero editable: los subtotales, el subtotal
-    general, el addendum, el IVA y el total son fórmulas sobre las
-    cantidades y precios de las filas, no valores fijos.
+    general, el IVA y el total son fórmulas sobre las cantidades y
+    precios de las filas, no valores fijos.
     """
     libro = Workbook()
     hoja = libro.active
@@ -311,8 +308,6 @@ def generar_excel(cotizacion: Cotizacion) -> bytes:
 
     fila += 1
     datos_cliente = [("Cliente", cotizacion.cliente_nombre)]
-    if cotizacion.cliente_empresa:
-        datos_cliente.append(("Empresa", cotizacion.cliente_empresa))
     if cotizacion.cliente_email:
         datos_cliente.append(("Correo", cotizacion.cliente_email))
     if cotizacion.cliente_telefono:
@@ -352,22 +347,13 @@ def generar_excel(cotizacion: Cotizacion) -> bytes:
     celda_subtotal_general.number_format = FORMATO_MONEDA_EXCEL
     fila += 1
 
-    fila_addendum = fila
-    hoja.cell(row=fila, column=4, value=f"Addendum ({_porcentaje(cotizacion.addendum_porcentaje)})").alignment = Alignment(horizontal="right")
-    celda_addendum = hoja.cell(
-        row=fila, column=5, value=f"=E{fila_subtotal}*{cotizacion.addendum_porcentaje}/100"
-    )
-    celda_addendum.number_format = FORMATO_MONEDA_EXCEL
-    fila += 1
-
     fila_iva = fila
     etiqueta_iva = f"IVA ({_porcentaje(cotizacion.iva_porcentaje)})" if cotizacion.iva_porcentaje is not None else "IVA"
     hoja.cell(row=fila, column=4, value=etiqueta_iva).alignment = Alignment(horizontal="right")
-    # Sobre el subtotal más el addendum, no solo el subtotal.
     celda_iva = hoja.cell(
         row=fila,
         column=5,
-        value=f"=(E{fila_subtotal}+E{fila_addendum})*{cotizacion.iva_porcentaje or 0}/100",
+        value=f"=E{fila_subtotal}*{cotizacion.iva_porcentaje or 0}/100",
     )
     celda_iva.number_format = FORMATO_MONEDA_EXCEL
     fila += 1
@@ -376,7 +362,7 @@ def generar_excel(cotizacion: Cotizacion) -> bytes:
     celda_etiqueta_total = hoja.cell(row=fila, column=4, value="Total")
     celda_etiqueta_total.alignment = Alignment(horizontal="right")
     celda_etiqueta_total.font = negrita
-    celda_total = hoja.cell(row=fila, column=5, value=f"=E{fila_subtotal}+E{fila_addendum}+E{fila_iva}")
+    celda_total = hoja.cell(row=fila, column=5, value=f"=E{fila_subtotal}+E{fila_iva}")
     celda_total.number_format = FORMATO_MONEDA_EXCEL
     celda_total.font = negrita
     fila += 2

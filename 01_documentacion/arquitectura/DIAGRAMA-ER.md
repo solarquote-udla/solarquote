@@ -84,7 +84,6 @@ erDiagram
         string nombre
         string tipo_identificacion
         string identificacion UK
-        string empresa "nullable"
         string email "nullable"
         string telefono "nullable"
         string direccion "nullable"
@@ -116,13 +115,10 @@ erDiagram
         int cliente_id FK "nullable"
         int proyecto_id FK "nullable"
         string cliente_nombre
-        string cliente_empresa "nullable"
         string cliente_email "nullable"
         string cliente_telefono "nullable"
         string proyecto_nombre "nullable"
-        decimal addendum_porcentaje
         decimal subtotal "nullable"
-        decimal addendum_monto "nullable"
         decimal iva_porcentaje "nullable"
         decimal iva_monto "nullable"
         decimal total "nullable"
@@ -230,6 +226,9 @@ erDiagram
         float tolerancia_proporcion
         float capacidad_deseada_kwp "nullable"
         int paneles_ancho_minimo
+        int paneles_ancho "nullable"
+        float separacion_paneles_largo_m
+        float separacion_paneles_ancho_m
         int total_paneles
         float potencia_kwp
         jsonb resumen

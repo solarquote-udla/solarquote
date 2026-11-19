@@ -35,7 +35,6 @@ vi.mock("@/services/cotizaciones", () => ({
         numero_proforma: null,
         estado: "cotizada",
         cliente_nombre: "Constructora Andina",
-        cliente_empresa: null,
         proyecto_id: null,
         proyecto_nombre: null,
         total: "436.77",
@@ -53,14 +52,11 @@ vi.mock("@/services/cotizaciones", () => ({
     estado: "cotizada",
     cliente_id: null,
     cliente_nombre: "Constructora Andina",
-    cliente_empresa: "Andina SAS",
     cliente_email: "contacto@andina.com",
     cliente_telefono: "0999999999",
     proyecto_id: null,
     proyecto_nombre: null,
-    addendum_porcentaje: "0.00",
     subtotal: "379.80",
-    addendum_monto: "0.00",
     iva_porcentaje: "15.00",
     iva_monto: "56.97",
     total: "436.77",
@@ -134,7 +130,6 @@ describe("CotizacionDetallePage", () => {
     montar(<CotizacionDetallePage />, "/cotizaciones/1", ["/cotizaciones/:cotizacionId"]);
 
     expect(await screen.findByText("Constructora Andina")).toBeTruthy();
-    expect(screen.getByText("Andina SAS")).toBeTruthy();
     expect(screen.getByText("Proforma SQ-0001")).toBeTruthy();
     expect(screen.getByText("VAR1650")).toBeTruthy();
     expect(screen.getByText("$436.77")).toBeTruthy();

@@ -48,7 +48,6 @@ def listar_clientes(
         query = query.filter(
             or_(
                 Cliente.nombre.ilike(patron),
-                Cliente.empresa.ilike(patron),
                 Cliente.identificacion.ilike(patron),
             )
         )
@@ -72,7 +71,6 @@ def crear_cliente(db: Session, datos: ClienteCrear) -> tuple[Cliente, int]:
         nombre=datos.nombre,
         tipo_identificacion=datos.tipo_identificacion,
         identificacion=datos.identificacion,
-        empresa=datos.empresa,
         email=datos.email,
         telefono=datos.telefono,
         direccion=datos.direccion,

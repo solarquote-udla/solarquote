@@ -48,7 +48,6 @@ class Cliente(Base):
         nullable=False,
     )
 
-    empresa: Mapped[str | None] = mapped_column(String(150), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     telefono: Mapped[str | None] = mapped_column(String(30), nullable=True)
     direccion: Mapped[str | None] = mapped_column(String(255), nullable=True)

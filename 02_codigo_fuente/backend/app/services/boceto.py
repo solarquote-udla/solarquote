@@ -220,10 +220,9 @@ def panel_de(db: Session, proyecto_id: int) -> PanelReferencia:
 
 def a_respuesta(db: Session, boceto: Boceto) -> BocetoLeer:
     panel = panel_de(db, boceto.proyecto_id)
-    mayor, menor = max(panel.largo_mm, panel.ancho_mm) / 1000, min(panel.largo_mm, panel.ancho_mm) / 1000
     bloques = []
     for b in boceto.bloques:
-        prop = proporcion_bloque(b.paneles_largo, b.paneles_ancho, mayor, menor)
+        prop = proporcion_bloque(b.paneles_largo, b.paneles_ancho)
         bloques.append(
             BloqueBocetoLeer(
                 etiqueta=b.etiqueta,

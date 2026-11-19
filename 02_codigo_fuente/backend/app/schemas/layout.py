@@ -12,8 +12,15 @@ from app.services.calculo_layout import (
     PANELES_ANCHO_MINIMO_DEFECTO,
     PANELES_LARGO_DEFECTO,
     PASILLO_DEFECTO_M,
+    SEPARACION_ANCHO_DEFECTO_M,
+    SEPARACION_LARGO_DEFECTO_M,
     TOLERANCIA_DEFECTO,
 )
+
+# L y A dependen del cliente: en las plantas reales de HEXtructure hay
+# bloques de 2 × 30, 8 × 24, 10 × 28 y 22 × 28.
+PANELES_LARGO_MAXIMO = 40
+PANELES_ANCHO_MAXIMO = 500
 
 
 class LayoutGenerar(BaseModel):
@@ -22,8 +29,26 @@ class LayoutGenerar(BaseModel):
     paneles_largo: int = Field(
         default=PANELES_LARGO_DEFECTO,
         ge=2,
-        le=20,
+        le=PANELES_LARGO_MAXIMO,
         description="L: paneles en la dirección de la pendiente. Siempre par.",
+    )
+    paneles_ancho: int | None = Field(
+        default=None,
+        ge=1,
+        le=PANELES_ANCHO_MAXIMO,
+        description="A: paneles a lo largo de la fila. Sin valor, el bloque compacto (A = 3 × L).",
+    )
+    separacion_paneles_largo_m: float = Field(
+        default=SEPARACION_LARGO_DEFECTO_M,
+        ge=0,
+        le=0.5,
+        description="Separación entre paneles a lo largo (entre las filas de la pendiente), en metros",
+    )
+    separacion_paneles_ancho_m: float = Field(
+        default=SEPARACION_ANCHO_DEFECTO_M,
+        ge=0,
+        le=0.5,
+        description="Separación entre paneles a lo ancho (clamp intermedio), en metros",
     )
     pasillo_m: float = Field(
         default=PASILLO_DEFECTO_M,
@@ -35,7 +60,7 @@ class LayoutGenerar(BaseModel):
         default=TOLERANCIA_DEFECTO,
         ge=0.01,
         le=0.5,
-        description="Desvío admitido respecto a ancho = 3 × largo (0.2 = ±20 %)",
+        description="Desvío admitido respecto al bloque compacto A = 3 × L (0.2 = ±20 %)",
     )
     capacidad_deseada_kwp: float | None = Field(
         default=None,
@@ -75,7 +100,7 @@ class BloqueEditar(BaseModel):
     """
 
     origen: list[float] = Field(min_length=2, max_length=2, description="Esquina suroeste [x, y], en metros")
-    paneles_ancho: int = Field(ge=1, le=500, description="A: paneles a lo largo de la fila")
+    paneles_ancho: int = Field(ge=1, le=PANELES_ANCHO_MAXIMO, description="A: paneles a lo largo de la fila")
     inversor: int | None = Field(
         default=None,
         ge=0,
@@ -158,7 +183,7 @@ class LayoutLeer(BaseModel):
 
     total_paneles: int
     potencia_kwp: float
-    paneles_ancho_ideal: int
+    paneles_ancho_ideal: int = Field(description="A del bloque completo")
     largo_bloque_m: float
     ancho_bloque_m: float
     separacion_este_oeste_m: float
@@ -173,7 +198,11 @@ class LayoutLeer(BaseModel):
 
     # Para que el plano pueda editar bloques con la misma geometría que el backend
     angulo_norte: float = Field(description="Grados del norte en sentido horario desde +Y, usados al generar")
-    lado_menor_m: float = Field(description="Lo que suma cada panel de A al bloque, en metros")
+    lado_menor_m: float = Field(description="Lado menor del panel, en metros")
+    separacion_paneles_ancho_m: float = Field(
+        description="Separación entre paneles en A: el bloque mide A · lado_menor + (A − 1) · separación"
+    )
+    bloque_compacto: bool = Field(description="El bloque completo cumple A = 3 × L dentro de la tolerancia")
     ediciones_manuales: int = Field(description="Cambios hechos a mano desde la última generación")
 
     desactualizado: bool = Field(
@@ -197,7 +226,6 @@ class ConfirmarLayout(BaseModel):
         default=False,
         description="El Gerente acepta bajo su responsabilidad los bloques fuera de proporción",
     )
-    addendum_porcentaje: Decimal = Field(default=Decimal("0"), ge=0, le=100)
 
 
 class CotizacionEmitidaLeer(BaseModel):
