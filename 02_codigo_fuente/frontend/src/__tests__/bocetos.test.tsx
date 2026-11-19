@@ -183,7 +183,9 @@ describe("Confirmación del boceto", () => {
     expect(screen.getByText("IA 55 %")).toBeTruthy();
     expect(screen.getByText("2.960")).toBeTruthy();
     expect(screen.getByText(/tapados por un rótulo/)).toBeTruthy();
-    expect(screen.getByText("Revisar")).toBeTruthy();
+    // 4 × 24 no es compacto (A = 3 × L = 12); 4 × 10 sí, dentro del 20 %
+    expect(screen.getAllByText("No compacto")).toHaveLength(1);
+    expect(screen.getAllByText("Compacto")).toHaveLength(1);
   });
 
   it("dice con qué se leyó el boceto: IA, DXF o geometría del PDF", async () => {
@@ -199,7 +201,7 @@ describe("Confirmación del boceto", () => {
 
   it("valida las correcciones en vivo y exige guardarlas antes de confirmar", async () => {
     vi.mocked(bocetos.guardarBloquesBoceto).mockResolvedValue(
-      BOCETO({ bloques: [bloque(4, 24, 30, "A", true), bloque(4, 24, 2, "B", true, null)], ediciones_manuales: 1 }) as never,
+      BOCETO({ bloques: [bloque(4, 24, 30, "A", true), bloque(4, 12, 2, "B", true, null)], ediciones_manuales: 1 }) as never,
     );
     await abrirConfirmacion();
 
@@ -208,15 +210,17 @@ describe("Confirmación del boceto", () => {
     expect(botonConfirmar().disabled).toBe(true);
 
     fireEvent.change(campo("L del tipo B"), { target: { value: "4" } });
-    fireEvent.change(campo("A del tipo B"), { target: { value: "24" } });
-    expect(screen.queryByText("Revisar")).toBeNull(); // 4 × 24 ya queda en proporción
+    fireEvent.change(campo("A del tipo B"), { target: { value: "12" } });
+    expect(screen.getAllByText("Compacto")).toHaveLength(1); // 4 × 12 es el bloque compacto
     expect(screen.getByText("Guarda los cambios antes de confirmar.")).toBeTruthy();
 
     await act(async () => fireEvent.click(screen.getByText("Guardar cambios")));
     expect(bocetos.guardarBloquesBoceto).toHaveBeenCalledWith(5, [
       { etiqueta: "A", paneles_largo: 4, paneles_ancho: 24, repeticiones: 30, orientacion: "vertical" },
-      { etiqueta: "B", paneles_largo: 4, paneles_ancho: 24, repeticiones: 2, orientacion: "vertical" },
+      { etiqueta: "B", paneles_largo: 4, paneles_ancho: 12, repeticiones: 2, orientacion: "vertical" },
     ]);
+    // El tipo A (4 × 24) sigue sin ser compacto: se acepta y ya se puede confirmar
+    fireEvent.click(screen.getByLabelText(/Acepto bajo mi responsabilidad/));
     expect(botonConfirmar().disabled).toBe(false);
   });
 
@@ -246,7 +250,7 @@ describe("Confirmación del boceto", () => {
     vi.mocked(bocetos.confirmarYCotizarBoceto).mockResolvedValue({ id: 42, numero_proforma: "CT-001-2026", total: "10.00" });
     await abrirConfirmacion();
     expect(botonConfirmar().disabled).toBe(true);
-    fireEvent.click(screen.getByLabelText(/Acepto bajo mi responsabilidad los 2 bloques/));
+    fireEvent.click(screen.getByLabelText(/Acepto bajo mi responsabilidad los 30 bloques/));
 
     await act(async () => {
       fireEvent.click(botonConfirmar());
@@ -290,7 +294,7 @@ describe("Confirmación del boceto", () => {
 
   it("muestra el error del backend al confirmar", async () => {
     vi.mocked(bocetos.confirmarYCotizarBoceto).mockRejectedValue(errorApi(422, "Falta el precio vigente de VAR1650."));
-    await abrirConfirmacion({ bloques: [bloque(4, 24, 30, "A", true)] });
+    await abrirConfirmacion({ bloques: [bloque(4, 12, 30, "A", true)] });
     await act(async () => fireEvent.click(botonConfirmar()));
     await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("VAR1650"));
   });

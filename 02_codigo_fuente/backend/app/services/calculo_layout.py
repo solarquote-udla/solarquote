@@ -14,15 +14,22 @@ Se sigue la notación de HEXtructure (cotización EMIHANA: L=4, A=28):
     A  paneles en el "ancho" del bloque — la dirección larga, a lo largo
        de las filas.
 
-El panel va con su lado mayor en la dirección de L. En metros:
+El panel va con su lado mayor en la dirección de L. Entre panel y panel
+queda una separación: a lo largo (entre las filas de la pendiente) y a lo
+ancho (el clamp intermedio). En metros:
 
-    largo_m = L · lado_mayor        ancho_m = A · lado_menor
+    largo_m = L · lado_mayor + (L − 1) · sep_largo
+    ancho_m = A · lado_menor + (A − 1) · sep_ancho
 
-Regla antisísmica del documento de titulación: ancho = 3 · largo. Con L
-fijado por el usuario, A se elige como el entero que más se acerca a esa
-proporción. Los bloques que se aparten más de la tolerancia (±20 % por
-defecto) se marcan en ámbar; no se descartan, porque la decisión final es
-del Gerente General (RF-05).
+L y A los elige el Gerente: dependen del cliente, del terreno y de cuántos
+paneles conecta a cada MPPT del inversor (revisión con HEXtructure del
+17 de noviembre de 2026: 8 × 13, 8 × 24, 10 × 28, 22 × 28, 2 × 30). Sin A,
+se usa el bloque compacto.
+
+Bloque compacto (antisísmico): A = 3 · L, contado en paneles (4 × 12,
+8 × 24, 2 × 6). Es una recomendación de HEXtructure, no una regla: los
+bloques que se aparten más de la tolerancia (±20 % por defecto) se marcan
+como no compactos y se avisa, pero no se descartan.
 
 Orientación
 -----------
@@ -79,12 +86,20 @@ from shapely.ops import unary_union
 
 from app.services.calculo_equipo import limites_string, separacion_entre_filas
 
-# Proporción estructural ancho / largo validada por simulación antisísmica.
+# Bloque compacto (antisísmico): A = 3 · L, en paneles.
 RELACION_OBJETIVO = 3.0
 
 TOLERANCIA_DEFECTO = 0.20
 PASILLO_DEFECTO_M = 2.0
 PANELES_LARGO_DEFECTO = 4
+# Separación entre paneles dentro del bloque, en metros (HEXtructure,
+# 17 de noviembre de 2026): 6 cm a lo largo, entre las filas de la
+# pendiente, y 2 cm a lo ancho, donde va el clamp intermedio. Las
+# funciones puras parten de 0 (bloque sin separaciones) para que un
+# layout generado antes de este cambio se pueda reconstruir igual; la
+# API usa estos valores.
+SEPARACION_LARGO_DEFECTO_M = 0.06
+SEPARACION_ANCHO_DEFECTO_M = 0.02
 # A mínimo de los bloques cortos. 1 = sin mínimo (todo lo que entra se
 # aprovecha), igual que antes de SQ-170. El valor que usará HEXtructure
 # por defecto está pendiente de confirmar con el Gerente General.
@@ -137,6 +152,10 @@ class ParametrosLayout:
     tolerancia_proporcion: float = TOLERANCIA_DEFECTO
     capacidad_deseada_kwp: float | None = None
     paneles_ancho_minimo: int = PANELES_ANCHO_MINIMO_DEFECTO
+    # A del bloque completo. None = bloque compacto (A = 3 · L).
+    paneles_ancho: int | None = None
+    separacion_largo_m: float = 0.0
+    separacion_ancho_m: float = 0.0
 
 
 # ─── Salidas ────────────────────────────────────────────────────────
@@ -217,6 +236,10 @@ class ResultadoLayout:
     # esquina suroeste y su A.
     angulo_norte: float = 0.0
     lado_menor_m: float = 0.0
+    separacion_largo_m: float = 0.0
+    separacion_ancho_m: float = 0.0
+    # El bloque completo cumple A = 3 · L dentro de la tolerancia.
+    bloque_compacto: bool = True
 
 
 # ─── Geometría del bloque ───────────────────────────────────────────
@@ -247,25 +270,24 @@ def vertices_de(poligono: Polygon) -> list[list[float]]:
     return [[round(x, 3), round(y, 3)] for x, y in list(poligono.exterior.coords)[:-1]]
 
 
-def paneles_ancho_ideal(paneles_largo: int, lado_mayor_m: float, lado_menor_m: float) -> int:
-    """
-    A que deja el bloque más cerca de ancho = 3 · largo.
-
-    Con el panel de 2278 × 1134 mm y L = 4: largo = 9,112 m, el ancho
-    ideal es 27,34 m y A = round(27,34 / 1,134) = 24.
-    """
-    ideal = RELACION_OBJETIVO * paneles_largo * lado_mayor_m / lado_menor_m
-    return max(1, round(ideal))
+def paneles_ancho_ideal(paneles_largo: int) -> int:
+    """A del bloque compacto: 3 · L (4 × 12, 8 × 24, 2 × 6)."""
+    return max(1, round(RELACION_OBJETIVO * paneles_largo))
 
 
-def proporcion_bloque(
-    paneles_largo: int,
-    paneles_ancho: int,
-    lado_mayor_m: float,
-    lado_menor_m: float,
-) -> float:
-    """ancho_m / largo_m, sobre las dimensiones nominales de la estructura."""
-    return (paneles_ancho * lado_menor_m) / (paneles_largo * lado_mayor_m)
+def proporcion_bloque(paneles_largo: int, paneles_ancho: int) -> float:
+    """A / L, en paneles. El bloque compacto da 3."""
+    return paneles_ancho / paneles_largo
+
+
+def medida_fila(paneles: int, lado_m: float, separacion_m: float) -> float:
+    """Medida de una fila de paneles con su separación: n · lado + (n − 1) · sep."""
+    return paneles * lado_m + max(0, paneles - 1) * separacion_m
+
+
+def paneles_que_entran(medida_m: float, lado_m: float, separacion_m: float) -> int:
+    """Cuántos paneles caben en una medida, con la separación entre ellos."""
+    return math.floor((medida_m + separacion_m) / (lado_m + separacion_m) + _EPS)
 
 
 def cumple_proporcion(proporcion: float, tolerancia: float) -> bool:
@@ -335,6 +357,7 @@ def _llenar_tramo(
     separacion: float,
     paneles_ancho: int,
     paneles_ancho_minimo: int = 1,
+    separacion_paneles_m: float = 0.0,
 ) -> list[tuple[float, float, int]]:
     """
     Bloques que entran en un tramo vertical: (y_inicio, y_fin, A).
@@ -349,9 +372,9 @@ def _llenar_tramo(
         y += alto_bloque + separacion
 
     sobrante = fin - y
-    a_corto = math.floor(sobrante / lado_menor_m + _EPS)
+    a_corto = min(paneles_ancho - 1, paneles_que_entran(sobrante, lado_menor_m, separacion_paneles_m))
     if a_corto >= max(1, paneles_ancho_minimo):
-        resultado.append((y, y + a_corto * lado_menor_m, a_corto))
+        resultado.append((y, y + medida_fila(a_corto, lado_menor_m, separacion_paneles_m), a_corto))
     return resultado
 
 
@@ -365,6 +388,7 @@ def _distribuir(
     separacion_y: float,
     paneles_ancho: int,
     paneles_ancho_minimo: int = 1,
+    separacion_paneles_m: float = 0.0,
 ) -> list[_BloqueLocal]:
     minx, miny, maxx, maxy = util.bounds
     bloques: list[_BloqueLocal] = []
@@ -373,7 +397,14 @@ def _distribuir(
     while x + ancho_franja <= maxx + _EPS:
         for inicio, fin in _tramos_libres(util, x, x + ancho_franja, miny, maxy):
             for y0, y1, a in _llenar_tramo(
-                inicio, fin, alto_bloque, lado_menor_m, separacion_y, paneles_ancho, paneles_ancho_minimo
+                inicio,
+                fin,
+                alto_bloque,
+                lado_menor_m,
+                separacion_y,
+                paneles_ancho,
+                paneles_ancho_minimo,
+                separacion_paneles_m,
             ):
                 bloques.append(_BloqueLocal(x, y0, x + ancho_franja, y1, a))
         x += paso_x
@@ -390,6 +421,7 @@ def _recortar_a_capacidad(
     paneles_largo: int,
     lado_menor_m: float,
     paneles_ancho_minimo: int = 1,
+    separacion_paneles_m: float = 0.0,
 ) -> list[_BloqueLocal]:
     """
     Se queda con los bloques justos para la capacidad pedida.
@@ -410,7 +442,9 @@ def _recortar_a_capacidad(
             faltan -= paneles
         else:
             a = min(b.paneles_ancho, max(math.ceil(faltan / paneles_largo), paneles_ancho_minimo))
-            resultado.append(_BloqueLocal(b.x0, b.y0, b.x1, b.y0 + a * lado_menor_m, a))
+            resultado.append(
+                _BloqueLocal(b.x0, b.y0, b.x1, b.y0 + medida_fila(a, lado_menor_m, separacion_paneles_m), a)
+            )
             faltan = 0
     return resultado
 
@@ -553,13 +587,13 @@ def _letra(indice: int) -> str:
 
 
 def advertencia_proporcion(tipos: list[TipoBloque], tolerancia: float) -> str | None:
-    """Aviso de bloques fuera de proporción, o None si todos cumplen."""
+    """Aviso de bloques no compactos, o None si todos lo son."""
     fuera = sum(t.repeticiones for t in tipos if not t.en_proporcion)
     if not fuera:
         return None
     return (
-        f"{fuera} bloque(s) se apartan más de {tolerancia:.0%} de la proporción "
-        f"ancho = 3 × largo. Revísalos antes de confirmar."
+        f"{fuera} bloque(s) no son compactos: se apartan más de {tolerancia:.0%} de "
+        f"A = 3 × L. Es una recomendación antisísmica, no un error; revísalos antes de confirmar."
     )
 
 
@@ -621,6 +655,10 @@ def generar_layout(
         raise LayoutImposible("L debe ser un número par mayor o igual a 2.")
     if parametros.paneles_ancho_minimo < 1:
         raise LayoutImposible("El A mínimo debe ser al menos 1.")
+    if parametros.paneles_ancho is not None and parametros.paneles_ancho < 1:
+        raise LayoutImposible("A debe ser al menos 1.")
+    if parametros.separacion_largo_m < 0 or parametros.separacion_ancho_m < 0:
+        raise LayoutImposible("La separación entre paneles no puede ser negativa.")
 
     advertencias: list[str] = []
 
@@ -629,16 +667,17 @@ def generar_layout(
     L = parametros.paneles_largo
     beta = math.radians(panel.angulo_montaje)
 
-    # ─── Dimensiones del bloque ideal ────────────────────────────
-    a_ideal = paneles_ancho_ideal(L, lado_mayor, lado_menor)
+    # ─── Dimensiones del bloque ──────────────────────────────────
+    sep_largo = parametros.separacion_largo_m
+    sep_ancho = parametros.separacion_ancho_m
+    a_ideal = parametros.paneles_ancho or paneles_ancho_ideal(L)
     if parametros.paneles_ancho_minimo > a_ideal:
         raise LayoutImposible(
-            f"El A mínimo ({parametros.paneles_ancho_minimo}) supera el A del bloque ideal "
-            f"({a_ideal} con L = {L}): no se generaría ningún bloque. Usa un A mínimo de "
-            f"{a_ideal} o menos."
+            f"El A mínimo ({parametros.paneles_ancho_minimo}) supera el A del bloque "
+            f"({a_ideal}): no se generaría ningún bloque. Usa un A mínimo de {a_ideal} o menos."
         )
-    largo_nominal = L * lado_mayor
-    ancho_bloque = a_ideal * lado_menor
+    largo_nominal = medida_fila(L, lado_mayor, sep_largo)
+    ancho_bloque = medida_fila(a_ideal, lado_menor, sep_ancho)
     # En planta, la pendiente acorta el largo: es lo que ocupa en el suelo.
     largo_planta = largo_nominal * math.cos(beta)
 
@@ -692,6 +731,7 @@ def generar_layout(
             separacion_y=separacion_ns,
             paneles_ancho=a_ideal,
             paneles_ancho_minimo=parametros.paneles_ancho_minimo,
+            separacion_paneles_m=sep_ancho,
         )
         paneles = sum(L * b.paneles_ancho for b in candidatos)
         cortos = sum(1 for b in candidatos if b.paneles_ancho != a_ideal)
@@ -715,7 +755,9 @@ def generar_layout(
         necesarios = math.ceil(parametros.capacidad_deseada_kwp * 1000 / panel.potencia_wp - _EPS)
         cabe = necesarios <= total_maximo
         if cabe:
-            mejor = _recortar_a_capacidad(mejor, necesarios, L, lado_menor, parametros.paneles_ancho_minimo)
+            mejor = _recortar_a_capacidad(
+                mejor, necesarios, L, lado_menor, parametros.paneles_ancho_minimo, sep_ancho
+            )
         else:
             advertencias.append(
                 f"La capacidad deseada ({parametros.capacidad_deseada_kwp:g} kWp) no cabe. "
@@ -735,7 +777,7 @@ def generar_layout(
     bloques = []
     for b in mejor:
         esquinas = vertices_de(rotate(box(b.x0, b.y0, b.x1, b.y1), -angulo, origin=(0, 0)))
-        prop = proporcion_bloque(L, b.paneles_ancho, lado_mayor, lado_menor)
+        prop = proporcion_bloque(L, b.paneles_ancho)
         bloques.append(
             Bloque(
                 vertices=esquinas,
@@ -753,12 +795,12 @@ def generar_layout(
     if aviso:
         advertencias.append(aviso)
 
-    if not cumple_proporcion(
-        proporcion_bloque(L, a_ideal, lado_mayor, lado_menor), parametros.tolerancia_proporcion
-    ):
+    compacto = cumple_proporcion(proporcion_bloque(L, a_ideal), parametros.tolerancia_proporcion)
+    if not compacto:
         advertencias.append(
-            "Con este panel ni siquiera el bloque ideal cumple la proporción: "
-            "prueba con otro L."
+            f"El bloque de {L} × {a_ideal} no es compacto: para un bloque antisísmico se "
+            f"recomienda A = 3 × L = {paneles_ancho_ideal(L)}. Puedes seguir si el cliente "
+            f"lo pide así."
         )
 
     return ResultadoLayout(
@@ -777,6 +819,9 @@ def generar_layout(
         advertencias=advertencias,
         angulo_norte=angulo,
         lado_menor_m=lado_menor,
+        separacion_largo_m=sep_largo,
+        separacion_ancho_m=sep_ancho,
+        bloque_compacto=compacto,
     )
 
 

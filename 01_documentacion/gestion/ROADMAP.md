@@ -139,7 +139,7 @@ del proyecto.
 
 ### Joseph — RF-03 (generación de layout solar)
 - Algoritmo que, dado el terreno y los caminos, distribuye bloques de paneles
-- Validación de la proporción antisísmica (ancho = 3 × largo)
+- Aviso de bloque compacto (antisísmico): A = 3 × L, en paneles
 - Marcado en ámbar de los bloques fuera de proporción
 - Visualización del layout generado en el canvas
 

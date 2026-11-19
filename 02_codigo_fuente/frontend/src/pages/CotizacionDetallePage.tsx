@@ -199,7 +199,7 @@ export function CotizacionDetallePage() {
                 <tr>
                   <th className="px-5 py-2 font-medium">Paneles en el largo (L)</th>
                   <th className="px-5 py-2 font-medium">Paneles en el ancho (A)</th>
-                  <th className="px-5 py-2 font-medium">Bloques (B)</th>
+                  <th className="px-5 py-2 font-medium">Bloques iguales (B)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-acero-100">

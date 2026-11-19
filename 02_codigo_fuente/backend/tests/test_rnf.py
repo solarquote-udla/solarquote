@@ -32,7 +32,7 @@ from app.services.calculo_layout import (
     electrica_inversor,
     generar_layout,
 )
-from tests.fabricas import crear_usuario
+from tests.fabricas import LAYOUT_CLASICO, crear_usuario
 from tests.test_varios_inversores import api, equipo, guardar, h, inversor  # noqa: F401
 
 LIMITE_LAYOUT_S = 15
@@ -89,7 +89,7 @@ def test_rnf03_generar_por_la_api_en_menos_de_15_s(api, db, h):  # noqa: F811
     guardar(api, h, pid, equipo(*[inversor(250) for _ in range(10)]))
 
     inicio = time.perf_counter()
-    r = api.post(f"/api/proyectos/{pid}/layout", headers=h, json={})
+    r = api.post(f"/api/proyectos/{pid}/layout", headers=h, json=LAYOUT_CLASICO)
     duracion = time.perf_counter() - inicio
 
     assert r.status_code == 200, r.text

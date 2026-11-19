@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 from app.models.cliente import Cliente, TipoIdentificacion
 from app.models.proyecto import Proyecto
 from app.models.usuario import Usuario
-from tests.fabricas import perfil_gerente
+from tests.fabricas import LAYOUT_CLASICO, perfil_gerente
 from app.schemas.equipo import ConfiguracionEquipoGuardar
 from app.schemas.layout import BloqueEditar, LayoutEditar, LayoutGenerar
 from app.schemas.terreno import TerrenoCrear
@@ -179,7 +179,7 @@ def proyecto(db: Session) -> Proyecto:
             }
         ),
     )
-    servicio.generar(db, p, LayoutGenerar())
+    servicio.generar(db, p, LayoutGenerar(**LAYOUT_CLASICO))
     return p
 
 
@@ -269,7 +269,7 @@ def test_backend_valida_con_el_mismo_largo_que_entrega_la_api(db, proyecto):
     # Float, como llega desde el formulario (Pydantic) y desde la base
     equipo.angulo_montaje = 22.0
     db.flush()
-    layout = servicio.generar(db, proyecto, LayoutGenerar())
+    layout = servicio.generar(db, proyecto, LayoutGenerar(**LAYOUT_CLASICO))
     largo_api = servicio.a_respuesta(layout, layout.huella, equipo).largo_bloque_m
     assert largo_api == 8.448
 
@@ -292,7 +292,7 @@ def test_regenerar_reinicia_el_contador_de_ediciones(db, proyecto):
     servicio.editar_bloques(db, proyecto, _como_edicion(layout, quitar=[0, 1]))
     assert servicio.obtener_layout(db, proyecto.id).resumen["ediciones_manuales"] == 2
 
-    regenerado = servicio.generar(db, proyecto, LayoutGenerar())
+    regenerado = servicio.generar(db, proyecto, LayoutGenerar(**LAYOUT_CLASICO))
     assert regenerado.resumen["ediciones_manuales"] == 0
     assert regenerado.total_paneles == 1764
 

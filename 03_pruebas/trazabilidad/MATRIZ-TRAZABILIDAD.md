@@ -78,7 +78,9 @@ Evidencia: PR #2, #38 y los del catálogo de paneles y los mensajes de validaci�
 
 | Regla del requisito | Pruebas |
 |---|---|
-| Bloques L × A con ancho = 3 × largo; aviso de los que se apartan | `test_layout`: `test_a_ideal_para_l4`, `test_proporcion_del_bloque_ideal`, `test_bloque_real_de_emihana_pasa_con_20_por_ciento` |
+| L y A los elige el Gerente (L par hasta 40); aviso de bloque compacto A = 3 × L, contado en paneles, sin bloquear (revisión con HEXtructure del 17 de noviembre de 2026) | `test_layout`: `test_bloque_compacto_es_a_igual_a_tres_l`, `test_bloques_reales_de_clientes_no_son_compactos`, `test_la_tolerancia_decide_el_borde`, `test_sin_a_se_usa_el_bloque_compacto`, `test_a_manual_no_compacto_avisa_pero_genera`; `test_api_layout_bloque_manual`; `bloqueCompacto.test.tsx` |
+| Separación entre paneles dentro del bloque (6 cm a lo largo, 2 cm entre paneles), configurable | `test_layout`: `test_separacion_entre_paneles_agranda_el_bloque`, `test_bloque_corto_cuenta_la_separacion`, `test_medida_fila_y_paneles_que_entran_son_inversas`; `test_api_layout_bloque_manual`: `test_editar_reconstruye_el_bloque_con_la_separacion`; `bloqueCompacto.test.tsx` (paridad de `anchoBloque`) |
+| Paneles dibujados dentro de cada bloque en el plano | `bloqueCompacto.test.tsx`: "cada bloque lleva sus paneles dibujados" |
 | Respeta el polígono y los caminos | `test_layout`: `test_terreno_irregular_con_caminos_cruzados`, `test_camino_que_cubre_todo_el_terreno` |
 | Separación por pasillo o sombra, la mayor | `test_layout`: `test_pasillo_configurable_se_respeta`, `test_la_sombra_reemplaza_al_pasillo_si_es_mayor`, `test_inclinacion_reduce_el_largo_en_planta` |
 | Capacidad deseada opcional: cabe o se informa la máxima | `test_layout`: `test_capacidad_que_cabe_recorta_el_layout`, `test_capacidad_que_no_cabe_devuelve_la_maxima` |

@@ -16,7 +16,7 @@ from app.core.permisos import Permiso
 from app.core.security import crear_access_token
 from app.main import app
 from app.models.cliente import Cliente, TipoIdentificacion
-from tests.fabricas import crear_usuario, perfil_personalizado
+from tests.fabricas import LAYOUT_CLASICO, crear_usuario, perfil_personalizado
 
 PANEL = {
     "marca": "Jinko", "modelo": "JKM580N", "potencia_wp": 580,
@@ -79,7 +79,7 @@ def guardar(api, h, pid, datos) -> dict:
 
 
 def generar(api, h, pid) -> dict:
-    r = api.post(f"/api/proyectos/{pid}/layout", headers=h, json={})
+    r = api.post(f"/api/proyectos/{pid}/layout", headers=h, json=LAYOUT_CLASICO)
     assert r.status_code == 200, r.text
     return r.json()
 
