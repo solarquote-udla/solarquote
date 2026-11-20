@@ -61,6 +61,48 @@ class ResultadoCalculoCotizacion(BaseModel):
     total: Decimal
 
 
+class TramoPago(BaseModel):
+    """Un tramo de la forma de pago (ej. "Anticipo", 40%)."""
+
+    nombre: str = Field(min_length=1, max_length=100)
+    porcentaje: Decimal = Field(gt=0, le=100)
+
+
+class CondicionesProforma(BaseModel):
+    """
+    Condiciones comerciales de la proforma, editables por cotización
+    (antes fijas en `settings` para todas: acuerdo de la reunión con
+    Santi, SQ-213). Lo que no se manda usa el valor de `settings` como
+    antes — ver `services/cotizacion.py`.
+
+    El precio por Wp no está acá: se calcula solo (subtotal ÷ potencia
+    en Wp), no se edita — es el número que el cliente compara contra el
+    precio de referencia del mercado.
+    """
+
+    plazo_dias: int | None = Field(default=None, ge=1)
+    validez_dias: int | None = Field(default=None, ge=1)
+    garantia_anios: int | None = Field(default=None, ge=1)
+    pagos: list[TramoPago] | None = Field(
+        default=None,
+        min_length=1,
+        description=(
+            "Tramos de la forma de pago (nombre y porcentaje), deben sumar 100. Las proformas reales "
+            "varían: CT519 es Anticipo 40 / Entrega 60; CT521A es Anticipo 30 / tres entregas de 25/25/20."
+        ),
+    )
+
+    @field_validator("pagos")
+    @classmethod
+    def validar_forma_de_pago(cls, pagos: list["TramoPago"] | None) -> list["TramoPago"] | None:
+        if pagos is not None:
+            suma = sum((tramo.porcentaje for tramo in pagos), start=Decimal("0"))
+            if suma != 100:
+                partes = " + ".join(f"{t.nombre} {t.porcentaje}" for t in pagos)
+                raise ValueError(f"Los porcentajes de la forma de pago deben sumar 100 ({partes} = {suma})")
+        return pagos
+
+
 class CotizacionCrear(BaseModel):
     # Nullable a propósito, igual que en el modelo: permite cotizar a un
     # cliente que todavía no está en el catálogo (RF-12). Si se manda
@@ -77,6 +119,10 @@ class CotizacionCrear(BaseModel):
     proyecto_nombre: str | None = Field(default=None, max_length=150)
 
     items: list[ItemCalculoEntrada] = Field(min_length=1)
+
+    condiciones: CondicionesProforma | None = Field(
+        default=None, description="Lo que no se manda usa el valor de settings, igual que antes"
+    )
 
     @model_validator(mode="after")
     def validar_cliente(self) -> "CotizacionCrear":
@@ -150,6 +196,13 @@ class MaterialCotizadoLeer(BaseModel):
     precio_unitario: Decimal
 
 
+class TramoPagoLeer(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    nombre: str
+    porcentaje: Decimal
+
+
 class CotizacionDetalleLeer(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -169,6 +222,14 @@ class CotizacionDetalleLeer(BaseModel):
     iva_porcentaje: Decimal | None
     iva_monto: Decimal | None
     total: Decimal | None
+
+    # Condiciones de la proforma, editables por cotización (SQ-213).
+    # Nullable/vacío: las cotizaciones de antes de este campo no lo tienen.
+    plazo_dias: int | None
+    validez_dias: int | None
+    garantia_anios: int | None
+    pagos: list[TramoPagoLeer]
+    precio_wp: Decimal | None
 
     created_at: datetime
     updated_at: datetime

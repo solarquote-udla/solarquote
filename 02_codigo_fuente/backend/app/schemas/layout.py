@@ -7,6 +7,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.schemas.cotizacion import CondicionesProforma
 from app.schemas.equipo import MAX_INVERSORES
 from app.services.calculo_layout import (
     PANELES_ANCHO_MINIMO_DEFECTO,
@@ -225,6 +226,9 @@ class ConfirmarLayout(BaseModel):
     acepta_fuera_de_proporcion: bool = Field(
         default=False,
         description="El Gerente acepta bajo su responsabilidad los bloques fuera de proporción",
+    )
+    condiciones: CondicionesProforma | None = Field(
+        default=None, description="Lo que no se manda usa el valor de settings, igual que antes"
     )
 
 

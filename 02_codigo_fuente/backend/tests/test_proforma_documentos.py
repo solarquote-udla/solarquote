@@ -24,7 +24,7 @@ from openpyxl import load_workbook
 from sqlalchemy.orm import Session
 
 from app.core.permisos import Permiso
-from app.models.cotizacion import Cotizacion, ItemCotizacion, MaterialCotizado
+from app.models.cotizacion import Cotizacion, ItemCotizacion, MaterialCotizado, TramoPagoCotizacion
 from app.models.material import Material
 from app.services import documentos
 from app.services.documentos import _moneda, _numero, _pluralizar, _porcentaje, settings
@@ -118,6 +118,20 @@ def _cotizacion_con_materiales(db: Session, **campos) -> Cotizacion:
         iva_porcentaje=Decimal("15.00"),
         iva_monto=Decimal("66.00"),
         total=Decimal("506.00"),
+        plazo_dias=campos.pop("plazo_dias", settings.PROFORMA_PLAZO_DIAS),
+        validez_dias=campos.pop("validez_dias", settings.PROFORMA_VALIDEZ_DIAS),
+        garantia_anios=campos.pop("garantia_anios", settings.PROFORMA_GARANTIA_ANIOS),
+        pagos=campos.pop(
+            "pagos",
+            [
+                TramoPagoCotizacion(orden=0, nombre="Anticipo", porcentaje=settings.PROFORMA_PAGO_ANTICIPO_PCT),
+                TramoPagoCotizacion(orden=1, nombre="Entrega", porcentaje=settings.PROFORMA_PAGO_ENTREGA_PCT),
+                TramoPagoCotizacion(
+                    orden=2, nombre="A 60 días de la entrega", porcentaje=settings.PROFORMA_PAGO_60_DIAS_PCT
+                ),
+            ],
+        ),
+        precio_wp=campos.pop("precio_wp", None),
         created_at=HOY,
         items=[ItemCotizacion(paneles_largo=4, paneles_ancho=28, bloques=12)],
         materiales=[
@@ -271,12 +285,13 @@ def test_word_totales_notas_condiciones_y_pagos(db: Session, datos_oferente) -> 
 
     assert "Plazo de entrega: 20 días." in texto
     assert "Validez de la oferta: 90 días." in texto
-    assert "Garantía: 1 año." in texto
+    assert "Garantía: 10 años." in texto
 
+    # Sobre el subtotal (sin IVA), no el total — "FORMA DE PAGO Y VALORES SIN IVA".
     assert ["Tramo", "Porcentaje", "Monto"] in filas
-    assert ["Anticipo", "30%", "$ 151,80"] in filas
-    assert ["Entrega", "40%", "$ 202,40"] in filas
-    assert ["A 60 días de la entrega", "30%", "$ 151,80"] in filas
+    assert ["Anticipo", "30%", "$ 132,00"] in filas
+    assert ["Entrega", "40%", "$ 176,00"] in filas
+    assert ["A 60 días de la entrega", "30%", "$ 132,00"] in filas
 
     assert "Banco: Banco de Prueba" in texto
     assert "Número de cuenta: 0000000000" in texto
@@ -357,9 +372,10 @@ def test_excel_subtotales_y_totales_son_formulas(db: Session, datos_oferente) ->
     fila_total = _fila_con_etiqueta(hoja, "Total")
     assert hoja[f"E{fila_total}"].value == f"=E{fila_subtotal}+E{fila_iva}"
 
-    for etiqueta, pct in [("Anticipo", "30"), ("Entrega", "40"), ("A 60 días de la entrega", "30")]:
+    # Sobre el subtotal (sin IVA), no el total — "FORMA DE PAGO Y VALORES SIN IVA".
+    for etiqueta, pct in [("Anticipo", "30.00"), ("Entrega", "40.00"), ("A 60 días de la entrega", "30.00")]:
         fila_pago = _fila_con_etiqueta(hoja, etiqueta, columna="A")
-        assert hoja[f"C{fila_pago}"].value == f"=E{fila_total}*{pct}/100", etiqueta
+        assert hoja[f"C{fila_pago}"].value == f"=E{fila_subtotal}*{pct}/100", etiqueta
 
 
 def test_excel_incluye_encabezado_materiales_en_orden_y_datos_bancarios(db: Session, datos_oferente) -> None:

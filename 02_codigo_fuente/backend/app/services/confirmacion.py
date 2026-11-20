@@ -29,7 +29,7 @@ from app.models.cotizacion import Cotizacion
 from app.models.layout import Layout
 from app.models.proyecto import EstadoProyecto, Proyecto
 from app.models.usuario import Usuario
-from app.schemas.cotizacion import CotizacionCrear, ItemCalculoEntrada
+from app.schemas.cotizacion import CondicionesProforma, CotizacionCrear, ItemCalculoEntrada
 from app.services.boceto import a_respuesta as boceto_a_respuesta
 from app.services.boceto import obtener_boceto
 from app.services.cotizacion import crear_cotizacion
@@ -78,6 +78,7 @@ def cotizar_layout(
     usuario: Usuario,
     *,
     acepta_fuera_de_proporcion: bool,
+    condiciones: CondicionesProforma | None = None,
 ) -> Cotizacion:
     """
     Confirma el layout del proyecto y emite su cotización.
@@ -108,6 +109,7 @@ def cotizar_layout(
         cliente_id=proyecto.cliente_id,
         proyecto_id=proyecto.id,
         proyecto_nombre=proyecto.nombre,
+        condiciones=condiciones,
         items=items_del_layout(layout),
     )
     cotizacion, _ = crear_cotizacion(
@@ -140,6 +142,7 @@ def cotizar_boceto(
     usuario: Usuario,
     *,
     acepta_fuera_de_proporcion: bool,
+    condiciones: CondicionesProforma | None = None,
 ) -> Cotizacion:
     """
     Confirma los bloques del boceto (RF-05) y emite su cotización (RF-06).
@@ -173,6 +176,7 @@ def cotizar_boceto(
         cliente_id=proyecto.cliente_id,
         proyecto_id=proyecto.id,
         proyecto_nombre=proyecto.nombre,
+        condiciones=condiciones,
         items=items_del_boceto(boceto),
     )
     cotizacion, _ = crear_cotizacion(

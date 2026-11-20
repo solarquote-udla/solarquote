@@ -539,10 +539,37 @@ export interface InversorLayout {
   motivo: string | null;
 }
 
+/** Un tramo de la forma de pago (ej. "Anticipo", 40%), al editarlo */
+export interface TramoPago {
+  nombre: string;
+  porcentaje: number;
+}
+
+/** Espejo de `TramoPagoLeer`: un tramo ya persistido, tal como se leyó */
+export interface TramoPagoLeer {
+  nombre: string;
+  porcentaje: string;
+}
+
+/**
+ * Espejo de `CondicionesProforma`: condiciones comerciales editables por
+ * cotización (SQ-213). Lo que no se manda usa el valor de settings, como
+ * antes de este campo. El precio por Wp no está acá: se calcula solo
+ * (subtotal ÷ potencia), no se edita.
+ */
+export interface CondicionesProforma {
+  plazo_dias?: number;
+  validez_dias?: number;
+  garantia_anios?: number;
+  /** Deben sumar 100. Las proformas reales varían cuántos tramos tienen. */
+  pagos?: TramoPago[];
+}
+
 /** Espejo de `ConfirmarLayout`: confirmación explícita del diseño (RF-05) */
 export interface ConfirmarLayout {
   /** Acepta bajo su responsabilidad los bloques fuera de proporción */
   acepta_fuera_de_proporcion: boolean;
+  condiciones?: CondicionesProforma;
 }
 
 /** Espejo de `CotizacionEmitidaLeer` */
@@ -663,6 +690,14 @@ export interface CotizacionDetalle {
   iva_porcentaje: string | null;
   iva_monto: string | null;
   total: string | null;
+
+  /** Condiciones de la proforma, editables por cotización (SQ-213). Vacío/null en cotizaciones de antes de este campo. */
+  plazo_dias: number | null;
+  validez_dias: number | null;
+  garantia_anios: number | null;
+  pagos: TramoPagoLeer[];
+  /** Calculado (subtotal ÷ potencia), no editable */
+  precio_wp: string | null;
 
   created_at: string;
   updated_at: string;
