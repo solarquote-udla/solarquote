@@ -53,6 +53,7 @@ calc-service e ia-service.
 | Corregir el polígono antes de confirmar | `asistentePaso1.test.tsx` (dibujo, coordenadas y medidas) |
 | Cada error junto a su campo y en rojo; obligatorios marcados; orientación entre 0 y 359,99; ancho y largo mayores que cero | `validacionPaso1.test.tsx` |
 | Ubicación con un punto en el mapa satelital (norte arriba) en lugar de escribir latitud y longitud, al estilo de Smart Design: mapa grande con pestañas Mapa y Plano, búsqueda de la dirección (OpenStreetMap) y longitud siempre entre -180 y 180; sin punto se avisa que no habrá sombra | `mapaUbicacion.test.tsx`; `coordenadas.test.tsx`; `validacionPaso1.test.tsx` (ubicación en el mapa y búsqueda de la dirección) |
+| Terreno dibujado sobre el mapa satelital (Lenin): largo de cada lado, ajuste a 90°, largo de cada lado editable, vértice en la mitad de un lado, mover y quitar vértices; el contorno se mide en metros desde el punto de ubicación | `terrenoMapa.test.tsx` (10 pruebas: conversión mapa y plano, ajuste a 90°, estirar un lado, Leaflet real); `pasoTerrenoMapa.test.tsx` (6 pruebas) |
 | Solo con permiso | `test_api_terreno`: `test_terreno_exige_generar_layout` |
 
 Evidencia: PR #1, #20, #34 y el PR de SQ-135.
@@ -157,8 +158,9 @@ público.
 | El número de proforma se asigna al emitir | Ya cubierto (SQ-82): `test_confirmacion`: `siguiente_numero_proforma` |
 | Los archivos se descargan desde la interfaz | `test_proforma_documentos`: `test_descarga_responde_el_archivo_con_su_tipo_y_nombre`; botón en `CotizacionDetallePage` (`cotizacion-detalle.test.tsx`) |
 | Documento de cotización en menos de 10 s (RNF-03) | `test_rnf`: `test_rnf03_documento_de_cotizacion_en_menos_de_10_s` |
+| Condiciones (plazo, validez, garantía) editables por cotización, no fijas en `settings`; forma de pago como lista de tramos (nombre y %) sobre el subtotal sin IVA; precio por Wp calculado, no editable (SQ-214) | `test_cotizacion_servicio`: `test_sin_condiciones_usa_los_valores_de_settings`, `test_condiciones_editadas_pisan_las_de_settings`, `test_precio_por_wp_se_calcula_del_subtotal_y_la_potencia`, `test_forma_de_pago_debe_sumar_cien` |
 
-Evidencia: PR de SQ-79/SQ-80/SQ-81/SQ-83/SQ-84 y el de SQ-213 (quita el addendum y el campo Empresa).
+Evidencia: PR de SQ-79/SQ-80/SQ-81/SQ-83/SQ-84, el de SQ-213 (quita el addendum y el campo Empresa) y el de SQ-214 (condiciones editables por cotización).
 
 ### RF-08 Lista de referencia de inversores
 

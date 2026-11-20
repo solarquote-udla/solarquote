@@ -106,6 +106,25 @@ class Cotizacion(Base):
     potencia_kwp: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     total_paneles: Mapped[int | None] = mapped_column(nullable=True)
 
+    # ─── Condiciones de la proforma, editables por cotización (SQ-213) ──
+    # Antes fijas en `settings` para todas las cotizaciones; ahora cada
+    # una puede pisarlas al confirmarse (ver schemas.cotizacion.CondicionesProforma).
+    # Nullable por lo mismo que el desglose de arriba: las cotizaciones de
+    # antes de este campo no tienen cómo reconstruirlo retroactivamente.
+    plazo_dias: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    validez_dias: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    garantia_anios: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # La forma de pago es una lista de tramos (nombre y porcentaje), no un
+    # número fijo de campos: las proformas reales varían (CT519: Anticipo
+    # 40 / Entrega 60; CT521A: Anticipo 30 / tres entregas parciales de
+    # 25/25/20) — ver TramoPagoCotizacion.
+    #
+    # Precio por Wp: calculado (subtotal ÷ potencia_wp), no editable — es
+    # el número que el cliente compara contra el precio de referencia del
+    # mercado, así que no debe escribirse a mano. Nulo si la cotización no
+    # tiene potencia (una cotización al vuelo, sin layout).
+    precio_wp: Mapped[Decimal | None] = mapped_column(Numeric(10, 4), nullable=True)
+
     estado: Mapped[EstadoCotizacion] = mapped_column(
         SAEnum(EstadoCotizacion, name="estado_cotizacion", values_callable=lambda e: [i.value for i in e]),
         default=EstadoCotizacion.COTIZADA,
@@ -141,6 +160,12 @@ class Cotizacion(Base):
         back_populates="cotizacion",
         cascade="all, delete-orphan",
         order_by="MaterialCotizado.id",
+    )
+
+    pagos: Mapped[list["TramoPagoCotizacion"]] = relationship(
+        back_populates="cotizacion",
+        cascade="all, delete-orphan",
+        order_by="TramoPagoCotizacion.orden",
     )
 
     cliente: Mapped["Cliente | None"] = relationship()  # noqa: F821
@@ -236,3 +261,30 @@ class MaterialCotizado(Base):
 
     def __repr__(self) -> str:
         return f"<MaterialCotizado cotizacion_id={self.cotizacion_id} material_id={self.material_id} cantidad={self.cantidad}>"
+
+
+class TramoPagoCotizacion(Base):
+    """
+    Un tramo de la forma de pago (ej. "Anticipo", 40%). La lista completa
+    de una cotización suma 100 — validado en schemas.cotizacion.CondicionesProforma,
+    no aquí: el modelo solo guarda lo que ya se validó al confirmarse.
+    """
+
+    __tablename__ = "tramos_pago_cotizacion"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    cotizacion_id: Mapped[int] = mapped_column(
+        ForeignKey("cotizaciones.id"),
+        nullable=False,
+        index=True,
+    )
+
+    orden: Mapped[int] = mapped_column(Integer, nullable=False)
+    nombre: Mapped[str] = mapped_column(String(100), nullable=False)
+    porcentaje: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
+
+    cotizacion: Mapped["Cotizacion"] = relationship(back_populates="pagos")
+
+    def __repr__(self) -> str:
+        return f"<TramoPagoCotizacion {self.nombre} {self.porcentaje}%>"

@@ -144,6 +144,7 @@ def confirmar_y_cotizar(
             proyecto_id,
             usuario,
             acepta_fuera_de_proporcion=datos.acepta_fuera_de_proporcion,
+            condiciones=datos.condiciones,
         )
     except NoSePuedeCotizar as error:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
