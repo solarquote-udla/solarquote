@@ -6,11 +6,14 @@
  * Sin id en la ruta (/generar) es un proyecto nuevo: "Siguiente" lo crea,
  * guarda el terreno y pasa al Paso 2.
  *
- * Tres formas de ingresar la geometría, porque los datos llegan de formas
- * distintas según el proyecto:
+ * Cuatro formas de ingresar la geometría, porque los datos llegan de
+ * formas distintas según el proyecto:
  *   - Ancho y largo (el caso más común): "Actualizar plano"
+ *   - Dibujar el contorno sobre el mapa satelital, con el largo de cada
+ *     lado y ángulos de 90° (revisión del 16 de noviembre, Lenin)
  *   - Dibujar el contorno con clics sobre el plano (terrenos irregulares)
  *   - Editar las coordenadas a mano (datos de un levantamiento)
+ * En los cuatro casos el largo de cada lado se puede corregir a mano.
  *
  * Los caminos se definen en el Paso 3, junto al layout. Aquí solo se
  * muestran si ya existen.
@@ -29,7 +32,7 @@ import { EncabezadoProyecto } from "@/components/EncabezadoProyecto";
 import { rutaPaso } from "@/components/asistente";
 import { Campo } from "@/components/Campo";
 import { FormularioCliente } from "@/components/FormularioCliente";
-import { MapaUbicacion } from "@/components/MapaUbicacion";
+import { MapaUbicacion, type DibujoMapa } from "@/components/MapaUbicacion";
 import { useCambiosSinGuardar } from "@/hooks/useCambiosSinGuardar";
 import { useAccionUnica } from "@/hooks/useAccionUnica";
 import { mensajeDeError } from "@/services/api";
@@ -40,6 +43,17 @@ import { actualizarTerreno, crearTerreno, obtenerTerreno } from "@/services/terr
 import type { ClienteListado, Proyecto, ProyectoActualizar, Punto, Terreno } from "@/types/api";
 import { bordeCampo } from "@/utils/campo";
 import { formatearArea, formatearMetros, limitesDe, rectangulo } from "@/utils/geometria";
+import {
+  ajustarAngulo,
+  anguloEnVertice,
+  aMapa,
+  aPlano,
+  cambiarLargoLado,
+  insertarEnMitad,
+  largosDeLados,
+  quitarVertice,
+  type Coordenadas,
+} from "@/utils/terrenoMapa";
 
 const BOTON =
   "rounded-lg border border-acero-300 bg-superficie px-3 py-1.5 text-sm text-acero-700 transition hover:bg-acero-100 disabled:cursor-not-allowed disabled:opacity-40";
@@ -202,6 +216,9 @@ export function TerrenoPage() {
   const [borrador, setBorrador] = useState<Punto[]>([]);
   const [lienzo, setLienzo] = useState({ ancho: 100, alto: 60 });
   const [ajustarAlMetro, setAjustarAlMetro] = useState(true);
+  // Dibujo sobre el mapa (Lenin): ajusta a 90° los lados casi rectos
+  const [dibujoEnMapa, setDibujoEnMapa] = useState(false);
+  const [angulosRectos, setAngulosRectos] = useState(true);
 
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -227,6 +244,7 @@ export function TerrenoPage() {
     if (ext) setLienzo({ ancho: Math.max(10, ext.ancho), alto: Math.max(10, ext.largo) });
     setBorrador([]);
     setDibujando(false);
+    setDibujoEnMapa(false);
   }, []);
 
   useEffect(() => {
@@ -376,12 +394,84 @@ export function TerrenoPage() {
     setDibujando(false);
   }
 
+  function empezarDibujo(enMapa: boolean) {
+    setError(null);
+    setBorrador([]);
+    setDibujando(true);
+    setDibujoEnMapa(enMapa);
+  }
+
+  function cancelarDibujo() {
+    setBorrador([]);
+    setDibujando(false);
+    setDibujoEnMapa(false);
+  }
+
+  /** Agrega un vértice al borrador, ajustado a 90° si corresponde. */
+  function agregarAlBorrador(p: Punto) {
+    setBorrador((b) => [...b, angulosRectos ? ajustarAngulo(b[b.length - 2], b[b.length - 1], p) : p]);
+  }
+
   function cerrarBorrador() {
     if (borrador.length < 3) return;
     cambiarContorno(borrador);
+    const ext = extension(borrador);
+    if (ext) setLienzo({ ancho: Math.max(10, ext.ancho), alto: Math.max(10, ext.largo) });
+    // Dibujado sobre el mapa, el norte se conoce: está arriba
+    if (dibujoEnMapa && orientacion.trim() === "") setOrientacion("0");
     setBorrador([]);
     setDibujando(false);
+    setDibujoEnMapa(false);
   }
+
+  // ─── Terreno sobre el mapa ───────────────────────────
+  // El contorno se mide en metros desde el punto de ubicación, con la
+  // orientación del norte del terreno (0 si no está definida).
+
+  const norte = gradosOrientacion !== null && !Number.isNaN(gradosOrientacion) ? gradosOrientacion : 0;
+
+  function clicDibujoMapa(c: Coordenadas) {
+    if (!coordenadas) {
+      // Sin ubicación, la primera esquina del terreno pasa a ser el punto
+      setDatos((d) => ({ ...d, latitud: String(c.latitud), longitud: String(c.longitud) }));
+      setBorrador([[0, 0]]);
+      return;
+    }
+    agregarAlBorrador(aPlano(coordenadas, c, norte));
+  }
+
+  const dibujoMapa: DibujoMapa | undefined = useMemo(() => {
+    const aGeo = (p: Punto) => (coordenadas ? aMapa(coordenadas, p, norte) : null);
+    const geo = (puntos: Punto[]) => (coordenadas ? puntos.map((p) => aGeo(p) as Coordenadas) : []);
+    const etiquetasDe = (puntos: Punto[], cerrado: boolean) => {
+      const largos = largosDeLados(puntos);
+      return (cerrado ? largos : largos.slice(0, -1)).map(formatearMetros);
+    };
+    return {
+      contorno: vertices.length >= 3 ? geo(vertices) : [],
+      etiquetas: etiquetasDe(vertices, true),
+      caminos: caminos.map((c) => geo(c.vertices)),
+      borrador: geo(borrador),
+      etiquetasBorrador: etiquetasDe(borrador, false),
+      dibujando: dibujando && dibujoEnMapa,
+      vistaPrevia: (c) => {
+        if (!coordenadas || borrador.length === 0) return null;
+        const ultimo = borrador[borrador.length - 1];
+        const crudo = aPlano(coordenadas, c, norte);
+        const p = angulosRectos ? ajustarAngulo(borrador[borrador.length - 2], ultimo, crudo) : crudo;
+        return { punto: aMapa(coordenadas, p, norte), etiqueta: formatearMetros(Math.hypot(p[0] - ultimo[0], p[1] - ultimo[1])) };
+      },
+      onClicDibujo: clicDibujoMapa,
+      onCerrarBorrador: cerrarBorrador,
+      onMoverVertice: (i, c) => {
+        if (coordenadas) cambiarContorno(vertices.map((p, k) => (k === i ? aPlano(coordenadas, c, norte) : p)));
+      },
+      onInsertarVertice: (i) => cambiarContorno(insertarEnMitad(vertices, i)),
+      onQuitarVertice: (i) => cambiarContorno(quitarVertice(vertices, i)),
+    };
+    // Las funciones de arriba solo leen este mismo estado
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coordenadas, norte, vertices, caminos, borrador, dibujando, dibujoEnMapa, angulosRectos, orientacion]);
 
   function editarVertice(indice: number, eje: 0 | 1, valor: number) {
     if (Number.isNaN(valor)) return;
@@ -554,9 +644,11 @@ export function TerrenoPage() {
                 type="button"
                 role="tab"
                 aria-selected={vista === v}
+                disabled={dibujando}
+                title={dibujando ? "Termina o cancela el dibujo del contorno" : undefined}
                 onClick={() => setVista(v)}
                 className={[
-                  "rounded-md px-4 py-1.5 text-sm font-medium transition",
+                  "rounded-md px-4 py-1.5 text-sm font-medium transition disabled:cursor-not-allowed",
                   vista === v ? "bg-solar-500 text-acero-50" : "text-acero-600 hover:bg-acero-100",
                 ].join(" ")}
               >
@@ -567,16 +659,44 @@ export function TerrenoPage() {
 
           {vista === "mapa" ? (
             <div>
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                {!dibujando ? (
+                  <button type="button" className={BOTON} onClick={() => empezarDibujo(true)}>
+                    {vertices.length ? "Redibujar terreno en el mapa" : "Dibujar terreno en el mapa"}
+                  </button>
+                ) : (
+                  <>
+                    <button type="button" className={BOTON} onClick={() => setBorrador((b) => b.slice(0, -1))} disabled={borrador.length === 0}>
+                      Deshacer punto
+                    </button>
+                    <button type="button" className={BOTON} onClick={cerrarBorrador} disabled={borrador.length < 3}>
+                      Cerrar contorno
+                    </button>
+                    <button type="button" className={BOTON} onClick={cancelarDibujo}>
+                      Cancelar dibujo
+                    </button>
+                  </>
+                )}
+                <label className="ml-auto flex items-center gap-2 text-sm text-acero-600">
+                  <input type="checkbox" checked={angulosRectos} onChange={(e) => setAngulosRectos(e.target.checked)} className="accent-solar-500" />
+                  Ajustar a 90°
+                </label>
+              </div>
               <MapaUbicacion
                 valor={coordenadas}
                 enfoque={enfoque}
                 alto="h-[32rem]"
+                dibujo={dibujoMapa}
                 onCambio={({ latitud, longitud }) =>
                   setDatos((d) => ({ ...d, latitud: String(latitud), longitud: String(longitud) }))
                 }
               />
               <p className="mt-2 text-xs text-acero-500">
-                Busca la dirección a la derecha o haz clic sobre el terreno; el punto se puede arrastrar. El norte está arriba.
+                {dibujando
+                  ? "Haz clic en cada esquina del terreno; clic en la primera para cerrar. Los lados casi rectos se ajustan a 90°."
+                  : vertices.length >= 3
+                    ? "Arrastra un vértice para moverlo, haz doble clic para quitarlo o clic en el punto blanco de un lado para agregar uno. El punto rojo ubica el terreno: al arrastrarlo, el contorno se mueve con él. El norte está arriba."
+                    : "Busca la dirección a la derecha o haz clic sobre el terreno; el punto se puede arrastrar. Luego dibuja el terreno en el mapa. El norte está arriba."}
               </p>
             </div>
           ) : (
@@ -586,11 +706,7 @@ export function TerrenoPage() {
                   <button
                     type="button"
                     className={BOTON}
-                    onClick={() => {
-                      setError(null);
-                      setBorrador([]);
-                      setDibujando(true);
-                    }}
+                    onClick={() => empezarDibujo(false)}
                   >
                     {vertices.length ? "Redibujar contorno" : "Dibujar contorno"}
                   </button>
@@ -602,8 +718,8 @@ export function TerrenoPage() {
                     <button type="button" className={BOTON} onClick={cerrarBorrador} disabled={borrador.length < 3}>
                       Cerrar contorno
                     </button>
-                    <button type="button" className={BOTON} onClick={() => { setBorrador([]); setDibujando(false); }}>
-                      Cancelar
+                    <button type="button" className={BOTON} onClick={cancelarDibujo}>
+                      Cancelar dibujo
                     </button>
                   </>
                 )}
@@ -613,6 +729,10 @@ export function TerrenoPage() {
                     : "Ingresa ancho y largo a la derecha, o dibuja el contorno si el terreno es irregular."}
                 </span>
                 <label className="ml-auto flex items-center gap-2 text-sm text-acero-600">
+                  <input type="checkbox" checked={angulosRectos} onChange={(e) => setAngulosRectos(e.target.checked)} className="accent-solar-500" />
+                  Ajustar a 90°
+                </label>
+                <label className="flex items-center gap-2 text-sm text-acero-600">
                   <input type="checkbox" checked={ajustarAlMetro} onChange={(e) => setAjustarAlMetro(e.target.checked)} className="accent-solar-500" />
                   Ajustar al metro
                 </label>
@@ -625,7 +745,7 @@ export function TerrenoPage() {
                 dibujando={dibujando ? "terreno" : null}
                 lienzo={lienzo}
                 pasoAjuste={ajustarAlMetro ? 1 : null}
-                onAgregarPunto={(p) => setBorrador((b) => [...b, p])}
+                onAgregarPunto={agregarAlBorrador}
                 onCerrarBorrador={cerrarBorrador}
               />
 
@@ -788,6 +908,26 @@ export function TerrenoPage() {
               Actualizar plano
             </button>
 
+            {vertices.length >= 3 && (
+              <div className="mt-4">
+                <p className={ETIQUETA}>Medidas de los lados</p>
+                <ul className="mt-1 max-h-56 space-y-1 overflow-y-auto" aria-label="Medidas de los lados">
+                  {largosDeLados(vertices).map((largo, i) => (
+                    <LadoEditable
+                      key={`${i}-${largo.toFixed(2)}`}
+                      indice={i}
+                      largo={largo}
+                      recto={Math.abs(anguloEnVertice(vertices, (i + 1) % vertices.length) - 90) < 0.5}
+                      onCambiar={(nuevo) => cambiarContorno(cambiarLargoLado(vertices, i, nuevo))}
+                    />
+                  ))}
+                </ul>
+                <p className="mt-1 text-[11px] text-acero-400">
+                  Al cambiar un lado, el terreno se estira en esa dirección: en un rectángulo se mueve el lado opuesto.
+                </p>
+              </div>
+            )}
+
             <button type="button" className="mt-3 text-xs font-medium text-solar-700 hover:underline" onClick={() => setVerCoordenadas((v) => !v)} aria-expanded={verCoordenadas}>
               {verCoordenadas ? "Ocultar coordenadas" : `Editar coordenadas (${vertices.length} vértices)`}
             </button>
@@ -926,5 +1066,59 @@ export function TerrenoPage() {
         }}
       />
     </div>
+  );
+}
+
+/**
+ * Un lado del contorno con su largo editable. Aplica el cambio al salir
+ * del campo o con Enter, no en cada tecla: escribir "4" camino a "45"
+ * no debe deformar el terreno.
+ */
+function LadoEditable({
+  indice,
+  largo,
+  recto,
+  onCambiar,
+}: {
+  indice: number;
+  largo: number;
+  recto: boolean;
+  onCambiar: (largo: number) => void;
+}) {
+  const inicial = String(Math.round(largo * 100) / 100);
+  const [texto, setTexto] = useState(inicial);
+  const valor = Number(texto.replace(",", "."));
+  const invalido = texto.trim() === "" || !Number.isFinite(valor) || valor <= 0;
+
+  function aplicar() {
+    if (invalido) {
+      setTexto(inicial);
+      return;
+    }
+    if (Math.abs(valor - largo) > 0.005) onCambiar(valor);
+  }
+
+  return (
+    <li className="flex items-center gap-2 text-sm">
+      <span className="w-14 shrink-0 text-xs text-acero-500">Lado {indice + 1}</span>
+      <input
+        className={`w-full rounded-lg border bg-acero-50 px-2 py-1 text-sm text-acero-900 focus:outline-none focus:ring-1 ${bordeCampo(invalido ? "invalido" : undefined)}`}
+        inputMode="decimal"
+        value={texto}
+        aria-label={`Largo del lado ${indice + 1} (m)`}
+        onChange={(e) => setTexto(e.target.value)}
+        onBlur={aplicar}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            aplicar();
+          }
+        }}
+      />
+      <span className="w-6 shrink-0 text-xs text-acero-400">m</span>
+      <span className="w-8 shrink-0 text-[11px] text-acero-400" title={recto ? "Ángulo recto con el lado siguiente" : undefined}>
+        {recto ? "90°" : ""}
+      </span>
+    </li>
   );
 }
