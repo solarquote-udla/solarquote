@@ -45,6 +45,19 @@ const { obtenerCotizacion, obtenerProformaWord, obtenerProformaExcel } = vi.hois
   };
 });
 
+vi.mock("@/hooks/useAuth", () => ({
+  useAuth: () => ({ usuario: { id: 1, nombre: "Gerente" }, tienePermiso: () => true }),
+}));
+vi.mock("@/services/planta", () => ({
+  obtenerPlanta: vi.fn().mockResolvedValue({
+    cotizacion_id: 7,
+    proyecto_id: null,
+    terreno: null,
+    layout: null,
+    cambio_despues_de_cotizar: false,
+  }),
+}));
+
 vi.mock("@/services/cotizaciones", async () => {
   const real = await vi.importActual<typeof import("@/services/cotizaciones")>("@/services/cotizaciones");
   return { ...real, obtenerCotizacion, obtenerProformaWord, obtenerProformaExcel };

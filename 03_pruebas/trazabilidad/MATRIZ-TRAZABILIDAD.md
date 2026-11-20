@@ -53,6 +53,7 @@ calc-service e ia-service.
 | Corregir el polígono antes de confirmar | `asistentePaso1.test.tsx` (dibujo, coordenadas y medidas) |
 | Cada error junto a su campo y en rojo; obligatorios marcados; orientación entre 0 y 359,99; ancho y largo mayores que cero | `validacionPaso1.test.tsx` |
 | Ubicación con un punto en el mapa satelital (norte arriba) en lugar de escribir latitud y longitud, al estilo de Smart Design: mapa grande con pestañas Mapa y Plano, búsqueda de la dirección (OpenStreetMap) y longitud siempre entre -180 y 180; sin punto se avisa que no habrá sombra | `mapaUbicacion.test.tsx`; `coordenadas.test.tsx`; `validacionPaso1.test.tsx` (ubicación en el mapa y búsqueda de la dirección) |
+| Terreno dibujado sobre el mapa satelital (Lenin): largo de cada lado, ajuste a 90°, largo de cada lado editable, vértice en la mitad de un lado, mover y quitar vértices; el contorno se mide en metros desde el punto de ubicación | `terrenoMapa.test.tsx` (10 pruebas: conversión mapa y plano, ajuste a 90°, estirar un lado, Leaflet real); `pasoTerrenoMapa.test.tsx` (6 pruebas) |
 | Solo con permiso | `test_api_terreno`: `test_terreno_exige_generar_layout` |
 
 Evidencia: PR #1, #20, #34 y el PR de SQ-135.
@@ -198,6 +199,7 @@ Evidencia: PR #23 a #25, #35, el PR de SQ-135, el PR de SQ-211 y el PR de SQ-212
 | Detalle con materiales, cantidades y L/A/B | `test_cotizacion_historial`: `test_obtener_cotizacion_trae_items_y_materiales`; `historial.test.tsx` |
 | Solo con permiso | `test_seguridad`: `test_historial_lo_lee_quien_tiene_*`, `test_historial_no_lo_lee_cualquier_otro_permiso` |
 | Descargar de nuevo el documento | `test_proforma_documentos`: `test_descarga_responde_el_archivo_con_su_tipo_y_nombre` |
+| Ver la planta del proyecto desde el detalle (pedido de Santi): terreno, caminos y bloques con sus paneles, de solo lectura y con el permiso del historial; aviso si el plano cambió después de cotizar | `test_planta` (6 pruebas); `plantaCotizacion.test.tsx` (6 pruebas) |
 
 Evidencia: PR #39.
 
