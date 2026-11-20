@@ -6,7 +6,8 @@
  * contra el catálogo actual — ver CotizacionDetalleLeer en el backend.
  *
  * Arriba, la línea de tiempo de la propuesta (RF-16) con el enlace a los
- * reportes de despacho y recepción.
+ * reportes de despacho y recepción. Después de los ítems, la planta del
+ * proyecto (pedido de Santi, 17 de noviembre).
  */
 
 import { useEffect, useState } from "react";
@@ -14,6 +15,7 @@ import { Link, useLocation, useParams } from "react-router-dom";
 
 import { EstadoCotizacionBadge } from "@/components/EstadoCotizacionBadge";
 import { LineaTiempoPropuesta } from "@/components/LineaTiempoPropuesta";
+import { PlantaCotizacion } from "@/components/PlantaCotizacion";
 import { mensajeDeError } from "@/services/api";
 import { obtenerCotizacion, obtenerProformaExcel, obtenerProformaWord } from "@/services/cotizaciones";
 import { obtenerValidacion } from "@/services/validacion";
@@ -213,6 +215,8 @@ export function CotizacionDetallePage() {
               </tbody>
             </table>
           </section>
+
+          <PlantaCotizacion cotizacionId={cotizacion.id} />
 
           <section className="mt-6 overflow-hidden rounded-xl border border-acero-200 bg-superficie">
             <h2 className="border-b border-acero-200 bg-acero-50 px-5 py-3 text-sm font-semibold text-acero-900">
