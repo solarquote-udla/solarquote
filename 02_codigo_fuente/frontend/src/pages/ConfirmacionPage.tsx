@@ -17,6 +17,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { EstadoProyectoBadge } from "@/components/EstadoProyectoBadge";
+import { PestanasPlano3D } from "@/components/PestanasPlano3D";
 import { VistaLayout } from "@/components/VistaLayout";
 import { rutaPaso } from "@/components/asistente";
 import { FormularioCondiciones } from "@/components/FormularioCondiciones";
@@ -182,13 +183,24 @@ export function ConfirmacionPage() {
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           {terreno && layout ? (
-            <VistaLayout
-              terreno={terreno.vertices}
-              caminos={terreno.caminos.map((c) => c.vertices)}
-              bloques={layout.bloques.map((b, i) => ({ ...b, clave: i }))}
-              orientacionNorte={terreno.orientacion_norte}
-              desactualizado={layout.desactualizado}
-              inversores={Math.max(layout.inversores.length, 1)}
+            <PestanasPlano3D
+              datos3d={{
+                terreno: terreno.vertices,
+                caminos: terreno.caminos.map((c) => c.vertices),
+                bloques: layout.bloques,
+                anguloMontaje: equipo?.angulo_montaje ?? null,
+                orientacionNorte: terreno.orientacion_norte,
+              }}
+              plano={
+                <VistaLayout
+                  terreno={terreno.vertices}
+                  caminos={terreno.caminos.map((c) => c.vertices)}
+                  bloques={layout.bloques.map((b, i) => ({ ...b, clave: i }))}
+                  orientacionNorte={terreno.orientacion_norte}
+                  desactualizado={layout.desactualizado}
+                  inversores={Math.max(layout.inversores.length, 1)}
+                />
+              }
             />
           ) : (
             <div className="rounded-xl border border-dashed border-acero-300 bg-superficie p-10 text-center text-sm text-acero-500">

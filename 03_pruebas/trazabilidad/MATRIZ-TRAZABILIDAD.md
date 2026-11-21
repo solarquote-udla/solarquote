@@ -92,6 +92,7 @@ Evidencia: PR #2, #38 y los del catálogo de paneles y los mensajes de validaci�
 | A mínimo de los bloques cortos (SQ-170): sin él se aprovecha todo; con él no se generan bloques más cortos, tampoco al recortar por capacidad | `test_layout`: `test_a_minimo_*` (4 pruebas), `test_capacidad_con_a_minimo_no_deja_un_bloque_chico_al_final`; `test_api_layout_a_minimo` (4 pruebas); `layoutAMinimo.test.tsx` |
 | La capacidad deseada parte de la potencia objetivo del Paso 2; si esa potencia cambia, el layout queda desactualizado | `test_layout_edicion`: `test_cambiar_la_potencia_objetivo_desactualiza_el_layout`; `potenciaObjetivo.test.tsx` |
 | Edición manual (SQ-64) | `test_layout_edicion` (23 pruebas), paridad con `utils/edicionLayout.ts`; `asistentePasos2y3.test.tsx` |
+| Vista 3D del layout (Lenin): terreno, caminos y bloques con los paneles en la estructura en casita (soportes en V y en A) con el ángulo de montaje del Paso 2; se gira y acerca con el mouse; aviso si no hay WebGL | `vista3d.test.tsx` (8 pruebas: geometría de soportes y paneles, inclinación, base derecha, pestañas Plano y 3D) |
 
 Evidencia: PR #14, #27, #34, #38 y el de SQ-170.
 
@@ -160,6 +161,7 @@ público.
 | Documento de cotización en menos de 10 s (RNF-03) | `test_rnf`: `test_rnf03_documento_de_cotizacion_en_menos_de_10_s` |
 | Condiciones (plazo, validez, garantía) editables por cotización, no fijas en `settings`; forma de pago como lista de tramos (nombre y %) sobre el subtotal sin IVA; precio por Wp calculado, no editable (SQ-214) | `test_cotizacion_servicio`: `test_sin_condiciones_usa_los_valores_de_settings`, `test_condiciones_editadas_pisan_las_de_settings`, `test_precio_por_wp_se_calcula_del_subtotal_y_la_potencia`, `test_forma_de_pago_debe_sumar_cien` |
 | Formulario de condiciones en la confirmación del Paso 3 y del boceto: parte de la configuración (`GET /api/proforma/condiciones`), formas de pago 40 / 60 y 30 / 25 / 25 / 20, errores junto a cada campo y no confirma si los tramos no suman 100; las condiciones se ven en el detalle de la cotización con los pagos sin IVA | `test_condiciones_proforma` (4 pruebas); `condicionesProforma.test.tsx` (9 pruebas) |
+| En el Excel, el precio por Wp y la fila final "Total sin IVA" de la tabla de pagos son fórmulas (recalculan si cambia una cantidad); una cotización anterior a SQ-213/214 sin tramos propios usa los de la configuración en el Word y el Excel, en vez de la tabla de pagos vacía | `test_excel_precio_por_wp_es_formula_sobre_el_subtotal`, `test_excel_sin_potencia_no_rompe_el_precio_por_wp`, `test_excel_total_sin_iva_suma_los_tramos_de_pago`, `test_excel_sin_tramos_propios_usa_los_de_la_configuracion`, `test_word_totales_notas_condiciones_y_pagos` (fila "Total sin IVA"), `test_word_sin_tramos_propios_usa_los_de_la_configuracion` |
 
 Evidencia: PR de SQ-79/SQ-80/SQ-81/SQ-83/SQ-84, el de SQ-213 (quita el addendum y el campo Empresa) y el de SQ-214 (condiciones editables por cotización).
 
