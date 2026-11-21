@@ -21,7 +21,7 @@ import L from "leaflet";
 import { useEffect, useRef } from "react";
 
 import { normalizarLongitud, redondearCoordenada } from "@/utils/coordenadas";
-import type { Coordenadas } from "@/utils/terrenoMapa";
+import { desplazamientoEtiqueta, type Coordenadas } from "@/utils/terrenoMapa";
 
 export type { Coordenadas } from "@/utils/terrenoMapa";
 
@@ -103,10 +103,10 @@ const MITAD = L.divIcon({
 });
 
 /** Texto con el largo de un lado, centrado en su mitad. */
-function etiqueta(texto: string): L.DivIcon {
+function etiqueta(texto: string, [dx, dy]: [number, number] = [0, 0]): L.DivIcon {
   return L.divIcon({
     className: "",
-    html: `<div class="etiqueta-lado" style="transform:translate(-50%,-50%);display:inline-block;white-space:nowrap;padding:1px 5px;border-radius:4px;background:#0f172acc;color:#fff;font-size:11px;font-weight:600">${texto}</div>`,
+    html: `<div class="etiqueta-lado" style="transform:translate(calc(-50% + ${dx}px),calc(-50% + ${dy}px));display:inline-block;white-space:nowrap;padding:1px 5px;border-radius:4px;background:#0f172acc;color:#fff;font-size:11px;font-weight:600">${texto}</div>`,
     iconSize: [0, 0],
   });
 }
@@ -227,7 +227,9 @@ export function MapaUbicacion({ valor, onCambio, enfoque = 0, alto = "h-64", dib
       }).addTo(capa);
       contorno.forEach((a, i) => {
         const b = contorno[(i + 1) % contorno.length];
-        L.marker(mitad(a, b), { icon: etiqueta(dibujo.etiquetas[i] ?? ""), interactive: false, keyboard: false }).addTo(capa);
+        // La etiqueta va afuera del terreno para no tapar el punto de la mitad
+        const icono = etiqueta(dibujo.etiquetas[i] ?? "", desplazamientoEtiqueta(contorno, i));
+        L.marker(mitad(a, b), { icon: icono, interactive: false, keyboard: false }).addTo(capa);
         const medio = L.marker(mitad(a, b), { icon: MITAD, keyboard: false, title: `Agregar un vértice en la mitad del lado ${i + 1}` });
         medio.on("click", () => dibujoActual.current?.onInsertarVertice(i));
         medio.addTo(capa);

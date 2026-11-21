@@ -391,6 +391,32 @@ def test_capacidad_nunca_deja_un_bloque_mas_angosto_que_3_aunque_a_minimo_este_e
     assert min(t.paneles_ancho for t in r.tipos) == 3
 
 
+def test_capacidad_elige_bloques_completos_en_el_centro_y_no_las_puntas():
+    """
+    Revisión del 21 de noviembre (captura del Gerente): terreno de 78 x 67 m
+    dibujado sobre el mapa, girado 40 grados, Canadian 700 Wp a 7 grados,
+    L = 4, A compacto (12) y 222 kWp. Antes el recorte iba de izquierda a
+    derecha: llenaba la punta angosta del terreno con bloques cortos
+    (4 x 9, 4 x 8 y 4 x 3) y dejaba vacío el resto. Ahora toma primero los
+    bloques completos más cercanos al centro y solo acorta el último.
+    """
+    panel = PanelLayout(largo_mm=2384, ancho_mm=1303, potencia_wp=700, angulo_montaje=7)
+    terreno = [list(p) for p in rotate(Polygon(rectangulo(78, 67)), 40, origin=(0, 0)).exterior.coords[:-1]]
+    r = generar_layout(terreno, [], panel, ParametrosLayout(paneles_largo=4, capacidad_deseada_kwp=222), orientacion_norte=0)
+
+    assert r.capacidad.cabe
+    assert r.capacidad.paneles_necesarios == 318
+    assert r.total_paneles == 320
+    # Seis bloques completos de 4 x 12 y solo el último acortado
+    assert sorted((t.paneles_ancho, t.repeticiones) for t in r.tipos) == [(8, 1), (12, 6)]
+
+    # La planta queda alrededor del centro del terreno, no en una punta
+    centro = Polygon(terreno).centroid
+    xs = [sum(v[0] for v in b.vertices) / 4 for b in r.bloques]
+    ys = [sum(v[1] for v in b.vertices) / 4 for b in r.bloques]
+    assert math.hypot(sum(xs) / len(xs) - centro.x, sum(ys) / len(ys) - centro.y) < 8
+
+
 def test_capacidad_que_no_cabe_devuelve_la_maxima():
     r = generar_layout(
         rectangulo(100, 60),
