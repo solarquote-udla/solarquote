@@ -775,7 +775,7 @@ export function TerrenoPage() {
         </section>
 
         {/* ─── Panel derecho ────────────────────────────── */}
-        <aside className="space-y-4">
+        <aside className="space-y-4 self-start lg:sticky lg:top-6">
           <div className={TARJETA}>
             <h2 className={TITULO_TARJETA}>DATOS DEL PROYECTO</h2>
             <div className="mt-3 space-y-3">
