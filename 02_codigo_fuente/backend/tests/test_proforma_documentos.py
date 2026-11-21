@@ -298,6 +298,22 @@ def test_word_totales_notas_condiciones_y_pagos(db: Session, datos_oferente) -> 
     assert "Representante de Prueba" in texto
     assert "Representante legal" in texto
 
+    # Fila final de la tabla de pagos, como en CT519 y CT521A.
+    assert ["Total sin IVA", "", "$ 440,00"] in filas
+
+
+def test_word_sin_tramos_propios_usa_los_de_la_configuracion(db: Session, datos_oferente) -> None:
+    """Una cotización de antes de SQ-213 no tiene tramos_pago_cotizacion: la tabla no debe salir vacía."""
+    cotizacion = _cotizacion_con_materiales(db, pagos=[])
+
+    documento = Document(io.BytesIO(documentos.generar_word(cotizacion)))
+    filas = [[c.text for c in fila.cells] for tabla in documento.tables for fila in tabla.rows]
+
+    assert ["Anticipo", "30%", "$ 132,00"] in filas
+    assert ["Entrega", "40%", "$ 176,00"] in filas
+    assert ["A 60 días de la entrega", "30%", "$ 132,00"] in filas
+    assert ["Total sin IVA", "", "$ 440,00"] in filas
+
 
 def test_word_sin_datos_del_oferente_no_falla_y_omite_las_secciones(db: Session, sin_datos_oferente) -> None:
     """Como en CI: nada configurado todavía. El documento se genera igual, sin esas líneas."""
@@ -374,6 +390,64 @@ def test_excel_subtotales_y_totales_son_formulas(db: Session, datos_oferente) ->
 
     # Sobre el subtotal (sin IVA), no el total — "FORMA DE PAGO Y VALORES SIN IVA".
     for etiqueta, pct in [("Anticipo", "30.00"), ("Entrega", "40.00"), ("A 60 días de la entrega", "30.00")]:
+        fila_pago = _fila_con_etiqueta(hoja, etiqueta, columna="A")
+        assert hoja[f"C{fila_pago}"].value == f"=E{fila_subtotal}*{pct}/100", etiqueta
+
+
+def test_excel_precio_por_wp_es_formula_sobre_el_subtotal(db: Session, datos_oferente) -> None:
+    """Si Santiago cambia una cantidad, el precio por Wp debe cambiar con ella."""
+    cotizacion = _cotizacion_con_materiales(db, precio_wp=Decimal("0.0380"))
+
+    libro = load_workbook(io.BytesIO(documentos.generar_excel(cotizacion)), data_only=False)
+    hoja = libro.active
+
+    fila_precio_wp = _fila_con_etiqueta(hoja, "Precio por Wp:", columna="A")
+    fila_subtotal = _fila_con_etiqueta(hoja, "Subtotal")
+    # potencia_kwp = 45.20 (valor por defecto de la fábrica de prueba) × 1000
+    assert hoja[f"B{fila_precio_wp}"].value == f"=E{fila_subtotal}/45200.00"
+
+
+def test_excel_sin_potencia_no_rompe_el_precio_por_wp(db: Session, datos_oferente) -> None:
+    """No debería pasar en la práctica (precio_wp sale de dividir por la potencia), pero no debe romper el documento."""
+    cotizacion = _cotizacion_con_materiales(db, precio_wp=Decimal("0.0380"), potencia_kwp=None)
+
+    libro = load_workbook(io.BytesIO(documentos.generar_excel(cotizacion)))
+    fila_precio_wp = _fila_con_etiqueta(libro.active, "Precio por Wp:", columna="A")
+
+    assert libro.active[f"B{fila_precio_wp}"].value is None
+
+
+def test_excel_total_sin_iva_suma_los_tramos_de_pago(db: Session, datos_oferente) -> None:
+    """Fila final de la tabla de pagos, como en CT519 y CT521A: suma de los tramos, también en fórmula."""
+    cotizacion = _cotizacion_con_materiales(db)
+
+    libro = load_workbook(io.BytesIO(documentos.generar_excel(cotizacion)), data_only=False)
+    hoja = libro.active
+
+    primera_fila_pago = _fila_con_etiqueta(hoja, "Anticipo", columna="A")
+    ultima_fila_pago = _fila_con_etiqueta(hoja, "A 60 días de la entrega", columna="A")
+    fila_total = _fila_con_etiqueta(hoja, "Total sin IVA", columna="A")
+
+    assert fila_total == ultima_fila_pago + 1
+    assert hoja[f"C{fila_total}"].value == f"=SUM(C{primera_fila_pago}:C{ultima_fila_pago})"
+
+
+def test_excel_sin_tramos_propios_usa_los_de_la_configuracion(db: Session, datos_oferente) -> None:
+    cotizacion = _cotizacion_con_materiales(db, pagos=[])
+
+    libro = load_workbook(io.BytesIO(documentos.generar_excel(cotizacion)), data_only=False)
+    hoja = libro.active
+    fila_subtotal = _fila_con_etiqueta(hoja, "Subtotal")
+
+    # Los valores de la configuración, sin pasar por la base de datos, no
+    # tienen por qué tener la misma precisión decimal que un tramo guardado
+    # (ver test_excel_subtotales_y_totales_son_formulas): el monto es el
+    # mismo, aunque "30" y "30.00" se vean distinto como texto de fórmula.
+    for etiqueta, pct in [
+        ("Anticipo", settings.PROFORMA_PAGO_ANTICIPO_PCT),
+        ("Entrega", settings.PROFORMA_PAGO_ENTREGA_PCT),
+        ("A 60 días de la entrega", settings.PROFORMA_PAGO_60_DIAS_PCT),
+    ]:
         fila_pago = _fila_con_etiqueta(hoja, etiqueta, columna="A")
         assert hoja[f"C{fila_pago}"].value == f"=E{fila_subtotal}*{pct}/100", etiqueta
 
