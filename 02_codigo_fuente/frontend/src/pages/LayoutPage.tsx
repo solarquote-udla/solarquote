@@ -27,6 +27,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { BarraPaso } from "@/components/BarraPaso";
 import { EncabezadoProyecto } from "@/components/EncabezadoProyecto";
 import { rutaPaso } from "@/components/asistente";
+import { PestanasPlano3D } from "@/components/PestanasPlano3D";
 import { VistaLayout, type BloqueDibujo } from "@/components/VistaLayout";
 import { useCambiosSinGuardar } from "@/hooks/useCambiosSinGuardar";
 import { useAccionUnica } from "@/hooks/useAccionUnica";
@@ -941,27 +942,39 @@ export function LayoutPage() {
           )}
 
           {terreno && (
-            <VistaLayout
-              terreno={terreno.vertices}
-              caminos={terreno.caminos.map((c) => c.vertices)}
-              bloques={dibujo}
-              orientacionNorte={terreno.orientacion_norte}
-              desactualizado={layout?.desactualizado}
-              inversores={cantidadInversores}
-              editable={borrador !== null}
-              seleccionado={seleccionado}
-              onSeleccionar={setSeleccionado}
-              onIniciarArrastre={(clave) => {
-                origenAlArrastrar.current = borrador?.find((b) => b.clave === clave)?.origen ?? null;
+            <PestanasPlano3D
+              sin3D={borrador !== null ? "Termina la edición para ver el 3D" : undefined}
+              datos3d={{
+                terreno: terreno.vertices,
+                caminos: terreno.caminos.map((c) => c.vertices),
+                bloques: dibujo,
+                anguloMontaje: equipo?.angulo_montaje ?? null,
+                orientacionNorte: terreno.orientacion_norte,
               }}
-              onArrastrar={(clave, [dx, dy]) => {
-                const base = origenAlArrastrar.current;
-                // Zona muerta: un clic para seleccionar no debe mover el bloque
-                if (!base || Math.hypot(dx, dy) < ZONA_MUERTA_M) return;
-                setBorrador((bs) =>
-                  bs?.map((b) => (b.clave === clave ? { ...b, origen: [ajustar(base[0] + dx), ajustar(base[1] + dy)] } : b)) ?? null,
-                );
-              }}
+              plano={
+                <VistaLayout
+                  terreno={terreno.vertices}
+                  caminos={terreno.caminos.map((c) => c.vertices)}
+                  bloques={dibujo}
+                  orientacionNorte={terreno.orientacion_norte}
+                  desactualizado={layout?.desactualizado}
+                  inversores={cantidadInversores}
+                  editable={borrador !== null}
+                  seleccionado={seleccionado}
+                  onSeleccionar={setSeleccionado}
+                  onIniciarArrastre={(clave) => {
+                    origenAlArrastrar.current = borrador?.find((b) => b.clave === clave)?.origen ?? null;
+                  }}
+                  onArrastrar={(clave, [dx, dy]) => {
+                    const base = origenAlArrastrar.current;
+                    // Zona muerta: un clic para seleccionar no debe mover el bloque
+                    if (!base || Math.hypot(dx, dy) < ZONA_MUERTA_M) return;
+                    setBorrador((bs) =>
+                      bs?.map((b) => (b.clave === clave ? { ...b, origen: [ajustar(base[0] + dx), ajustar(base[1] + dy)] } : b)) ?? null,
+                    );
+                  }}
+                />
+              }
             />
           )}
         </div>
