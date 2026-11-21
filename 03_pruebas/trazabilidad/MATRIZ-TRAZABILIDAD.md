@@ -91,6 +91,7 @@ Evidencia: PR #2, #38 y los del catálogo de paneles y los mensajes de validaci�
 | L par | `test_layout`: `test_l_impar_o_cero_se_rechaza` |
 | A mínimo de los bloques cortos (SQ-170): sin él se aprovecha todo; con él no se generan bloques más cortos, tampoco al recortar por capacidad | `test_layout`: `test_a_minimo_*` (4 pruebas), `test_capacidad_con_a_minimo_no_deja_un_bloque_chico_al_final`; `test_api_layout_a_minimo` (4 pruebas); `layoutAMinimo.test.tsx` |
 | La capacidad deseada parte de la potencia objetivo del Paso 2; si esa potencia cambia, el layout queda desactualizado | `test_layout_edicion`: `test_cambiar_la_potencia_objetivo_desactualiza_el_layout`; `potenciaObjetivo.test.tsx` |
+| Al recortar a la capacidad deseada, el último bloque nunca queda más angosto que 3 paneles (ni un candidato ya angosto por un camino se instala tal cual), aunque "A mínimo" esté en 1: una estructura de soporte para 1 o 2 paneles no es construible, aunque la potencia cuadre (revisión de UX del 21 de noviembre de 2026) | `test_layout`: `test_capacidad_nunca_deja_un_bloque_mas_angosto_que_3_aunque_a_minimo_este_en_1` |
 | Edición manual (SQ-64) | `test_layout_edicion` (23 pruebas), paridad con `utils/edicionLayout.ts`; `asistentePasos2y3.test.tsx` |
 
 Evidencia: PR #14, #27, #34, #38 y el de SQ-170.

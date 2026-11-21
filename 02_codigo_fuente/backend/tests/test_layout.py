@@ -363,6 +363,34 @@ def test_capacidad_con_a_minimo_no_deja_un_bloque_chico_al_final():
     assert min(t.paneles_ancho for t in r.tipos) == 12
 
 
+def test_capacidad_nunca_deja_un_bloque_mas_angosto_que_3_aunque_a_minimo_este_en_1():
+    """
+    Revisión de UX del 21 de noviembre de 2026: un camino de acceso parte
+    el terreno en tramos más chicos, y recortar a una capacidad deseada
+    puede terminar en un bloque de 1 o 2 paneles — una estructura de
+    soporte independiente para eso no es construible, aunque la potencia
+    cuadre. Sin que el Gerente toque "A mínimo" (que sigue en 1, su
+    valor por defecto), el recorte nunca deja un bloque de menos de 3.
+
+    482 paneles necesarios: 20 bloques completos (480) y faltan 2, que
+    acortados a ceil(2 / 4) = 1 fila serían un bloque de 4 × 1. Con el
+    piso de 3, se instalan 4 × 3 = 12 en vez de 4, un poco más que lo
+    justo, en vez de ese bloque.
+    """
+    camino = rectangulo(100, 4, 0, 28)
+    r = generar_layout(
+        rectangulo(100, 60),
+        [camino],
+        PANEL_PLANO,
+        ParametrosLayout(paneles_ancho=24, capacidad_deseada_kwp=482 * 0.58),
+        orientacion_norte=0,
+    )
+    assert r.capacidad.cabe
+    assert r.capacidad.paneles_necesarios == 482
+    assert r.total_paneles == 480 + 4 * 3
+    assert min(t.paneles_ancho for t in r.tipos) == 3
+
+
 def test_capacidad_que_no_cabe_devuelve_la_maxima():
     r = generar_layout(
         rectangulo(100, 60),

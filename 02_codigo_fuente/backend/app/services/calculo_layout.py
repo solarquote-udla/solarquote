@@ -105,6 +105,19 @@ SEPARACION_ANCHO_DEFECTO_M = 0.02
 # por defecto está pendiente de confirmar con el Gerente General.
 PANELES_ANCHO_MINIMO_DEFECTO = 1
 
+# Al recortar a la capacidad deseada, el último bloque nunca queda más
+# angosto que esto, aunque "A mínimo" esté en 1 o 2: una estructura de
+# soporte independiente de 1 o 2 paneles no es construible en la
+# práctica, aunque la potencia instalada cuadre exacto (revisión de UX
+# del 21 de noviembre de 2026, con el caso real de un terreno con camino
+# y capacidad deseada que generaba un bloque de 4 × 1). Se prefiere
+# instalar unos paneles de más, igual que ya hace "A mínimo" con el
+# sobrante de un tramo (SQ-170) — esto es lo mismo, pero como piso fijo
+# para que no haga falta subir "A mínimo" a mano cada vez. No aplica al
+# resto del layout: maximizar paneles (sin capacidad deseada) sigue
+# aprovechando el sobrante de un tramo tal como lo deje "A mínimo".
+PANELES_ANCHO_MINIMO_RECORTE = 3
+
 # Cuántos puntos de arranque se prueban para la primera franja. 24 deja el
 # error de discretización por debajo del 5 % del paso horizontal, que es
 # el margen que pide RNF-01.
@@ -428,20 +441,27 @@ def _recortar_a_capacidad(
 
     Recorre en orden de franja y altura, que mantiene la planta compacta.
     El último bloque se acorta para no pasarse más de una fila de L, pero
-    nunca por debajo del A mínimo: en ese caso se instalan unos paneles
-    de más antes que dejar un bloque que habría que borrar a mano.
+    nunca por debajo del A mínimo ni de PANELES_ANCHO_MINIMO_RECORTE. Un
+    candidato que ya nace más angosto que ese piso (un sobrante de tramo
+    del paso de maximizar, sin relación con la capacidad pedida) se salta
+    en vez de instalarlo: en cualquiera de los dos casos se prefieren unos
+    paneles de más antes que una estructura de soporte independiente para
+    un puñado de paneles, que no sería real aunque la cuenta cuadre.
     """
+    piso = max(1, paneles_ancho_minimo, PANELES_ANCHO_MINIMO_RECORTE)
     resultado = []
     faltan = paneles_necesarios
     for b in sorted(bloques, key=lambda b: (b.x0, b.y0)):
         if faltan <= 0:
             break
+        if b.paneles_ancho < piso:
+            continue
         paneles = paneles_largo * b.paneles_ancho
         if paneles <= faltan:
             resultado.append(b)
             faltan -= paneles
         else:
-            a = min(b.paneles_ancho, max(math.ceil(faltan / paneles_largo), paneles_ancho_minimo))
+            a = max(math.ceil(faltan / paneles_largo), piso)
             resultado.append(
                 _BloqueLocal(b.x0, b.y0, b.x1, b.y0 + medida_fila(a, lado_menor_m, separacion_paneles_m), a)
             )
