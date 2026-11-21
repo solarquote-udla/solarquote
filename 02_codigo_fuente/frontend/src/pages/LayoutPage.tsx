@@ -967,7 +967,7 @@ export function LayoutPage() {
         </div>
 
         {/* ─── Resultados ───────────────────────────────── */}
-        <aside className="space-y-5">
+        <aside className="space-y-5 self-start lg:sticky lg:top-6">
           {/* ─── Resumen (prototipo) ─────────────────────── */}
           <div className="grid grid-cols-2 gap-3">
             {[
