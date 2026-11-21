@@ -16,9 +16,13 @@ subtotal — las proformas dicen "FORMA DE PAGO Y VALORES SIN IVA". El
 precio por Wp se calcula (subtotal ÷ potencia en Wp), no se edita.
 
 El Word es un documento fijo. El Excel es editable: los subtotales por
-material, el subtotal general, el IVA, el total y la tabla de pagos son
-fórmulas, no valores — si Santiago cambia una cantidad, todo lo demás se
-recalcula solo.
+material, el subtotal general, el IVA, el total, el precio por Wp y la
+tabla de pagos (con su fila "Total sin IVA") son fórmulas, no valores —
+si Santiago cambia una cantidad, todo lo demás se recalcula solo.
+
+Una cotización de antes de las condiciones editables (SQ-213) no tiene
+tramos de pago propios: el Word y el Excel usan los de la configuración,
+igual que al confirmarla, en vez de mostrar la tabla de pagos vacía.
 
 El dinero se maneja en `Decimal` y se imprime con el formato de Ecuador
 ($ 5.025,60), el mismo de la proforma real — distinto a como se ve en la
@@ -38,7 +42,7 @@ from openpyxl.utils import get_column_letter
 from app.core.config import settings
 from app.core.fechas import ZONA_ECUADOR
 from app.models.cotizacion import Cotizacion, MaterialCotizado
-from app.services.cotizacion import CODIGO_LOGISTICA
+from app.services.cotizacion import CODIGO_LOGISTICA, tramos_pago_por_defecto
 
 # Orden de la proforma real (CT-129-2025), no alfabético. Un material que
 # no esté aquí (fuera del catálogo de las fórmulas f(L,A,B) y de LOG) cae
@@ -148,13 +152,18 @@ def _pagos(cotizacion: Cotizacion) -> list[tuple[str, Decimal, Decimal | None]]:
     (etiqueta, porcentaje, monto) para cada tramo de la forma de pago, con
     los tramos de esta cotización (editables por cotización, SQ-213) sobre
     el **subtotal**, no el total: las proformas dicen "FORMA DE PAGO Y
-    VALORES SIN IVA". Vacío: una cotización de antes de este campo no
-    tiene tramos.
+    VALORES SIN IVA". Una cotización de antes de este campo no tiene
+    tramos propios: usa los de la configuración, como al confirmarla.
     """
     subtotal = cotizacion.subtotal
+    tramos = (
+        [(tramo.nombre, tramo.porcentaje) for tramo in cotizacion.pagos]
+        if cotizacion.pagos
+        else tramos_pago_por_defecto()
+    )
     return [
-        (tramo.nombre, tramo.porcentaje, (subtotal * tramo.porcentaje / Decimal("100")) if subtotal is not None else None)
-        for tramo in cotizacion.pagos
+        (nombre, porcentaje, (subtotal * porcentaje / Decimal("100")) if subtotal is not None else None)
+        for nombre, porcentaje in tramos
     ]
 
 
@@ -270,10 +279,19 @@ def generar_word(cotizacion: Cotizacion) -> bytes:
         for parrafo in celda.paragraphs:
             for corrida in parrafo.runs:
                 corrida.bold = True
-    for etiqueta, pct, monto in _pagos(cotizacion):
+    pagos = _pagos(cotizacion)
+    for etiqueta, pct, monto in pagos:
         fila = tabla_pagos.add_row().cells
         for celda, texto in zip(fila, [etiqueta, _porcentaje(pct), _moneda(monto)]):
             celda.text = texto
+    if pagos:
+        fila_total_pagos = tabla_pagos.add_row().cells
+        for celda, texto in zip(fila_total_pagos, ["Total sin IVA", "", _moneda(cotizacion.subtotal)]):
+            celda.text = texto
+        for celda in fila_total_pagos:
+            for parrafo in celda.paragraphs:
+                for corrida in parrafo.runs:
+                    corrida.bold = True
 
     if settings.HEXTRUCTURE_BANCO:
         documento.add_heading("Datos bancarios", level=2)
@@ -301,6 +319,7 @@ def generar_word(cotizacion: Cotizacion) -> bytes:
 # ─── Excel ──────────────────────────────────────────────────────────
 
 FORMATO_MONEDA_EXCEL = '"$" #,##0.00'
+FORMATO_PRECIO_WP_EXCEL = '"$" #,##0.0000'
 
 
 def generar_excel(cotizacion: Cotizacion) -> bytes:
@@ -337,8 +356,13 @@ def generar_excel(cotizacion: Cotizacion) -> bytes:
     if cotizacion.potencia_kwp is not None:
         hoja.cell(row=fila, column=1, value=f"Potencia: {_numero(cotizacion.potencia_kwp)} kWp")
         fila += 1
+    fila_precio_wp = None
     if cotizacion.precio_wp is not None:
-        hoja.cell(row=fila, column=1, value=f"Precio: {_precio_wp(cotizacion.precio_wp)} por Wp")
+        # El valor se llena más abajo, como fórmula sobre el subtotal (ver
+        # fila_subtotal): si Santiago cambia una cantidad, el precio por
+        # Wp cambia con ella, en vez de quedar fijo en el valor de hoy.
+        hoja.cell(row=fila, column=1, value="Precio por Wp:")
+        fila_precio_wp = fila
         fila += 1
 
     fila += 1
@@ -381,6 +405,11 @@ def generar_excel(cotizacion: Cotizacion) -> bytes:
     celda_subtotal_general = hoja.cell(row=fila, column=5, value=f"=SUM(E{primera_fila_materiales}:E{ultima_fila_materiales})")
     celda_subtotal_general.number_format = FORMATO_MONEDA_EXCEL
     fila += 1
+
+    if fila_precio_wp is not None and cotizacion.potencia_kwp:
+        potencia_wp = cotizacion.potencia_kwp * Decimal(1000)
+        celda_precio_wp = hoja.cell(row=fila_precio_wp, column=2, value=f"=E{fila_subtotal}/{potencia_wp}")
+        celda_precio_wp.number_format = FORMATO_PRECIO_WP_EXCEL
 
     fila_iva = fila
     etiqueta_iva = f"IVA ({_porcentaje(cotizacion.iva_porcentaje)})" if cotizacion.iva_porcentaje is not None else "IVA"
@@ -441,12 +470,20 @@ def generar_excel(cotizacion: Cotizacion) -> bytes:
     for columna, texto in enumerate(["Tramo", "Porcentaje", "Monto"], start=1):
         hoja.cell(row=fila, column=columna, value=texto).font = negrita
     fila += 1
+    primera_fila_pago = fila
     for etiqueta, pct, _ in _pagos(cotizacion):
         hoja.cell(row=fila, column=1, value=etiqueta)
         hoja.cell(row=fila, column=2, value=_porcentaje(pct))
         # También fórmula, sobre el subtotal (sin IVA): cambia si cambia una cantidad.
         celda_pago = hoja.cell(row=fila, column=3, value=f"=E{fila_subtotal}*{pct}/100")
         celda_pago.number_format = FORMATO_MONEDA_EXCEL
+        fila += 1
+    ultima_fila_pago = fila - 1
+    if ultima_fila_pago >= primera_fila_pago:
+        hoja.cell(row=fila, column=1, value="Total sin IVA").font = negrita
+        celda_total_pagos = hoja.cell(row=fila, column=3, value=f"=SUM(C{primera_fila_pago}:C{ultima_fila_pago})")
+        celda_total_pagos.number_format = FORMATO_MONEDA_EXCEL
+        celda_total_pagos.font = negrita
         fila += 1
 
     if settings.HEXTRUCTURE_BANCO:

@@ -70,6 +70,19 @@ describe("Dashboard", () => {
     expect(proyectosServicio.listarProyectos).not.toHaveBeenCalled();
   });
 
+  it("Nuevo proyecto es la acción principal, resaltada aunque no se pase el mouse", async () => {
+    permisos = ["generar_layout", "cargar_boceto", "historial", "clientes"];
+    vi.mocked(proyectosServicio.listarProyectos).mockResolvedValue([]);
+    abrir();
+
+    const accesos = screen.getByRole("navigation", { name: "Accesos rápidos" });
+    const nuevoProyecto = within(accesos).getByRole("link", { name: /Nuevo proyecto/ });
+    const historial = within(accesos).getByRole("link", { name: /Historial/ });
+
+    expect(nuevoProyecto.className).toMatch(/bg-solar-500/);
+    expect(historial.className).not.toMatch(/bg-solar-500/);
+  });
+
   it("el gerente ve todos los accesos de cálculo y clientes", async () => {
     permisos = ["generar_layout", "cargar_boceto", "historial", "clientes"];
     vi.mocked(proyectosServicio.listarProyectos).mockResolvedValue([]);
