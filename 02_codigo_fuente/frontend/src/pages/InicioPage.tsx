@@ -161,16 +161,26 @@ export function InicioPage() {
 
       {accesos.length > 0 && (
         <nav aria-label="Accesos rápidos" className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {accesos.map((a) => (
-            <Link
-              key={a.ruta}
-              to={a.ruta}
-              className="group rounded-xl border border-acero-200 bg-superficie p-5 transition hover:border-solar-400 hover:shadow-md"
-            >
-              <p className="text-base font-semibold text-acero-900 group-hover:text-solar-700">{a.titulo}</p>
-              <p className="mt-1 text-sm text-acero-500">{a.descripcion}</p>
-            </Link>
-          ))}
+          {accesos.map((a) => {
+            // La acción principal del dashboard: siempre resaltada, no solo al pasar el mouse.
+            const principal = a.ruta === "/generar";
+            return (
+              <Link
+                key={a.ruta}
+                to={a.ruta}
+                className={
+                  principal
+                    ? "group rounded-xl border border-solar-500 bg-solar-500 p-5 shadow-sm transition hover:bg-solar-600 hover:border-solar-600"
+                    : "group rounded-xl border border-acero-200 bg-superficie p-5 transition hover:border-solar-400 hover:shadow-md"
+                }
+              >
+                <p className={principal ? "text-base font-semibold text-acero-50" : "text-base font-semibold text-acero-900 group-hover:text-solar-700"}>
+                  {a.titulo}
+                </p>
+                <p className={principal ? "mt-1 text-sm text-acero-50" : "mt-1 text-sm text-acero-500"}>{a.descripcion}</p>
+              </Link>
+            );
+          })}
         </nav>
       )}
 
