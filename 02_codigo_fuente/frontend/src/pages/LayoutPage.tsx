@@ -55,7 +55,7 @@ import {
   type GeometriaLayout,
 } from "@/utils/edicionLayout";
 import { aCompacto, esCompacto } from "@/utils/bloque";
-import { corredor, esPoligonoSimple, largoEje, nombreCaminoDibujado } from "@/utils/caminos";
+import { corredor, esPoligonoSimple, largoEje, medidasCamino, nombreCaminoDibujado } from "@/utils/caminos";
 import { formatearArea, limitesDe } from "@/utils/geometria";
 import { ajustarAngulo } from "@/utils/terrenoMapa";
 import { colorInversor } from "@/utils/inversores";
@@ -177,19 +177,24 @@ function nombreCamino(existentes: (string | null)[], direccion: Direccion): stri
 /**
  * Sentido y ancho de un camino, para la lista del panel.
  *
- * El sentido sale del nombre que le da esta pantalla ("Camino H1" o
- * "Camino V1"): adivinarlo por la forma falla en terrenos angostos, donde
- * un camino horizontal puede ser más alto que ancho. Solo para caminos
- * con otro nombre (creados antes del asistente) se infiere por la forma.
+ * Para los caminos rectos de borde a borde, el sentido sale del nombre que
+ * les da esta pantalla ("Camino H1" o "Camino V1"): adivinarlo por la
+ * forma falla en terrenos angostos. Los demás (dibujados en el mapa, en
+ * diagonal o con quiebres) muestran su ancho y largo reales.
  */
 function describirCamino(nombre: string | null, vertices: Punto[]): string {
   const caja = limitesDe(vertices);
   if (!caja) return "Sin geometría";
-  const dx = caja.maxX - caja.minX;
-  const dy = caja.maxY - caja.minY;
   const letra = nombre?.match(/^Camino ([HV])\d+$/)?.[1];
-  const horizontal = letra ? letra === "H" : dx >= dy;
-  return `${horizontal ? "Horizontal" : "Vertical"} · ${numero(horizontal ? dy : dx)} m de ancho`;
+  if (letra) {
+    const horizontal = letra === "H";
+    return `${horizontal ? "Horizontal" : "Vertical"} · ${numero(horizontal ? caja.maxY - caja.minY : caja.maxX - caja.minX)} m de ancho`;
+  }
+  // Dibujado en el mapa (o creado antes del asistente): puede ir en diagonal
+  // o con quiebres, así que la caja que lo encierra no dice su ancho
+  const medidas = medidasCamino(vertices);
+  if (!medidas) return "Sin geometría";
+  return `${numero(medidas.ancho)} m de ancho · ${numero(medidas.largo, 0)} m de largo`;
 }
 
 /** Cuánto mide el terreno en la dirección en que se mide la posición del eje. */

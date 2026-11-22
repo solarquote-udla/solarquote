@@ -41,8 +41,11 @@ export interface DibujoMapa {
   borrador: Coordenadas[];
   etiquetasBorrador: string[];
   dibujando: boolean;
-  /** Punto que quedaría bajo el cursor (ya ajustado a 90°) y el largo del lado. */
-  vistaPrevia: (c: Coordenadas) => { punto: Coordenadas; etiqueta: string } | null;
+  /**
+   * Punto que quedaría bajo el cursor (ajustado a 90°, salvo con `sinAjuste`)
+   * y el largo del lado.
+   */
+  vistaPrevia: (c: Coordenadas, sinAjuste?: boolean) => { punto: Coordenadas; etiqueta: string } | null;
   onClicDibujo: (c: Coordenadas) => void;
   onCerrarBorrador: () => void;
   onMoverVertice: (i: number, c: Coordenadas) => void;
@@ -100,6 +103,12 @@ const MITAD = L.divIcon({
 
 const etiqueta = iconoTexto;
 
+/**
+ * Distancia en pantalla a la que el cursor "se pega" a la primera esquina
+ * para cerrar el contorno, sin que el ajuste a 90° lo desvíe.
+ */
+const IMAN_CIERRE_PX = 18;
+
 const mitad = (a: Coordenadas, b: Coordenadas): L.LatLngTuple => [
   (a.latitud + b.latitud) / 2,
   (a.longitud + b.longitud) / 2,
@@ -128,10 +137,16 @@ export function MapaUbicacion({ valor, onCambio, enfoque = 0, alto = "h-64", dib
     );
     capaDibujo.current = L.layerGroup().addTo(m);
     capaPrevia.current = L.layerGroup().addTo(m);
+    /** Con tres esquinas o más, el cursor está pegado a la primera: el clic cierra. */
+    const cercaDelInicio = (d: DibujoMapa, ll: L.LatLng) =>
+      d.borrador.length >= 3 &&
+      m.latLngToContainerPoint(ll).distanceTo(m.latLngToContainerPoint(aLatLng(d.borrador[0]))) <= IMAN_CIERRE_PX;
+
     m.on("click", (e: L.LeafletMouseEvent) => {
       const d = dibujoActual.current;
       if (d?.dibujando) {
-        d.onClicDibujo(aCoordenadas(e.latlng));
+        if (cercaDelInicio(d, e.latlng)) d.onCerrarBorrador();
+        else d.onClicDibujo(aCoordenadas(e.latlng));
         return;
       }
       // Con el terreno dibujado, un clic suelto no mueve la ubicación: el
@@ -146,10 +161,15 @@ export function MapaUbicacion({ valor, onCambio, enfoque = 0, alto = "h-64", dib
       if (!previa) return;
       previa.clearLayers();
       if (!d?.dibujando || d.borrador.length === 0) return;
-      const vista = d.vistaPrevia(aCoordenadas(e.latlng));
+      // Cerca de la primera esquina, el lado va justo a ella (sin ajuste a 90°)
+      const cierra = cercaDelInicio(d, e.latlng);
+      const vista = cierra ? d.vistaPrevia(d.borrador[0], true) : d.vistaPrevia(aCoordenadas(e.latlng));
       if (!vista) return;
       const ultimo = d.borrador[d.borrador.length - 1];
       L.polyline([aLatLng(ultimo), aLatLng(vista.punto)], { color: AMARILLO, weight: 2, dashArray: "6 6", interactive: false }).addTo(previa);
+      if (cierra) {
+        L.circleMarker(aLatLng(d.borrador[0]), { radius: 12, color: AMARILLO, weight: 2, fill: false, interactive: false }).addTo(previa);
+      }
       L.marker(mitad(ultimo, vista.punto), { icon: etiqueta(vista.etiqueta), interactive: false, keyboard: false }).addTo(previa);
     });
     m.on("mouseout", () => capaPrevia.current?.clearLayers());

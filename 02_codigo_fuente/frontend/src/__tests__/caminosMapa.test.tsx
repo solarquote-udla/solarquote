@@ -10,7 +10,7 @@ import { hayCambiosPendientes } from "@/hooks/useCambiosSinGuardar";
 import { LayoutPage } from "@/pages/LayoutPage";
 import * as terreno from "@/services/terreno";
 import type { Punto } from "@/types/api";
-import { corredor, esPoligonoSimple, largoEje, nombreCaminoDibujado } from "@/utils/caminos";
+import { corredor, esPoligonoSimple, largoEje, medidasCamino, nombreCaminoDibujado } from "@/utils/caminos";
 
 import { montar } from "./utilidades";
 
@@ -90,6 +90,22 @@ describe("geometría del camino", () => {
     expect(esPoligonoSimple([[0, 0], [10, 0], [10, 10], [0, 10]])).toBe(true);
   });
 
+  it("ancho y largo reales de un camino guardado, aunque vaya en diagonal o con quiebres", () => {
+    const recto = medidasCamino([[0, 28], [100, 28], [100, 32], [0, 32]]);
+    expect(recto?.ancho).toBeCloseTo(4, 6);
+    expect(recto?.largo).toBeCloseTo(100, 6);
+    // El mismo camino girado 35°: la caja que lo encierra ya no dice su ancho
+    const t = (35 * Math.PI) / 180;
+    const girado = ([[0, 0], [80, 0], [80, 4.3], [0, 4.3]] as Punto[]).map(([x, y]) => [x * Math.cos(t) - y * Math.sin(t), x * Math.sin(t) + y * Math.cos(t)] as Punto);
+    expect(medidasCamino(girado)?.ancho).toBeCloseTo(4.3, 6);
+    // Con un quiebre de 90°: ancho exacto, largo por el eje
+    const quiebre = medidasCamino(corredor([[0, 0], [50, 0], [50, 40]], 4));
+    expect(quiebre?.ancho).toBeCloseTo(4, 0);
+    expect(quiebre?.largo).toBeGreaterThan(85);
+    expect(quiebre?.largo).toBeLessThan(95);
+    expect(medidasCamino([[0, 0], [1, 1]])).toBeNull();
+  });
+
   it("largo del eje y nombre libre", () => {
     expect(largoEje([[0, 0], [30, 0], [30, 40]])).toBe(70);
     expect(nombreCaminoDibujado(["Camino H1", "Camino 1", "Camino 3", null])).toBe("Camino 4");
@@ -137,6 +153,19 @@ describe("Paso 3: caminos dibujados en el mapa", () => {
     expect(datos.vertices).toHaveLength(6);
     expect(await screen.findByText(/Camino 1 agregado/)).toBeTruthy();
     expect(hayCambiosPendientes()).toBe(false);
+  });
+
+  it("un camino dibujado en diagonal muestra su ancho y largo reales, no la caja que lo encierra", async () => {
+    const t = (35 * Math.PI) / 180;
+    const diagonal = ([[0, 0], [80, 0], [80, 4.3], [0, 4.3]] as Punto[]).map(
+      ([x, y]) => [10 + x * Math.cos(t) - y * Math.sin(t), 5 + x * Math.sin(t) + y * Math.cos(t)] as Punto,
+    );
+    const { TERRENO, rect } = await import("./utilidades");
+    vi.mocked(terreno.obtenerTerreno).mockResolvedValueOnce(
+      TERRENO(rect(100, 60), [{ id: 3, nombre: "Camino 1", tipo: "acceso", vertices: diagonal }]) as never,
+    );
+    paso3();
+    expect(await screen.findByText(/4,3 m de ancho · 80 m de largo/)).toBeTruthy();
   });
 
   it("deshacer, cancelar y un ancho inválido no guardan nada", async () => {

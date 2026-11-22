@@ -87,3 +87,26 @@ export function nombreCaminoDibujado(existentes: (string | null)[]): string {
   });
   return `Camino ${Math.max(0, ...usados) + 1}`;
 }
+
+/**
+ * Ancho y largo de un camino guardado, a partir de su polígono: área y
+ * perímetro de una franja (exacto para un camino recto, muy cercano para
+ * uno con quiebres). El camino no guarda su eje.
+ */
+export function medidasCamino(poligono: Punto[]): { ancho: number; largo: number } | null {
+  const n = poligono.length;
+  if (n < 3) return null;
+  let area = 0;
+  let perimetro = 0;
+  poligono.forEach((p, i) => {
+    const q = poligono[(i + 1) % n];
+    area += p[0] * q[1] - q[0] * p[1];
+    perimetro += Math.hypot(q[0] - p[0], q[1] - p[1]);
+  });
+  area = Math.abs(area) / 2;
+  const mitad = perimetro / 2;
+  const discriminante = mitad * mitad - 4 * area;
+  if (area === 0 || discriminante < 0) return null;
+  const ancho = (mitad - Math.sqrt(discriminante)) / 2;
+  return { ancho, largo: area / ancho };
+}
