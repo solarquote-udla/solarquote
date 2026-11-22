@@ -71,7 +71,9 @@ al leerlos.
 6. Se prueban **24 desfases** de la primera franja y se elige el que ubica
    más paneles; a igualdad, el que tiene menos bloques cortos.
 7. Si se pidió una **capacidad en kWp**, se recorta el layout a los paneles
-   necesarios. Si no cabe, se entrega el máximo y se informa.
+   necesarios: primero los bloques completos más cercanos al centro de la
+   planta, después los demás, y solo el último se acorta (nunca a menos de
+   3 paneles en A). Si no cabe, se entrega el máximo y se informa.
 8. Se agrupan los bloques idénticos por tipo (A, B, C…, el más repetido
    primero) y se calcula la **configuración eléctrica**.
 

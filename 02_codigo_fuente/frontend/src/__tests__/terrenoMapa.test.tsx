@@ -15,6 +15,7 @@ import {
   aMapa,
   aPlano,
   cambiarLargoLado,
+  desplazamientoEtiqueta,
   insertarEnMitad,
   largosDeLados,
   quitarVertice,
@@ -104,6 +105,19 @@ describe("geometría del terreno sobre el mapa", () => {
     expect(quitarVertice(con, 1)).toEqual(RECTANGULO);
     const triangulo: Punto[] = [[0, 0], [10, 0], [0, 10]];
     expect(quitarVertice(triangulo, 0)).toBe(triangulo);
+  });
+
+  it("la etiqueta de cada lado va afuera del terreno, gire como gire el contorno", () => {
+    // RECTANGULO va en sentido antihorario: lado 1 al sur, 2 al este, 3 al norte, 4 al oeste
+    const antihorario = RECTANGULO.map((p) => aMapa(ORIGEN, p));
+    expect(desplazamientoEtiqueta(antihorario, 0)).toEqual([0, 16]); // abajo
+    expect(desplazamientoEtiqueta(antihorario, 1)).toEqual([16, 0]); // derecha
+    expect(desplazamientoEtiqueta(antihorario, 2)).toEqual([0, -16]); // arriba
+    expect(desplazamientoEtiqueta(antihorario, 3)).toEqual([-16, 0]); // izquierda
+    // El mismo terreno dibujado al revés: las etiquetas siguen afuera
+    const horario = [...antihorario].reverse();
+    expect(desplazamientoEtiqueta(horario, 0)).toEqual([0, -16]); // de NO a NE: lado norte, arriba
+    expect(desplazamientoEtiqueta(horario.slice(0, 2), 0)).toEqual([0, 0]);
   });
 
   it("mide el ángulo de cada vértice", () => {
