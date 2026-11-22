@@ -141,3 +141,28 @@ export function anguloEnVertice(vertices: Punto[], i: number): number {
   const vy = c[1] - b[1];
   return Math.abs(Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy)) / GRADO;
 }
+
+/**
+ * Desplazamiento en píxeles (x a la derecha, y hacia abajo) para poner la
+ * etiqueta del lado `i` afuera del terreno, y no encima del punto que
+ * agrega un vértice en la mitad del lado. El mapa tiene el norte arriba.
+ */
+export function desplazamientoEtiqueta(contorno: Coordenadas[], i: number, pixeles = 16): [number, number] {
+  const n = contorno.length;
+  if (n < 3) return [0, 0];
+  const lat0 = contorno[0].latitud * GRADO;
+  const enMetros = (c: Coordenadas): Punto => [c.longitud * Math.cos(lat0), c.latitud];
+  const puntos = contorno.map(enMetros);
+  // Área con signo: positiva si el contorno va en sentido antihorario
+  const area = puntos.reduce((s, p, k) => {
+    const q = puntos[(k + 1) % n];
+    return s + p[0] * q[1] - q[0] * p[1];
+  }, 0);
+  const [ax, ay] = puntos[i];
+  const [bx, by] = puntos[(i + 1) % n];
+  const largo = Math.hypot(bx - ax, by - ay) || 1;
+  const [dx, dy] = [(bx - ax) / largo, (by - ay) / largo];
+  // Antihorario: el interior queda a la izquierda, afuera es la normal derecha
+  const [este, norte] = area > 0 ? [dy, -dx] : [-dy, dx];
+  return [Math.round(este * pixeles) || 0, Math.round(-norte * pixeles) || 0];
+}

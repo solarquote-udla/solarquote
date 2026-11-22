@@ -54,6 +54,7 @@ calc-service e ia-service.
 | Cada error junto a su campo y en rojo; obligatorios marcados; orientación entre 0 y 359,99; ancho y largo mayores que cero | `validacionPaso1.test.tsx` |
 | Ubicación con un punto en el mapa satelital (norte arriba) en lugar de escribir latitud y longitud, al estilo de Smart Design: mapa grande con pestañas Mapa y Plano, búsqueda de la dirección (OpenStreetMap) y longitud siempre entre -180 y 180; sin punto se avisa que no habrá sombra | `mapaUbicacion.test.tsx`; `coordenadas.test.tsx`; `validacionPaso1.test.tsx` (ubicación en el mapa y búsqueda de la dirección) |
 | Terreno dibujado sobre el mapa satelital (Lenin): largo de cada lado, ajuste a 90°, largo de cada lado editable, vértice en la mitad de un lado, mover y quitar vértices; el contorno se mide en metros desde el punto de ubicación | `terrenoMapa.test.tsx` (10 pruebas: conversión mapa y plano, ajuste a 90°, estirar un lado, Leaflet real); `pasoTerrenoMapa.test.tsx` (6 pruebas) |
+| La medida de cada lado en el mapa va afuera del terreno, sin tapar el punto que agrega un vértice | `terrenoMapa.test.tsx`: etiqueta afuera del terreno |
 | Solo con permiso | `test_api_terreno`: `test_terreno_exige_generar_layout` |
 
 Evidencia: PR #1, #20, #34 y el PR de SQ-135.
@@ -86,6 +87,7 @@ Evidencia: PR #2, #38 y los del catálogo de paneles y los mensajes de validaci�
 | Respeta el polígono y los caminos | `test_layout`: `test_terreno_irregular_con_caminos_cruzados`, `test_camino_que_cubre_todo_el_terreno` |
 | Separación por pasillo o sombra, la mayor | `test_layout`: `test_pasillo_configurable_se_respeta`, `test_la_sombra_reemplaza_al_pasillo_si_es_mayor`, `test_inclinacion_reduce_el_largo_en_planta` |
 | Capacidad deseada opcional: cabe o se informa la máxima | `test_layout`: `test_capacidad_que_cabe_recorta_el_layout`, `test_capacidad_que_no_cabe_devuelve_la_maxima` |
+| Al recortar a la capacidad se eligen los bloques completos más cercanos al centro; los bloques cortos de las puntas solo entran si hacen falta | `test_layout`: `test_capacidad_elige_bloques_completos_en_el_centro_y_no_las_puntas` |
 | Validación eléctrica: strings y strings por MPPT | `test_layout`: `test_electrica_inversor_*` (6 pruebas) |
 | Reparto de bloques entre inversores | `test_layout`: `test_dos_inversores_iguales_se_reparten_mitad_y_mitad`, `test_cada_inversor_recibe_un_sector_seguido`; `test_varios_inversores` |
 | L par | `test_layout`: `test_l_impar_o_cero_se_rechaza` |

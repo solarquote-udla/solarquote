@@ -439,7 +439,14 @@ def _recortar_a_capacidad(
     """
     Se queda con los bloques justos para la capacidad pedida.
 
-    Recorre en orden de franja y altura, que mantiene la planta compacta.
+    Elige primero los bloques completos (los de más paneles en A) y, entre
+    ellos, los más cercanos al centro de la planta; después los demás, con
+    el mismo criterio. Así la planta queda junta en el centro y los
+    bloques cortos que sobran en las puntas del terreno solo entran si
+    hacen falta (revisión del 21 de noviembre: con un terreno girado, el
+    orden de izquierda a derecha llenaba primero la punta angosta con
+    bloques no compactos y dejaba vacío el resto).
+
     El último bloque se acorta para no pasarse más de una fila de L, pero
     nunca por debajo del A mínimo ni de PANELES_ANCHO_MINIMO_RECORTE. Un
     candidato que ya nace más angosto que ese piso (un sobrante de tramo
@@ -449,13 +456,25 @@ def _recortar_a_capacidad(
     un puñado de paneles, que no sería real aunque la cuenta cuadre.
     """
     piso = max(1, paneles_ancho_minimo, PANELES_ANCHO_MINIMO_RECORTE)
+    candidatos = [b for b in bloques if b.paneles_ancho >= piso]
+    if not candidatos:
+        return []
+
+    completo = max(b.paneles_ancho for b in candidatos)
+    peso = sum(b.paneles_ancho for b in candidatos)
+    cx = sum((b.x0 + b.x1) / 2 * b.paneles_ancho for b in candidatos) / peso
+    cy = sum((b.y0 + b.y1) / 2 * b.paneles_ancho for b in candidatos) / peso
+
+    def prioridad(b: _BloqueLocal) -> tuple[bool, float, float, float]:
+        distancia = math.hypot((b.x0 + b.x1) / 2 - cx, (b.y0 + b.y1) / 2 - cy)
+        # Redondeo al centímetro: dos bloques a la misma distancia se ordenan por posición
+        return (b.paneles_ancho < completo, round(distancia, 2), b.x0, b.y0)
+
     resultado = []
     faltan = paneles_necesarios
-    for b in sorted(bloques, key=lambda b: (b.x0, b.y0)):
+    for b in sorted(candidatos, key=prioridad):
         if faltan <= 0:
             break
-        if b.paneles_ancho < piso:
-            continue
         paneles = paneles_largo * b.paneles_ancho
         if paneles <= faltan:
             resultado.append(b)
