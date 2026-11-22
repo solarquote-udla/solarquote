@@ -12,8 +12,7 @@
  * doble clic. El mapa solo trabaja con latitud y longitud: la página
  * pasa todo a metros (utils/terrenoMapa.ts).
  *
- * La imagen satelital es de Esri (World Imagery). La URL se puede cambiar
- * con VITE_MAPA_TILES_URL, por ejemplo para usar una clave propia.
+ * La imagen satelital y su atribución están en utils/mapaSatelital.ts.
  */
 import "leaflet/dist/leaflet.css";
 
@@ -21,14 +20,11 @@ import L from "leaflet";
 import { useEffect, useRef } from "react";
 
 import { normalizarLongitud, redondearCoordenada } from "@/utils/coordenadas";
+import { crearMapaSatelital, iconoTexto } from "@/utils/mapaSatelital";
 import { desplazamientoEtiqueta, type Coordenadas } from "@/utils/terrenoMapa";
 
 export type { Coordenadas } from "@/utils/terrenoMapa";
 
-const TILES_URL =
-  import.meta.env.VITE_MAPA_TILES_URL ??
-  "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
-const ATRIBUCION = "Imagen: Esri, Maxar, Earthstar Geographics";
 
 /** Centro de Ecuador continental cuando el proyecto aún no tiene ubicación. */
 const CENTRO_ECUADOR: L.LatLngTuple = [-1.5, -78.5];
@@ -102,14 +98,7 @@ const MITAD = L.divIcon({
   iconAnchor: [5, 5],
 });
 
-/** Texto con el largo de un lado, centrado en su mitad. */
-function etiqueta(texto: string, [dx, dy]: [number, number] = [0, 0]): L.DivIcon {
-  return L.divIcon({
-    className: "",
-    html: `<div class="etiqueta-lado" style="transform:translate(calc(-50% + ${dx}px),calc(-50% + ${dy}px));display:inline-block;white-space:nowrap;padding:1px 5px;border-radius:4px;background:#0f172acc;color:#fff;font-size:11px;font-weight:600">${texto}</div>`,
-    iconSize: [0, 0],
-  });
-}
+const etiqueta = iconoTexto;
 
 const mitad = (a: Coordenadas, b: Coordenadas): L.LatLngTuple => [
   (a.latitud + b.latitud) / 2,
@@ -132,13 +121,11 @@ export function MapaUbicacion({ valor, onCambio, enfoque = 0, alto = "h-64", dib
   // Crear el mapa una sola vez
   useEffect(() => {
     if (!contenedor.current) return;
-    const m = L.map(contenedor.current, {
-      center: valor ? [valor.latitud, valor.longitud] : CENTRO_ECUADOR,
-      zoom: valor ? ZOOM_TERRENO : ZOOM_PAIS,
-      maxZoom: 19,
-      worldCopyJump: true,
-    });
-    L.tileLayer(TILES_URL, { attribution: ATRIBUCION, maxZoom: 19 }).addTo(m);
+    const m = crearMapaSatelital(
+      contenedor.current,
+      valor ? [valor.latitud, valor.longitud] : CENTRO_ECUADOR,
+      valor ? ZOOM_TERRENO : ZOOM_PAIS,
+    );
     capaDibujo.current = L.layerGroup().addTo(m);
     capaPrevia.current = L.layerGroup().addTo(m);
     m.on("click", (e: L.LeafletMouseEvent) => {
