@@ -980,7 +980,7 @@ export function LayoutPage() {
         </div>
 
         {/* ─── Resultados ───────────────────────────────── */}
-        <aside className="space-y-5 self-start lg:sticky lg:top-6">
+        <aside className="space-y-5 self-start lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto lg:pr-1">
           {/* ─── Resumen (prototipo) ─────────────────────── */}
           <div className="grid grid-cols-2 gap-3">
             {[
