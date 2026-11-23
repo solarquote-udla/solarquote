@@ -79,6 +79,16 @@ class LayoutGenerar(BaseModel):
         ),
     )
 
+    lado_bloques: int | None = Field(
+        default=None,
+        ge=0,
+        le=10_000,
+        description=(
+            "Lado del terreno (0 = del primer vértice al segundo) con el que se alinean los "
+            "bloques. Sin valor, los bloques siguen el norte."
+        ),
+    )
+
     @field_validator("paneles_largo")
     @classmethod
     def validar_par(cls, v: int) -> int:
@@ -198,7 +208,12 @@ class LayoutLeer(BaseModel):
     advertencias: list[str]
 
     # Para que el plano pueda editar bloques con la misma geometría que el backend
-    angulo_norte: float = Field(description="Grados del norte en sentido horario desde +Y, usados al generar")
+    angulo_norte: float = Field(
+        description=(
+            "Giro de los bloques usado al generar: grados en sentido horario desde +Y. Es el norte, "
+            "o el norte más el giro hacia el lado elegido en `lado_bloques`."
+        )
+    )
     lado_menor_m: float = Field(description="Lado menor del panel, en metros")
     separacion_paneles_ancho_m: float = Field(
         description="Separación entre paneles en A: el bloque mide A · lado_menor + (A − 1) · separación"
