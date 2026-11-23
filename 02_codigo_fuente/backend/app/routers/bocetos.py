@@ -37,7 +37,13 @@ router = APIRouter(
     dependencies=[Depends(puede_cargar)],
 )
 
-TIPOS_MEDIO = {"pdf": "application/pdf", "png": "image/png", "jpg": "image/jpeg", "dxf": "application/dxf"}
+TIPOS_MEDIO = {
+    "pdf": "application/pdf",
+    "png": "image/png",
+    "jpg": "image/jpeg",
+    "dxf": "application/dxf",
+    "dwg": "image/vnd.dwg",
+}
 
 
 def _proyecto_o_404(db: Session, proyecto_id: int):
@@ -66,7 +72,7 @@ def consultar(proyecto_id: int, db: Session = Depends(get_db)) -> BocetoLeer:
 @router.post("", response_model=BocetoLeer, status_code=status.HTTP_201_CREATED)
 def cargar(
     proyecto_id: int,
-    archivo: UploadFile = File(..., description="PDF, JPG, PNG o DXF de hasta 10 MB"),
+    archivo: UploadFile = File(..., description="PDF, JPG, PNG, DXF o DWG de hasta 10 MB"),
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(puede_cargar),
 ) -> BocetoLeer:
@@ -75,7 +81,7 @@ def cargar(
     con un PDF grande.
 
     409 si el proyecto ya está cotizado; 413 si supera 10 MB; 415 si el
-    formato no se admite (un DWG hay que exportarlo a DXF); 422 si está
+    formato no se admite (o un DWG sin el convertidor instalado); 422 si está
     vacío o el DXF no tiene paneles; 502/504 si ia-service falla o tarda;
     503 si la lectura con IA no está configurada.
     """

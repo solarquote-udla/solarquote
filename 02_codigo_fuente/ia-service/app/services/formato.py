@@ -6,7 +6,7 @@ La extensión la elige el usuario y puede mentir; los primeros bytes no.
 
 
 class FormatoNoAdmitido(ValueError):
-    """El archivo no es PDF, PNG, JPG ni DXF."""
+    """El archivo no es PDF, PNG, JPG, DXF ni DWG."""
 
 
 def detectar_formato(contenido: bytes) -> str:
@@ -16,11 +16,10 @@ def detectar_formato(contenido: bytes) -> str:
         return "png"
     if contenido.startswith(b"\xff\xd8\xff"):
         return "jpg"
+    # DWG de AutoCAD: "AC10" y la versión (AC1032 = AutoCAD 2018); se
+    # convierte a DXF antes de leerlo (services/dwg.py)
     if contenido.startswith(b"AC10") or contenido.startswith(b"AC1."):
-        raise FormatoNoAdmitido(
-            "Los archivos DWG no se pueden leer directamente. Ábrelo en AutoCAD y guárdalo como DXF "
-            "(Guardar como > DXF) para cargarlo."
-        )
+        return "dwg"
     if contenido.startswith(b"AutoCAD Binary DXF"):
         return "dxf"
     # DXF de texto: empieza con el código de grupo 0 y la sección SECTION,
@@ -32,4 +31,4 @@ def detectar_formato(contenido: bytes) -> str:
             return "dxf"
         if lineas[i] not in ("999",) and not (i > 0 and lineas[i - 1] == "999"):
             break
-    raise FormatoNoAdmitido("Formato no admitido. Carga un PDF, una imagen (JPG o PNG) o un DXF de AutoCAD.")
+    raise FormatoNoAdmitido("Formato no admitido. Carga un PDF, una imagen (JPG o PNG) o un plano de AutoCAD (DXF o DWG).")

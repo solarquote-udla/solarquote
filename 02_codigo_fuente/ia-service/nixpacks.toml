@@ -1,0 +1,5 @@
+# Paquetes del sistema para Railway (Nixpacks). "..." conserva los de Python
+# que Nixpacks agrega solo; libredwg trae dwg2dxf, que convierte los planos
+# DWG de AutoCAD a DXF (app/services/dwg.py).
+[phases.setup]
+nixPkgs = ["...", "libredwg"]

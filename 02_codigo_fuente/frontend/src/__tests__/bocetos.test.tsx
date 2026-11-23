@@ -85,16 +85,23 @@ function completarDatos() {
 const botonProcesar = () => screen.getByText("Procesar boceto") as HTMLButtonElement;
 
 describe("Cargar boceto", () => {
-  it("rechaza DWG y formatos no admitidos sin llamar al backend", async () => {
+  it("rechaza formatos no admitidos sin llamar al backend", async () => {
     await abrirCarga();
-    elegirArchivo(archivo("plano.dwg"));
-    expect(screen.getByRole("alert").textContent).toContain("Guardar como > DXF");
     elegirArchivo(archivo("foto.gif"));
     expect(screen.getByRole("alert").textContent).toContain("Formato no admitido");
     elegirArchivo(archivo("grande.pdf", 10 * 1024 * 1024 + 1));
     expect(screen.getByRole("alert").textContent).toContain("10 MB");
     completarDatos();
     expect(botonProcesar().disabled).toBe(true);
+  });
+
+  it("acepta planos DWG de AutoCAD: se pueden elegir y se leen de la geometría", async () => {
+    await abrirCarga();
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    expect(input.accept).toContain(".dwg");
+    elegirArchivo(archivo("IMPLANTACION INCUBANDINA.dwg"));
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByText(/se lee directo de la geometría/)).toBeTruthy();
   });
 
   it("crea el proyecto, sube el archivo una sola vez y abre la confirmación", async () => {
@@ -148,7 +155,7 @@ describe("Cargar boceto", () => {
     await act(async () => fireEvent.click(botonProcesar()));
 
     expect(screen.getByText("PROCESANDO BOCETO")).toBeTruthy();
-    expect(screen.getByText("Leyendo la geometría del DXF")).toBeTruthy();
+    expect(screen.getByText("Leyendo la geometría del plano de AutoCAD")).toBeTruthy();
     await act(async () => fireEvent.click(screen.getByText("Cancelar")));
 
     expect(screen.getByRole("status").textContent).toContain("Se canceló");
@@ -196,7 +203,7 @@ describe("Confirmación del boceto", () => {
     expect(screen.getByText(/leído de la geometría del PDF/)).toBeTruthy();
     cleanup();
     await abrirConfirmacion({ metodo: "dxf", formato: "dxf" });
-    expect(screen.getByText(/leído del DXF/)).toBeTruthy();
+    expect(screen.getByText(/leído del plano de AutoCAD/)).toBeTruthy();
   });
 
   it("valida las correcciones en vivo y exige guardarlas antes de confirmar", async () => {
