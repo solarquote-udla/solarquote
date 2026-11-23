@@ -454,11 +454,11 @@ export function TerrenoPage() {
       borrador: geo(borrador),
       etiquetasBorrador: etiquetasDe(borrador, false),
       dibujando: dibujando && dibujoEnMapa,
-      vistaPrevia: (c) => {
+      vistaPrevia: (c, sinAjuste) => {
         if (!coordenadas || borrador.length === 0) return null;
         const ultimo = borrador[borrador.length - 1];
         const crudo = aPlano(coordenadas, c, norte);
-        const p = angulosRectos ? ajustarAngulo(borrador[borrador.length - 2], ultimo, crudo) : crudo;
+        const p = angulosRectos && !sinAjuste ? ajustarAngulo(borrador[borrador.length - 2], ultimo, crudo) : crudo;
         return { punto: aMapa(coordenadas, p, norte), etiqueta: formatearMetros(Math.hypot(p[0] - ultimo[0], p[1] - ultimo[1])) };
       },
       onClicDibujo: clicDibujoMapa,

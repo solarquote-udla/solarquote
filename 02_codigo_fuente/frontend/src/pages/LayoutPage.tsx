@@ -27,7 +27,8 @@ import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { BarraPaso } from "@/components/BarraPaso";
 import { EncabezadoProyecto } from "@/components/EncabezadoProyecto";
 import { rutaPaso } from "@/components/asistente";
-import { PestanasPlano3D } from "@/components/PestanasPlano3D";
+import { MapaLayout } from "@/components/MapaLayout";
+import { PestanasPlano3D, type VistaLayout as VistaDelLayout } from "@/components/PestanasPlano3D";
 import { VistaLayout, type BloqueDibujo } from "@/components/VistaLayout";
 import { useCambiosSinGuardar } from "@/hooks/useCambiosSinGuardar";
 import { useAccionUnica } from "@/hooks/useAccionUnica";
@@ -54,7 +55,9 @@ import {
   type GeometriaLayout,
 } from "@/utils/edicionLayout";
 import { aCompacto, esCompacto } from "@/utils/bloque";
+import { corredor, esPoligonoSimple, largoEje, medidasCamino, nombreCaminoDibujado } from "@/utils/caminos";
 import { formatearArea, limitesDe } from "@/utils/geometria";
+import { ajustarAngulo } from "@/utils/terrenoMapa";
 import { colorInversor } from "@/utils/inversores";
 
 /** Un bloque del borrador: geometría editable más el inversor al que va. */
@@ -125,6 +128,14 @@ const A_MAXIMO = 500;
 
 type Direccion = "horizontal" | "vertical";
 
+/** Camino que se está dibujando sobre el mapa: su eje y su ancho. */
+interface CaminoEnDibujo {
+  eje: Punto[];
+  ancho: string;
+  tipo: TipoCamino;
+  angulosRectos: boolean;
+}
+
 interface FormularioCamino {
   direccion: Direccion;
   /** Eje del camino desde el borde inferior (horizontal) o izquierdo (vertical), en m */
@@ -166,19 +177,24 @@ function nombreCamino(existentes: (string | null)[], direccion: Direccion): stri
 /**
  * Sentido y ancho de un camino, para la lista del panel.
  *
- * El sentido sale del nombre que le da esta pantalla ("Camino H1" o
- * "Camino V1"): adivinarlo por la forma falla en terrenos angostos, donde
- * un camino horizontal puede ser más alto que ancho. Solo para caminos
- * con otro nombre (creados antes del asistente) se infiere por la forma.
+ * Para los caminos rectos de borde a borde, el sentido sale del nombre que
+ * les da esta pantalla ("Camino H1" o "Camino V1"): adivinarlo por la
+ * forma falla en terrenos angostos. Los demás (dibujados en el mapa, en
+ * diagonal o con quiebres) muestran su ancho y largo reales.
  */
 function describirCamino(nombre: string | null, vertices: Punto[]): string {
   const caja = limitesDe(vertices);
   if (!caja) return "Sin geometría";
-  const dx = caja.maxX - caja.minX;
-  const dy = caja.maxY - caja.minY;
   const letra = nombre?.match(/^Camino ([HV])\d+$/)?.[1];
-  const horizontal = letra ? letra === "H" : dx >= dy;
-  return `${horizontal ? "Horizontal" : "Vertical"} · ${numero(horizontal ? dy : dx)} m de ancho`;
+  if (letra) {
+    const horizontal = letra === "H";
+    return `${horizontal ? "Horizontal" : "Vertical"} · ${numero(horizontal ? caja.maxY - caja.minY : caja.maxX - caja.minX)} m de ancho`;
+  }
+  // Dibujado en el mapa (o creado antes del asistente): puede ir en diagonal
+  // o con quiebres, así que la caja que lo encierra no dice su ancho
+  const medidas = medidasCamino(vertices);
+  if (!medidas) return "Sin geometría";
+  return `${numero(medidas.ancho)} m de ancho · ${numero(medidas.largo, 0)} m de largo`;
 }
 
 /** Cuánto mide el terreno en la dirección en que se mide la posición del eje. */
@@ -359,6 +375,10 @@ export function LayoutPage() {
   // "Editar datos" del encabezado tiene su propio formulario
   const [encabezadoSucio, setEncabezadoSucio] = useState(false);
   const [procesandoCamino, setProcesandoCamino] = useState(false);
+  // Camino dibujado sobre el mapa (revisión de UX del 21 de noviembre)
+  const [caminoMapa, setCaminoMapa] = useState<CaminoEnDibujo | null>(null);
+  // Pestaña del layout; null = la que corresponde (Mapa si hay ubicación)
+  const [vistaElegida, setVistaElegida] = useState<VistaDelLayout | null>(null);
   const unaVez = useAccionUnica();
 
   const original = useMemo<BloqueBorrador[]>(
@@ -641,6 +661,52 @@ export function LayoutPage() {
     }
   }
 
+  // ─── Camino dibujado en el mapa ──────────────────────
+
+  function empezarCaminoMapa() {
+    setError(null);
+    setAviso(null);
+    setFormCamino(null);
+    setCaminoMapa({ eje: [], ancho: "4", tipo: TipoCamino.ACCESO, angulosRectos: true });
+    setVistaElegida("mapa");
+  }
+
+  /** Punto del eje, ajustado a 90° o en línea con el tramo anterior si corresponde. */
+  function puntoDelEje(c: CaminoEnDibujo, p: Punto): Punto {
+    return c.angulosRectos ? ajustarAngulo(c.eje[c.eje.length - 2], c.eje[c.eje.length - 1], p) : p;
+  }
+
+  async function terminarCaminoMapa() {
+    if (!terreno || !caminoMapa) return;
+    const ancho = aNumero(caminoMapa.ancho);
+    if (caminoMapa.eje.length < 2) {
+      setError("Marca al menos dos puntos del eje del camino.");
+      return;
+    }
+    if (ancho === null || ancho <= 0 || ancho > 50) {
+      setError("El ancho del camino debe estar entre 0 y 50 m.");
+      return;
+    }
+    const vertices = corredor(caminoMapa.eje, ancho);
+    if (!esPoligonoSimple(vertices)) {
+      setError("El camino se cruza consigo mismo: evita los giros tan cerrados o dibújalo en dos caminos.");
+      return;
+    }
+    setProcesandoCamino(true);
+    setError(null);
+    try {
+      const nombre = nombreCaminoDibujado(terreno.caminos.map((c) => c.nombre));
+      await agregarCamino(proyectoId, { nombre, tipo: caminoMapa.tipo, vertices });
+      await recargarTrasCamino();
+      setCaminoMapa(null);
+      setAviso(`${nombre} agregado (${numero(largoEje(caminoMapa.eje))} m de largo, ${numero(ancho)} m de ancho).${layout ? " Vuelve a generar el layout." : ""}`);
+    } catch (e) {
+      setError(mensajeDeError(e, "No se pudo agregar el camino"));
+    } finally {
+      setProcesandoCamino(false);
+    }
+  }
+
   /** "Ajustar B8" del prototipo: abre la edición con el primer bloque de ese tipo elegido. */
   function ajustarTipo(tipo: string) {
     if (!layout) return;
@@ -690,11 +756,18 @@ export function LayoutPage() {
    * guardar, un camino a medio cargar, parámetros cambiados sin volver a
    * generar y los datos del proyecto en edición.
    */
+  // Punto del Paso 1: con él, el layout y los caminos se ven sobre la imagen satelital
+  const ubicacion =
+    proyecto && proyecto.latitud !== null && proyecto.longitud !== null
+      ? { latitud: proyecto.latitud, longitud: proyecto.longitud }
+      : null;
+
   const parametrosCambiados =
     JSON.stringify(aPeticion(parametros)) !==
     JSON.stringify(aPeticion(desdeLayout(layout, equipo?.potencia_objetivo_kwp ?? null)));
   const caminoACargar = formCamino !== null && JSON.stringify(formCamino) !== JSON.stringify(formCaminoInicial);
-  const sinGuardar = borrador !== null || caminoACargar || parametrosCambiados || encabezadoSucio;
+  const caminoDibujado = caminoMapa !== null && caminoMapa.eje.length > 0;
+  const sinGuardar = borrador !== null || caminoACargar || caminoDibujado || parametrosCambiados || encabezadoSucio;
   useCambiosSinGuardar(sinGuardar);
 
   if (!idValido) {
@@ -941,9 +1014,216 @@ export function LayoutPage() {
             </div>
           )}
 
+          {/* ─── Caminos de acceso ───────────────────────── */}
+          {terreno && (
+            <div className="rounded-xl border border-acero-200 bg-superficie p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-xs font-semibold tracking-wider text-acero-400">CAMINOS DE ACCESO</h2>
+                {!formCamino && !caminoMapa && (
+                  <div className="flex gap-2">
+                  {ubicacion && (
+                    <button
+                      type="button"
+                      onClick={empezarCaminoMapa}
+                      disabled={procesandoCamino || borrador !== null}
+                      className="rounded-md bg-solar-500 px-2.5 py-1 text-xs font-semibold text-acero-50 hover:bg-solar-600 disabled:opacity-50"
+                    >
+                      Dibujar en el mapa
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={abrirFormCamino}
+                    disabled={procesandoCamino || borrador !== null}
+                    className="rounded-md border border-solar-500 px-2.5 py-1 text-xs font-semibold text-solar-700 hover:bg-solar-50 disabled:opacity-50"
+                  >
+                    + Agregar
+                  </button>
+                  </div>
+                )}
+              </div>
+
+              {caminoMapa && (
+                <div className="mt-3 space-y-3 rounded-lg border border-solar-300 bg-solar-50/40 p-3" aria-label="Dibujo del camino">
+                  <p className="text-xs text-acero-600">
+                    Haz clic en el mapa para marcar el eje del camino: dos puntos para uno recto, más para uno con curvas. Puede
+                    empezar y terminar fuera del terreno.
+                  </p>
+                  <div className="flex flex-wrap items-end gap-3">
+                    <Entrada etiqueta="Ancho del camino (m)">
+                      <input
+                        className={`${CAMPO} w-24`}
+                        inputMode="decimal"
+                        value={caminoMapa.ancho}
+                        onChange={(e) => setCaminoMapa((c) => (c ? { ...c, ancho: e.target.value } : c))}
+                      />
+                    </Entrada>
+                    <Entrada etiqueta="Tipo de camino">
+                      <select className={CAMPO} value={caminoMapa.tipo} onChange={(e) => setCaminoMapa((c) => (c ? { ...c, tipo: e.target.value as TipoCamino } : c))}>
+                        {Object.values(TipoCamino).map((tc) => (
+                          <option key={tc} value={tc}>
+                            {ETIQUETAS_TIPO_CAMINO[tc]}
+                          </option>
+                        ))}
+                      </select>
+                    </Entrada>
+                    <label className="flex items-center gap-2 pb-2 text-sm text-acero-600">
+                      <input
+                        type="checkbox"
+                        className="accent-solar-500"
+                        checked={caminoMapa.angulosRectos}
+                        onChange={(e) => setCaminoMapa((c) => (c ? { ...c, angulosRectos: e.target.checked } : c))}
+                      />
+                      Ajustar a 90°
+                    </label>
+                    <span className="pb-2 text-xs text-acero-500" data-testid="largo-camino">
+                      {caminoMapa.eje.length} punto{caminoMapa.eje.length === 1 ? "" : "s"} · {numero(largoEje(caminoMapa.eje))} m de largo
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCaminoMapa((c) => (c ? { ...c, eje: c.eje.slice(0, -1) } : c))}
+                      disabled={caminoMapa.eje.length === 0 || procesandoCamino}
+                      className="rounded-lg border border-acero-300 px-3 py-1.5 text-sm text-acero-700 hover:bg-acero-100 disabled:opacity-40"
+                    >
+                      Deshacer punto
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCaminoMapa(null)}
+                      disabled={procesandoCamino}
+                      className="rounded-lg border border-acero-300 px-3 py-1.5 text-sm text-acero-700 hover:bg-acero-100"
+                    >
+                      Cancelar camino
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void unaVez("terminar-camino", terminarCaminoMapa)}
+                      disabled={caminoMapa.eje.length < 2 || procesandoCamino}
+                      className="rounded-lg bg-solar-500 px-3 py-1.5 text-sm font-semibold text-acero-50 hover:bg-solar-600 disabled:opacity-50"
+                    >
+                      {procesandoCamino ? "Agregando…" : "Terminar camino"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {terreno.caminos.length === 0 && !formCamino && !caminoMapa && (
+                <p className="mt-3 text-sm text-acero-500">Sin caminos: los bloques ocupan todo el terreno útil.</p>
+              )}
+              <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                {terreno.caminos.map((c) => (
+                  <li key={c.id} className="flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2">
+                    <span>
+                      <span className="block text-sm font-medium text-amber-900">{c.nombre ?? "Camino"}</span>
+                      <span className="block text-xs text-amber-800">
+                        {describirCamino(c.nombre, c.vertices)} · {ETIQUETAS_TIPO_CAMINO[c.tipo]}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void unaVez(`quitar-camino-${c.id}`, () => quitarCamino(c.id, c.nombre))}
+                      disabled={procesandoCamino || borrador !== null}
+                      className="text-xs text-acero-500 hover:text-red-600 disabled:opacity-50"
+                    >
+                      Quitar
+                    </button>
+                  </li>
+                ))}
+              </ul>
+
+              {formCamino && (
+                <div className="mt-3 space-y-3 rounded-lg border border-acero-200 p-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["horizontal", "vertical"] as const).map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() =>
+                          setFormCamino((f) => {
+                            if (!f || !terreno || f.direccion === d) return f;
+                            // Si la posición sigue en el centro del otro eje, se centra en el nuevo
+                            const centrada = f.posicion === posicionCentrada(terreno.vertices, f.direccion);
+                            return { ...f, direccion: d, posicion: centrada ? posicionCentrada(terreno.vertices, d) : f.posicion };
+                          })
+                        }
+                        className={[
+                          "rounded-lg border px-3 py-1.5 text-sm transition",
+                          formCamino.direccion === d ? "border-solar-500 bg-solar-50 text-solar-700" : "border-acero-300 text-acero-700 hover:bg-acero-100",
+                        ].join(" ")}
+                      >
+                        {d === "horizontal" ? "Horizontal" : "Vertical"}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Entrada etiqueta={formCamino.direccion === "horizontal" ? "Eje desde abajo (m)" : "Eje desde la izquierda (m)"}>
+                      <input className={CAMPO} inputMode="decimal" value={formCamino.posicion} onChange={(e) => setFormCamino((f) => (f ? { ...f, posicion: e.target.value } : f))} />
+                    </Entrada>
+                    <Entrada etiqueta="Ancho (m)">
+                      <input className={CAMPO} inputMode="decimal" value={formCamino.ancho} onChange={(e) => setFormCamino((f) => (f ? { ...f, ancho: e.target.value } : f))} />
+                    </Entrada>
+                  </div>
+                  <Entrada etiqueta="Tipo">
+                    <select className={CAMPO} value={formCamino.tipo} onChange={(e) => setFormCamino((f) => (f ? { ...f, tipo: e.target.value as TipoCamino } : f))}>
+                      {Object.values(TipoCamino).map((t) => (
+                        <option key={t} value={t}>
+                          {ETIQUETAS_TIPO_CAMINO[t]}
+                        </option>
+                      ))}
+                    </select>
+                  </Entrada>
+                  <div className="flex justify-end gap-2">
+                    <button type="button" onClick={() => setFormCamino(null)} className="rounded-lg border border-acero-300 px-3 py-1.5 text-sm text-acero-700 hover:bg-acero-100">
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void unaVez("agregar-camino", guardarCamino)}
+                      disabled={procesandoCamino}
+                      className="rounded-lg bg-solar-500 px-3 py-1.5 text-sm font-semibold text-acero-50 hover:bg-solar-600 disabled:opacity-50"
+                    >
+                      {procesandoCamino ? "Agregando…" : "Agregar camino"}
+                    </button>
+                  </div>
+                </div>
+              )}
+              <p className="mt-3 text-xs text-acero-400">
+                {ubicacion
+                  ? "Dibuja el camino sobre el mapa o agrégalo recto, de borde a borde del terreno. El área útil descuenta solo lo que cae dentro."
+                  : "Los caminos se trazan rectos, de borde a borde del terreno; el área útil descuenta solo lo que cae dentro. Para dibujarlos sobre el mapa, ubica el proyecto en el Paso 1."}
+              </p>
+            </div>
+          )}
+
           {terreno && (
             <PestanasPlano3D
               sin3D={borrador !== null ? "Termina la edición para ver el 3D" : undefined}
+              vista={vistaElegida ?? (ubicacion ? "mapa" : "plano")}
+              onVista={setVistaElegida}
+              bloqueadas={caminoMapa ? "Termina o cancela el camino" : undefined}
+              mapa={
+                ubicacion ? (
+                  <MapaLayout
+                    ubicacion={ubicacion}
+                    orientacionNorte={terreno.orientacion_norte}
+                    terreno={terreno.vertices}
+                    caminos={terreno.caminos}
+                    bloques={dibujo}
+                    dibujo={
+                      caminoMapa
+                        ? {
+                            eje: caminoMapa.eje,
+                            ancho: aNumero(caminoMapa.ancho) ?? 0,
+                            vistaPrevia: (p) => puntoDelEje(caminoMapa, p),
+                            onPunto: (p) => setCaminoMapa((c) => (c ? { ...c, eje: [...c.eje, puntoDelEje(c, p)] } : c)),
+                          }
+                        : null
+                    }
+                  />
+                ) : undefined
+              }
               datos3d={{
                 terreno: terreno.vertices,
                 caminos: terreno.caminos.map((c) => c.vertices),
@@ -1049,109 +1329,6 @@ export function LayoutPage() {
                   </Link>
                 </p>
               )}
-            </div>
-          )}
-
-          {/* ─── Caminos de acceso ───────────────────────── */}
-          {terreno && (
-            <div className="rounded-xl border border-acero-200 bg-superficie p-5">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xs font-semibold tracking-wider text-acero-400">CAMINOS DE ACCESO</h2>
-                {!formCamino && (
-                  <button
-                    type="button"
-                    onClick={abrirFormCamino}
-                    disabled={procesandoCamino || borrador !== null}
-                    className="rounded-md border border-solar-500 px-2.5 py-1 text-xs font-semibold text-solar-700 hover:bg-solar-50 disabled:opacity-50"
-                  >
-                    + Agregar
-                  </button>
-                )}
-              </div>
-
-              {terreno.caminos.length === 0 && !formCamino && (
-                <p className="mt-3 text-sm text-acero-500">Sin caminos: los bloques ocupan todo el terreno útil.</p>
-              )}
-              <ul className="mt-3 space-y-2">
-                {terreno.caminos.map((c) => (
-                  <li key={c.id} className="flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2">
-                    <span>
-                      <span className="block text-sm font-medium text-amber-900">{c.nombre ?? "Camino"}</span>
-                      <span className="block text-xs text-amber-800">
-                        {describirCamino(c.nombre, c.vertices)} · {ETIQUETAS_TIPO_CAMINO[c.tipo]}
-                      </span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => void unaVez(`quitar-camino-${c.id}`, () => quitarCamino(c.id, c.nombre))}
-                      disabled={procesandoCamino || borrador !== null}
-                      className="text-xs text-acero-500 hover:text-red-600 disabled:opacity-50"
-                    >
-                      Quitar
-                    </button>
-                  </li>
-                ))}
-              </ul>
-
-              {formCamino && (
-                <div className="mt-3 space-y-3 rounded-lg border border-acero-200 p-3">
-                  <div className="grid grid-cols-2 gap-2">
-                    {(["horizontal", "vertical"] as const).map((d) => (
-                      <button
-                        key={d}
-                        type="button"
-                        onClick={() =>
-                          setFormCamino((f) => {
-                            if (!f || !terreno || f.direccion === d) return f;
-                            // Si la posición sigue en el centro del otro eje, se centra en el nuevo
-                            const centrada = f.posicion === posicionCentrada(terreno.vertices, f.direccion);
-                            return { ...f, direccion: d, posicion: centrada ? posicionCentrada(terreno.vertices, d) : f.posicion };
-                          })
-                        }
-                        className={[
-                          "rounded-lg border px-3 py-1.5 text-sm transition",
-                          formCamino.direccion === d ? "border-solar-500 bg-solar-50 text-solar-700" : "border-acero-300 text-acero-700 hover:bg-acero-100",
-                        ].join(" ")}
-                      >
-                        {d === "horizontal" ? "Horizontal" : "Vertical"}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Entrada etiqueta={formCamino.direccion === "horizontal" ? "Eje desde abajo (m)" : "Eje desde la izquierda (m)"}>
-                      <input className={CAMPO} inputMode="decimal" value={formCamino.posicion} onChange={(e) => setFormCamino((f) => (f ? { ...f, posicion: e.target.value } : f))} />
-                    </Entrada>
-                    <Entrada etiqueta="Ancho (m)">
-                      <input className={CAMPO} inputMode="decimal" value={formCamino.ancho} onChange={(e) => setFormCamino((f) => (f ? { ...f, ancho: e.target.value } : f))} />
-                    </Entrada>
-                  </div>
-                  <Entrada etiqueta="Tipo">
-                    <select className={CAMPO} value={formCamino.tipo} onChange={(e) => setFormCamino((f) => (f ? { ...f, tipo: e.target.value as TipoCamino } : f))}>
-                      {Object.values(TipoCamino).map((t) => (
-                        <option key={t} value={t}>
-                          {ETIQUETAS_TIPO_CAMINO[t]}
-                        </option>
-                      ))}
-                    </select>
-                  </Entrada>
-                  <div className="flex justify-end gap-2">
-                    <button type="button" onClick={() => setFormCamino(null)} className="rounded-lg border border-acero-300 px-3 py-1.5 text-sm text-acero-700 hover:bg-acero-100">
-                      Cancelar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void unaVez("agregar-camino", guardarCamino)}
-                      disabled={procesandoCamino}
-                      className="rounded-lg bg-solar-500 px-3 py-1.5 text-sm font-semibold text-acero-50 hover:bg-solar-600 disabled:opacity-50"
-                    >
-                      {procesandoCamino ? "Agregando…" : "Agregar camino"}
-                    </button>
-                  </div>
-                </div>
-              )}
-              <p className="mt-3 text-xs text-acero-400">
-                Los caminos se trazan rectos, de borde a borde del terreno; el área útil descuenta solo lo que cae dentro.
-              </p>
             </div>
           )}
 

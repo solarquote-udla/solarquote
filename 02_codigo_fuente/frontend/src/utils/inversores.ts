@@ -24,17 +24,19 @@ export interface ColorInversor {
   tarjeta: string;
   /** Texto con el color del inversor (con su variante para el tema claro) */
   texto: string;
+  /** El mismo color en hexadecimal, para el mapa (Leaflet no usa clases) */
+  hex: string;
 }
 
 const PALETA: ColorInversor[] = [
-  { relleno: "fill-sky-600/80", borde: "stroke-sky-300", muestra: "bg-sky-600", tarjeta: "border-sky-600", texto: "text-sky-400 claro:text-sky-700" },
-  { relleno: "fill-emerald-600/80", borde: "stroke-emerald-300", muestra: "bg-emerald-600", tarjeta: "border-emerald-600", texto: "text-emerald-400 claro:text-emerald-700" },
-  { relleno: "fill-violet-600/80", borde: "stroke-violet-300", muestra: "bg-violet-600", tarjeta: "border-violet-600", texto: "text-violet-400 claro:text-violet-700" },
-  { relleno: "fill-pink-600/80", borde: "stroke-pink-300", muestra: "bg-pink-600", tarjeta: "border-pink-600", texto: "text-pink-400 claro:text-pink-700" },
-  { relleno: "fill-teal-600/80", borde: "stroke-teal-300", muestra: "bg-teal-600", tarjeta: "border-teal-600", texto: "text-teal-400 claro:text-teal-700" },
-  { relleno: "fill-indigo-500/80", borde: "stroke-indigo-300", muestra: "bg-indigo-500", tarjeta: "border-indigo-500", texto: "text-indigo-400 claro:text-indigo-700" },
-  { relleno: "fill-fuchsia-600/80", borde: "stroke-fuchsia-300", muestra: "bg-fuchsia-600", tarjeta: "border-fuchsia-600", texto: "text-fuchsia-400 claro:text-fuchsia-700" },
-  { relleno: "fill-cyan-700/80", borde: "stroke-cyan-300", muestra: "bg-cyan-700", tarjeta: "border-cyan-700", texto: "text-cyan-400 claro:text-cyan-800" },
+  { relleno: "fill-sky-600/80", borde: "stroke-sky-300", muestra: "bg-sky-600", tarjeta: "border-sky-600", texto: "text-sky-400 claro:text-sky-700", hex: "#0284c7" },
+  { relleno: "fill-emerald-600/80", borde: "stroke-emerald-300", muestra: "bg-emerald-600", tarjeta: "border-emerald-600", texto: "text-emerald-400 claro:text-emerald-700", hex: "#059669" },
+  { relleno: "fill-violet-600/80", borde: "stroke-violet-300", muestra: "bg-violet-600", tarjeta: "border-violet-600", texto: "text-violet-400 claro:text-violet-700", hex: "#7c3aed" },
+  { relleno: "fill-pink-600/80", borde: "stroke-pink-300", muestra: "bg-pink-600", tarjeta: "border-pink-600", texto: "text-pink-400 claro:text-pink-700", hex: "#db2777" },
+  { relleno: "fill-teal-600/80", borde: "stroke-teal-300", muestra: "bg-teal-600", tarjeta: "border-teal-600", texto: "text-teal-400 claro:text-teal-700", hex: "#0d9488" },
+  { relleno: "fill-indigo-500/80", borde: "stroke-indigo-300", muestra: "bg-indigo-500", tarjeta: "border-indigo-500", texto: "text-indigo-400 claro:text-indigo-700", hex: "#6366f1" },
+  { relleno: "fill-fuchsia-600/80", borde: "stroke-fuchsia-300", muestra: "bg-fuchsia-600", tarjeta: "border-fuchsia-600", texto: "text-fuchsia-400 claro:text-fuchsia-700", hex: "#c026d3" },
+  { relleno: "fill-cyan-700/80", borde: "stroke-cyan-300", muestra: "bg-cyan-700", tarjeta: "border-cyan-700", texto: "text-cyan-400 claro:text-cyan-800", hex: "#0e7490" },
 ];
 
 /** Color del inversor `indice` (0 = Inversor 1). Con más de 8, los colores se repiten. */

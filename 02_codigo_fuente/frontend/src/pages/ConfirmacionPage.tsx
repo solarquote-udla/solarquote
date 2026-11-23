@@ -17,6 +17,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { EstadoProyectoBadge } from "@/components/EstadoProyectoBadge";
+import { MapaLayout } from "@/components/MapaLayout";
 import { PestanasPlano3D } from "@/components/PestanasPlano3D";
 import { VistaLayout } from "@/components/VistaLayout";
 import { rutaPaso } from "@/components/asistente";
@@ -184,6 +185,17 @@ export function ConfirmacionPage() {
         <div className="lg:col-span-2">
           {terreno && layout ? (
             <PestanasPlano3D
+              mapa={
+                proyecto.latitud !== null && proyecto.longitud !== null ? (
+                  <MapaLayout
+                    ubicacion={{ latitud: proyecto.latitud, longitud: proyecto.longitud }}
+                    orientacionNorte={terreno.orientacion_norte}
+                    terreno={terreno.vertices}
+                    caminos={terreno.caminos}
+                    bloques={layout.bloques}
+                  />
+                ) : undefined
+              }
               datos3d={{
                 terreno: terreno.vertices,
                 caminos: terreno.caminos.map((c) => c.vertices),
