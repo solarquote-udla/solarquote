@@ -137,6 +137,10 @@ class Settings(BaseSettings):
         "El plazo corre a partir de la fecha del anticipo y hoja técnica del panel a usar.",
     )
 
+    # Texto que sigue a "VIGENCIA DE LA OFERTA: N DÍAS" en la proforma (por
+    # ejemplo, el motivo de una vigencia corta). Vacío = solo los días.
+    PROFORMA_NOTA_VIGENCIA: str = ""
+
     @field_validator("PROFORMA_PAGO_60_DIAS_PCT")
     @classmethod
     def _validar_porcentajes_de_pago(cls, valor: Decimal, info) -> Decimal:
