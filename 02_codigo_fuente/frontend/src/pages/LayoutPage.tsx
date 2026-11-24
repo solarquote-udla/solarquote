@@ -57,7 +57,7 @@ import {
 import { aCompacto, esCompacto } from "@/utils/bloque";
 import { corredor, esPoligonoSimple, largoEje, medidasCamino, nombreCaminoDibujado } from "@/utils/caminos";
 import { formatearArea, limitesDe } from "@/utils/geometria";
-import { ajustarAngulo } from "@/utils/terrenoMapa";
+import { ajustarAngulo, largosDeLados } from "@/utils/terrenoMapa";
 import { colorInversor } from "@/utils/inversores";
 
 /** Un bloque del borrador: geometría editable más el inversor al que va. */
@@ -118,6 +118,8 @@ const PARAMETROS_DEFECTO = {
   aMinimo: "1",
   sepLargo: "6",
   sepAncho: "2",
+  // Lado del terreno con el que se alinean los bloques. Vacío = norte.
+  lado: "",
 };
 type Parametros = typeof PARAMETROS_DEFECTO;
 
@@ -231,6 +233,7 @@ function desdeLayout(l: Layout | null, objetivoKwp: number | null = null): Param
     aMinimo: String(l.parametros.paneles_ancho_minimo ?? 1),
     sepLargo: String(Math.round((l.parametros.separacion_paneles_largo_m ?? 0) * 1000) / 10),
     sepAncho: String(Math.round((l.parametros.separacion_paneles_ancho_m ?? 0) * 1000) / 10),
+    lado: l.parametros.lado_bloques == null ? "" : String(l.parametros.lado_bloques),
   };
 }
 
@@ -242,7 +245,11 @@ function aNumero(valor: string): number | null {
   return Number.isFinite(n) ? n : Number.NaN;
 }
 
-function aPeticion(p: Parametros): { datos: LayoutGenerar } | { error: string } {
+/**
+ * `lados`: cuántos lados tiene el terreno actual. Si el terreno cambió y
+ * el lado guardado ya no existe, los bloques vuelven al norte.
+ */
+function aPeticion(p: Parametros, lados: number): { datos: LayoutGenerar } | { error: string } {
   const largo = aNumero(p.L);
   const ancho = aNumero(p.A);
   const pasillo = aNumero(p.pasillo);
@@ -281,6 +288,7 @@ function aPeticion(p: Parametros): { datos: LayoutGenerar } | { error: string } 
       tolerancia_proporcion: tolerancia / 100,
       capacidad_deseada_kwp: kwp,
       paneles_ancho_minimo: aMinimo,
+      lado_bloques: p.lado !== "" && Number(p.lado) < lados ? Number(p.lado) : null,
     },
   };
 }
@@ -323,6 +331,9 @@ export function LayoutPage() {
 
   const [proyecto, setProyecto] = useState<Proyecto | null>(null);
   const [terreno, setTerreno] = useState<Terreno | null>(null);
+  // Lados del terreno para alinear los bloques: largo de cada uno y el más largo
+  const ladosTerreno = useMemo(() => (terreno ? largosDeLados(terreno.vertices) : []), [terreno]);
+  const ladoMasLargo = ladosTerreno.reduce((mejor, largo, i) => (largo > ladosTerreno[mejor] ? i : mejor), 0);
   const [equipo, setEquipo] = useState<ConfiguracionEquipo | null>(null);
   const [layout, setLayout] = useState<Layout | null>(null);
   const [cargando, setCargando] = useState(true);
@@ -724,7 +735,7 @@ export function LayoutPage() {
     setError(null);
     setAviso(null);
 
-    const resultado = aPeticion(parametros);
+    const resultado = aPeticion(parametros, ladosTerreno.length);
     if ("error" in resultado) {
       setError(resultado.error);
       return;
@@ -763,8 +774,8 @@ export function LayoutPage() {
       : null;
 
   const parametrosCambiados =
-    JSON.stringify(aPeticion(parametros)) !==
-    JSON.stringify(aPeticion(desdeLayout(layout, equipo?.potencia_objetivo_kwp ?? null)));
+    JSON.stringify(aPeticion(parametros, ladosTerreno.length)) !==
+    JSON.stringify(aPeticion(desdeLayout(layout, equipo?.potencia_objetivo_kwp ?? null), ladosTerreno.length));
   const caminoACargar = formCamino !== null && JSON.stringify(formCamino) !== JSON.stringify(formCaminoInicial);
   const caminoDibujado = caminoMapa !== null && caminoMapa.eje.length > 0;
   const sinGuardar = borrador !== null || caminoACargar || caminoDibujado || parametrosCambiados || encabezadoSucio;
@@ -880,6 +891,23 @@ export function LayoutPage() {
               <Entrada etiqueta="Separación entre paneles (cm)" ayuda="Clamp intermedio">
                 <input className={CAMPO} inputMode="decimal" aria-label="Separación entre paneles (cm)" value={parametros.sepAncho} onChange={(e) => actualizar("sepAncho", e.target.value)} />
               </Entrada>
+              <div className="sm:col-span-2">
+                <Entrada etiqueta="Orientación de los bloques" ayuda="Paralelo a un lado aprovecha mejor un terreno en diagonal">
+                  <select
+                    className={CAMPO}
+                    aria-label="Orientación de los bloques"
+                    value={parametros.lado !== "" && Number(parametros.lado) < ladosTerreno.length ? parametros.lado : ""}
+                    onChange={(e) => actualizar("lado", e.target.value)}
+                  >
+                    <option value="">Norte (filas de norte a sur)</option>
+                    {ladosTerreno.map((largo, i) => (
+                      <option key={i} value={String(i)}>
+                        {`Paralelo al lado ${i + 1} (${numero(largo, 1)} m)${i === ladoMasLargo ? ", el más largo" : ""}`}
+                      </option>
+                    ))}
+                  </select>
+                </Entrada>
+              </div>
             </div>
             {indicadorBloque && (
               <p
