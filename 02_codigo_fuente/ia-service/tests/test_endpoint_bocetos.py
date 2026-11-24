@@ -57,7 +57,8 @@ def test_archivo_demasiado_grande(monkeypatch):
     assert r.status_code == 413
 
 
-def test_dwg_pide_exportar_a_dxf():
+def test_dwg_sin_convertidor_pide_exportar_a_dxf(monkeypatch):
+    monkeypatch.setattr("app.services.dwg.shutil.which", lambda _: None)
     r = enviar(b"AC1032" + b"\x00" * 100, nombre="plano.dwg")
     assert r.status_code == 415
     assert "DXF" in r.json()["detail"]

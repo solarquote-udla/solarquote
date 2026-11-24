@@ -68,7 +68,7 @@ class PanelReferencia(BaseModel):
 class BocetoLeer(BaseModel):
     proyecto_id: int
     nombre_archivo: str
-    formato: Literal["pdf", "png", "jpg", "dxf"]
+    formato: Literal["pdf", "png", "jpg", "dxf", "dwg"]
     tamano_bytes: int
     metodo: Literal["dxf", "pdf", "ia"]  # pdf: geometría del PDF de CAD, sin IA
     advertencias: list[str]

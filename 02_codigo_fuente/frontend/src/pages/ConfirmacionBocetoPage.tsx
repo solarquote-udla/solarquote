@@ -44,7 +44,7 @@ const BOTON_SECUNDARIO =
   "rounded-lg border border-acero-300 px-4 py-2 text-center text-sm text-acero-700 hover:bg-acero-100 disabled:cursor-not-allowed disabled:opacity-50";
 
 const METODO_LECTURA: Record<Boceto["metodo"], string> = {
-  dxf: "leído del DXF",
+  dxf: "leído del plano de AutoCAD",
   pdf: "leído de la geometría del PDF",
   ia: "leído con IA",
 };
@@ -63,11 +63,12 @@ function filasDe(boceto: Boceto | null): FilaBoceto[] {
 const firma = (filas: FilaBoceto[]) =>
   JSON.stringify(filas.map((f) => [f.etiqueta.trim(), f.L.trim(), f.A.trim(), f.B.trim(), f.orientacion]));
 
-/** Vista del archivo original: imagen, PDF o, para un DXF, solo la descarga. */
+/** Vista del archivo original: imagen, PDF o, para un plano de AutoCAD, solo la descarga. */
 function VistaOriginal({ proyectoId, boceto }: { proyectoId: number; boceto: Boceto }) {
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const conVista = boceto.formato !== "dxf" && typeof URL.createObjectURL === "function";
+  const autocad = boceto.formato === "dxf" || boceto.formato === "dwg";
+  const conVista = !autocad && typeof URL.createObjectURL === "function";
 
   useEffect(() => {
     if (!conVista) return;
@@ -119,8 +120,8 @@ function VistaOriginal({ proyectoId, boceto }: { proyectoId: number; boceto: Boc
       <div className="mt-4">
         {!conVista ? (
           <p className="rounded-lg border border-dashed border-acero-300 p-8 text-center text-sm text-acero-500">
-            {boceto.formato === "dxf"
-              ? "Los DXF no tienen vista previa aquí: ábrelo en AutoCAD para compararlo."
+            {autocad
+              ? "Los planos de AutoCAD no tienen vista previa aquí: ábrelo en AutoCAD para compararlo."
               : "Vista previa no disponible."}
           </p>
         ) : url && boceto.formato === "pdf" ? (

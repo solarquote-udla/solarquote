@@ -107,6 +107,7 @@ Evidencia: PR #14, #27, #34, #38 y el de SQ-170.
 | Formatos PDF, JPG, PNG y DXF, detectados por contenido | `ia: test_endpoint_bocetos`: `test_el_formato_se_detecta_por_contenido_y_no_por_extension`, `test_formato_desconocido` |
 | Tamaño máximo 10 MB; archivo vacío | `ia: test_endpoint_bocetos`: `test_archivo_demasiado_grande`, `test_archivo_vacio`; `test_boceto`: `test_archivo_vacio_o_demasiado_grande`; `bocetos.test.tsx` |
 | DXF por geometría (ezdxf): L, A, B y orientación | `ia: test_dxf` (10 pruebas: rotación, bloques insertados, incompletos, L impar) |
+| DWG de AutoCAD: se convierte a DXF con LibreDWG (`dwg2dxf`) y se lee por geometría; sin convertidor, o si falla, pide guardarlo como DXF | `ia: test_dwg` (4 pruebas); `test_boceto`: `test_un_dwg_convertido_se_guarda_como_dwg_y_se_descarga_tal_cual`; `bocetos.test.tsx` (se puede elegir un DWG) |
 | PDF de CAD por geometría, sin IA (paneles dibujados como vectores); si no hay geometría, pasa a la IA | `ia: test_pdf_vectorial` (PDF vectoriales generados en la prueba: rectángulos `re` y polilíneas, panel parado, varias páginas, escaneo y PDF ilegible sin geometría, sin llamada a la API); `test_boceto`: `test_pdf_leido_por_geometria_se_guarda_con_su_metodo`; `bocetos.test.tsx` (etiqueta del método) |
 | PDF e imagen con IA, respuesta validada | `ia: test_ia` (API simulada: herramienta en modo auto con un reintento, errores de Anthropic al log sin la clave) |
 | PDF enviado como imágenes para que el modelo vea la grilla (página completa + 4 ampliaciones) | `ia: test_mosaico` (PDF reales generados en la prueba: tamaños, rótulos, límite de páginas, JPEG para escaneos pesados); `ia: test_ia`: `test_pdf_real_se_envia_como_mosaico_de_imagenes`, `test_pdf_que_no_se_puede_renderizar_va_como_documento` |
@@ -314,7 +315,7 @@ Evidencia: PR #40 y #43.
 | 3 | El factor de bcrypt (RNF-04) no tenía prueba | `test_rnf04_bcrypt_con_factor_de_al_menos_10` |
 | 4 | RNF-03 no tenía ninguna medición automatizada | Dos pruebas de tiempo del layout en `test_rnf` |
 | 5 | RF-09 dice "precio mayor o igual a cero", pero la API rechazaba 0 (`gt=0`), y la logística (LOG) nace en $0 | La API y la pantalla de precios aceptan 0 (`ge=0`); `test_acepta_cero` |
-| 6 | RF-04 lista DWG entre los formatos; el sistema pide exportarlo a DXF porque ezdxf no lee DWG | Decisión de diseño (PR #44); el requisito se corrigió en la tesis (sección 2.1.3, control de cambios CC-09) |
+| 6 | RF-04 lista DWG entre los formatos; ezdxf no lee DWG | Al principio se pedía exportarlo a DXF (PR #44, CC-09); desde el 23 de noviembre el DWG se convierte en el servidor con LibreDWG |
 | 7 | RF-13 pide bocetos procesados y lotes despachados y recibidos | Bocetos procesados agregado al tablero; lotes despachados y recibidos con el módulo de validación |
 | 8 | RF-07 y RF-14 a RF-16 sin implementar; sin pruebas de extremo a extremo | Todos implementados con sus pruebas; las de extremo a extremo, en el Sprint 7 |
 | 9 | RF-08 pide buscar inversores por marca o modelo; la pantalla no tenía búsqueda | Búsqueda en el catálogo de inversores; `inversores-catalogo.test.tsx` |
