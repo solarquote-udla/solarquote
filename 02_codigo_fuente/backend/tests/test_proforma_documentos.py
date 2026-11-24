@@ -29,7 +29,6 @@ from app.core.permisos import Permiso
 from app.models.cotizacion import Cotizacion, ItemCotizacion, MaterialCotizado, TramoPagoCotizacion
 from app.models.material import Material
 from app.services import documentos
-from app.services.cotizacion import CODIGO_LOGISTICA
 from app.services.documentos import (
     DESCRIPCIONES_PROFORMA,
     _moneda,
@@ -247,17 +246,21 @@ def test_material_fuera_del_orden_conocido_cae_al_final(db: Session) -> None:
 
 def test_codigos_y_descripciones_de_la_proforma_de_hextructure() -> None:
     """En el documento salen VARL1/VARL2/HEX1_B, como en CT519, no los códigos internos."""
-    var1650 = MaterialCotizado(material=Material(codigo="VAR1650", nombre="Varilla 1650"), cantidad=1)
-    nuevo = MaterialCotizado(material=Material(codigo="ZZZ_NUEVO", nombre="Material nuevo"), cantidad=1)
-    logistica = MaterialCotizado(material=Material(codigo=CODIGO_LOGISTICA, nombre="Logística"), cantidad=1)
+    var1650 = MaterialCotizado(material=Material(codigo="VAR1650", nombre="Varilla 1650", unidad="unidad"), cantidad=1)
+    nuevo = MaterialCotizado(material=Material(codigo="ZZZ_NUEVO", nombre="Material nuevo", unidad="kg"), cantidad=1)
 
     assert documentos._codigo(var1650) == "VARL1"
     assert documentos._descripcion(var1650) == DESCRIPCIONES_PROFORMA["VAR1650"]
-    assert documentos._unidad(var1650) == "u"
     # Un material que la tabla no conoce sale con su código y su nombre en mayúsculas
     assert documentos._codigo(nuevo) == "ZZZ_NUEVO"
     assert documentos._descripcion(nuevo) == "MATERIAL NUEVO"
-    assert documentos._unidad(logistica) == "U"
+
+
+@pytest.mark.parametrize("unidad, esperada", [("unidad", "u"), ("Unidades", "u"), ("kg", "kg"), ("m²", "m²")])
+def test_la_unidad_sale_del_material(unidad, esperada) -> None:
+    """La columna "Uni" lee la unidad configurada del material; "unidad" se abrevia como en CT519."""
+    material = MaterialCotizado(material=Material(codigo="X", nombre="X", unidad=unidad), cantidad=1)
+    assert documentos._unidad(material) == esperada
 
 
 # ─── Servicio: generar_word ────────────────────────────────────────────
@@ -399,6 +402,15 @@ def test_word_sin_proforma_ni_datos_opcionales_del_cliente_no_falla(db: Session,
     assert "Proyecto:" not in texto
 
 
+def test_word_cero_paneles_o_cero_potencia_se_muestran_como_cero(db: Session, sin_datos_oferente) -> None:
+    """Cero es un valor, no "sin configurar": la franja muestra 0 y no "—"."""
+    cotizacion = _cotizacion_con_materiales(db, potencia_kwp=Decimal("0"), total_paneles=0)
+
+    filas = _filas_word(Document(io.BytesIO(documentos.generar_word(cotizacion))))
+
+    assert ["0,00 KWp", "0 u", "20 días", "10 años"] in filas
+
+
 def test_word_sin_potencia_ni_paneles_deja_la_franja_con_guion(db: Session, sin_datos_oferente) -> None:
     cotizacion = _cotizacion_con_materiales(db, potencia_kwp=None)
 
@@ -428,22 +440,22 @@ def test_excel_subtotales_y_totales_son_formulas(db: Session, datos_oferente) ->
     fila_var = _fila_con_etiqueta(hoja, "VARL1", "A")
     fila_hex = _fila_con_etiqueta(hoja, "HEX1_B", "A")
     assert fila_var < fila_hex
-    assert hoja[f"F{fila_var}"].value == f"=B{fila_var}*E{fila_var}"
-    assert hoja[f"F{fila_hex}"].value == f"=B{fila_hex}*E{fila_hex}"
+    assert hoja[f"G{fila_var}"].value == f"=B{fila_var}*F{fila_var}"
+    assert hoja[f"G{fila_hex}"].value == f"=B{fila_hex}*F{fila_hex}"
 
-    fila_subtotal = _fila_con_etiqueta(hoja, "SUBTOTAL", "E")
-    assert hoja[f"F{fila_subtotal}"].value == f"=SUM(F{fila_var}:F{fila_hex})"
+    fila_subtotal = _fila_con_etiqueta(hoja, "SUBTOTAL", "F")
+    assert hoja[f"G{fila_subtotal}"].value == f"=SUM(G{fila_var}:G{fila_hex})"
 
-    fila_iva = _fila_con_etiqueta(hoja, "IVA 15%", "E")
-    assert hoja[f"F{fila_iva}"].value == f"=F{fila_subtotal}*15.00/100"
+    fila_iva = _fila_con_etiqueta(hoja, "IVA 15%", "F")
+    assert hoja[f"G{fila_iva}"].value == f"=G{fila_subtotal}*15.00/100"
 
-    fila_total = _fila_con_etiqueta(hoja, "TOTAL", "E")
-    assert hoja[f"F{fila_total}"].value == f"=F{fila_subtotal}+F{fila_iva}"
+    fila_total = _fila_con_etiqueta(hoja, "TOTAL", "F")
+    assert hoja[f"G{fila_total}"].value == f"=G{fila_subtotal}+G{fila_iva}"
 
     # Sobre el subtotal (sin IVA), no el total
     for etapa, pct in [("Anticipo", "30.00"), ("Entrega", "40.00"), ("A 60 días de la entrega", "30.00")]:
         fila_pago = _fila_con_etiqueta(hoja, etapa, "B")
-        assert hoja[f"C{fila_pago}"].value == f"=F{fila_subtotal}*{pct}/100", etapa
+        assert hoja[f"D{fila_pago}"].value == f"=G{fila_subtotal}*{pct}/100", etapa
 
 
 def test_excel_precio_por_wp_es_formula_sobre_el_subtotal(db: Session, datos_oferente) -> None:
@@ -452,10 +464,10 @@ def test_excel_precio_por_wp_es_formula_sobre_el_subtotal(db: Session, datos_ofe
 
     hoja = load_workbook(io.BytesIO(documentos.generar_excel(cotizacion)), data_only=False).active
 
-    fila_precio = _fila_con_etiqueta(hoja, "PRECIO USD/Wp:", "E")
-    fila_subtotal = _fila_con_etiqueta(hoja, "SUBTOTAL", "E")
+    fila_precio = _fila_con_etiqueta(hoja, "PRECIO USD/Wp:", "F")
+    fila_subtotal = _fila_con_etiqueta(hoja, "SUBTOTAL", "F")
     # potencia_kwp = 45.20 (valor por defecto de la fábrica de prueba) × 1000
-    assert hoja[f"F{fila_precio}"].value == f"=F{fila_subtotal}/45200.00"
+    assert hoja[f"G{fila_precio}"].value == f"=G{fila_subtotal}/45200.00"
 
 
 def test_excel_sin_potencia_no_rompe_el_precio_por_wp(db: Session, datos_oferente) -> None:
@@ -463,9 +475,9 @@ def test_excel_sin_potencia_no_rompe_el_precio_por_wp(db: Session, datos_oferent
     cotizacion = _cotizacion_con_materiales(db, precio_wp=Decimal("0.0380"), potencia_kwp=None)
 
     hoja = load_workbook(io.BytesIO(documentos.generar_excel(cotizacion))).active
-    fila_precio = _fila_con_etiqueta(hoja, "PRECIO USD/Wp:", "E")
+    fila_precio = _fila_con_etiqueta(hoja, "PRECIO USD/Wp:", "F")
 
-    assert hoja[f"F{fila_precio}"].value is None
+    assert hoja[f"G{fila_precio}"].value is None
 
 
 def test_excel_total_sin_iva_suma_los_tramos_de_pago(db: Session, datos_oferente) -> None:
@@ -479,14 +491,14 @@ def test_excel_total_sin_iva_suma_los_tramos_de_pago(db: Session, datos_oferente
     fila_total = _fila_con_etiqueta(hoja, "Total sin I.V.A.", "B")
 
     assert fila_total == ultima + 1
-    assert hoja[f"C{fila_total}"].value == f"=SUM(C{primera}:C{ultima})"
+    assert hoja[f"D{fila_total}"].value == f"=SUM(D{primera}:D{ultima})"
 
 
 def test_excel_sin_tramos_propios_usa_los_de_la_configuracion(db: Session, datos_oferente) -> None:
     cotizacion = _cotizacion_con_materiales(db, pagos=[])
 
     hoja = load_workbook(io.BytesIO(documentos.generar_excel(cotizacion)), data_only=False).active
-    fila_subtotal = _fila_con_etiqueta(hoja, "SUBTOTAL", "E")
+    fila_subtotal = _fila_con_etiqueta(hoja, "SUBTOTAL", "F")
 
     # Los valores de la configuración no tienen por qué tener la misma
     # precisión que un tramo guardado: "30" y "30.00" dan el mismo monto.
@@ -496,7 +508,7 @@ def test_excel_sin_tramos_propios_usa_los_de_la_configuracion(db: Session, datos
         ("A 60 días de la entrega", settings.PROFORMA_PAGO_60_DIAS_PCT),
     ]:
         fila_pago = _fila_con_etiqueta(hoja, etapa, "B")
-        assert hoja[f"C{fila_pago}"].value == f"=F{fila_subtotal}*{pct}/100", etapa
+        assert hoja[f"D{fila_pago}"].value == f"=G{fila_subtotal}*{pct}/100", etapa
 
 
 def test_excel_incluye_encabezado_materiales_figura_y_datos_bancarios(db: Session, datos_oferente) -> None:
@@ -509,12 +521,35 @@ def test_excel_incluye_encabezado_materiales_figura_y_datos_bancarios(db: Sessio
     assert "No. CT-130-2026" in aplanado
     assert "Empresa de prueba S.A.S." in aplanado
     assert "RUC: 0000000000001" in aplanado
-    assert ["Código", "Cantidad", "Uni", "Descripción", "P. Unit.", "Total"] in filas
+    # La descripción ocupa D:E combinadas: la celda E queda vacía
+    assert ["Código", "Cantidad", "Uni", "Descripción", "P. Unit.", "Total"] in [
+        [v for v in fila if v is not None] for fila in filas
+    ]
     assert DESCRIPCIONES_PROFORMA["VAR1650"] in aplanado
     assert "Banco" in aplanado and "Banco de Prueba" in aplanado
     assert "Representante de Prueba" in aplanado
     # El logo y la figura referencial
     assert len(hoja._images) == 2
+
+
+def test_excel_recuadros_y_franja_simetricos() -> None:
+    """Los recuadros del oferente y del cliente, y las casillas de la franja, miden casi lo mismo, como en el Word."""
+    ancho = lambda desde, hasta: sum(documentos.ANCHOS[c] for c in documentos._rango(desde, hasta))  # noqa: E731
+
+    oferente, cliente = (ancho(*r) for r in documentos.RECUADROS)
+    assert abs(oferente - cliente) <= 0.1 * max(oferente, cliente)
+
+    casillas = [ancho(*c) for c in documentos.CASILLAS_FRANJA]
+    assert max(casillas) - min(casillas) <= 0.3 * max(casillas)
+
+
+def test_excel_descripcion_en_dos_columnas_combinadas(db: Session, datos_oferente) -> None:
+    cotizacion = _cotizacion_con_materiales(db)
+
+    hoja = load_workbook(io.BytesIO(documentos.generar_excel(cotizacion))).active
+    fila_var = _fila_con_etiqueta(hoja, "VARL1", "A")
+
+    assert f"D{fila_var}:E{fila_var}" in {str(r) for r in hoja.merged_cells.ranges}
 
 
 def test_excel_sin_datos_del_oferente_no_falla(db: Session, sin_datos_oferente) -> None:

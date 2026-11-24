@@ -209,8 +209,14 @@ def _descripcion(material: MaterialCotizado) -> str:
     return DESCRIPCIONES_PROFORMA.get(material.material.codigo, material.material.nombre.upper())
 
 
+# Abreviaturas de la columna "Uni". Una unidad configurada que no está
+# aquí (kg, m, m²...) sale tal cual.
+ABREVIATURAS_UNIDAD = {"unidad": "u", "unidades": "u"}
+
+
 def _unidad(material: MaterialCotizado) -> str:
-    return "U" if material.material.codigo == CODIGO_LOGISTICA else "u"
+    unidad = (material.material.unidad or "").strip()
+    return ABREVIATURAS_UNIDAD.get(unidad.lower(), unidad)
 
 
 def _numero_proforma(cotizacion: Cotizacion) -> str:
@@ -224,8 +230,11 @@ def _fecha_larga(cotizacion: Cotizacion) -> str:
 
 
 def _potencia_panel_wp(cotizacion: Cotizacion) -> int | None:
-    """Wp de cada panel: potencia total ÷ número de paneles (la cotización no guarda el panel)."""
-    if not cotizacion.potencia_kwp or not cotizacion.total_paneles:
+    """
+    Wp de cada panel: potencia total ÷ número de paneles (la cotización no
+    guarda el panel). Sin potencia o sin paneles no se puede calcular.
+    """
+    if cotizacion.potencia_kwp is None or not cotizacion.total_paneles:
         return None
     return round(cotizacion.potencia_kwp * 1000 / cotizacion.total_paneles)
 
@@ -260,7 +269,7 @@ def _franja(cotizacion: Cotizacion) -> list[tuple[str, str]]:
     """Potencia, paneles, plazo y garantía, en ese orden, como la franja de la proforma real."""
     return [
         ("POTENCIA", f"{_numero(cotizacion.potencia_kwp)} KWp" if cotizacion.potencia_kwp is not None else "—"),
-        ("N. PANELES", f"{cotizacion.total_paneles:,} u".replace(",", ".") if cotizacion.total_paneles else "—"),
+        ("N. PANELES", f"{cotizacion.total_paneles:,} u".replace(",", ".") if cotizacion.total_paneles is not None else "—"),
         ("PLAZO", _pluralizar(cotizacion.plazo_dias, "día", "días") if cotizacion.plazo_dias is not None else "—"),
         (
             "GARANTÍA",
@@ -399,7 +408,7 @@ def generar_word(cotizacion: Cotizacion) -> bytes:
     # Concepto y panel
     _texto(documento, settings.PROFORMA_CONCEPTO.upper(), tamano=11, negrita=True).paragraph_format.space_before = Pt(8)
     wp = _potencia_panel_wp(cotizacion)
-    if wp:
+    if wp is not None:
         _texto(documento, f"PANEL: {wp} Wp", tamano=8.5, color=GRIS_TEXTO)
 
     # Franja: potencia, paneles, plazo, garantía
@@ -519,9 +528,14 @@ FORMATO_MONEDA_EXCEL = '"$" #,##0.00'
 FORMATO_PRECIO_WP_EXCEL = '"$" #,##0.0000'
 FORMATO_CANTIDAD_EXCEL = "#,##0.00"
 
-# Columnas de la tabla de materiales, como en la proforma real
-COLUMNAS = ("A", "B", "C", "D", "E", "F")
-ANCHOS = {"A": 11, "B": 14, "C": 12, "D": 56, "E": 12, "F": 14}
+# Columnas de la hoja. La descripción ocupa dos columnas combinadas (D:E):
+# así la tabla de materiales tiene el ancho que necesita y, a la vez, los
+# recuadros del oferente (A:D) y del cliente (E:G) y las cuatro casillas de
+# la franja quedan del mismo ancho, como en el Word.
+COLUMNAS = ("A", "B", "C", "D", "E", "F", "G")
+ANCHOS = {"A": 12, "B": 14, "C": 8, "D": 25, "E": 30, "F": 13, "G": 15}
+RECUADROS = (("A", "D"), ("E", "G"))
+CASILLAS_FRANJA = (("A", "B"), ("C", "D"), ("E", "E"), ("F", "G"))
 
 
 def _fuente(tamano: float = 9, negrita: bool = False, color: str = "000000", cursiva: bool = False) -> Font:
@@ -538,6 +552,10 @@ def _escribir(hoja, celda: str, valor, *, alineacion: str | None = None, ajustar
     if alineacion or ajustar:
         hoja[celda].alignment = Alignment(horizontal=alineacion, vertical="center", wrap_text=ajustar)
     return hoja[celda]
+
+
+def _rango(desde: str, hasta: str) -> tuple[str, ...]:
+    return COLUMNAS[COLUMNAS.index(desde) : COLUMNAS.index(hasta) + 1]
 
 
 def _recuadro(hoja, desde: str, hasta: str, color: str = GRIS_BORDE) -> None:
@@ -574,46 +592,46 @@ def generar_excel(cotizacion: Cotizacion) -> bytes:
     pagos = _pagos(cotizacion)
 
     # Encabezado
-    for columna in ("A", "B", "C", "D"):
+    for columna in _rango("A", "E"):
         hoja[f"{columna}1"].fill = _relleno(NARANJA)
     hoja.row_dimensions[1].height = 4
-    _escribir(hoja, "F2", "PROFORMA", alineacion="right", tamano=11, negrita=True, color=NARANJA)
-    _escribir(hoja, "F3", _numero_proforma(cotizacion), alineacion="right", tamano=13, negrita=True)
-    _escribir(hoja, "F4", _fecha_larga(cotizacion), alineacion="right", tamano=9, color=GRIS_TEXTO)
+    _escribir(hoja, "G2", "PROFORMA", alineacion="right", tamano=11, negrita=True, color=NARANJA)
+    _escribir(hoja, "G3", _numero_proforma(cotizacion), alineacion="right", tamano=13, negrita=True)
+    _escribir(hoja, "G4", _fecha_larga(cotizacion), alineacion="right", tamano=9, color=GRIS_TEXTO)
     logo = ExcelImage(str(LOGO))
     logo.width, logo.height = 230, 55
     hoja.add_image(logo, "A2")
 
-    # Recuadros del oferente (A:C) y del cliente (D:F)
+    # Recuadros del oferente y del cliente, del mismo ancho
     fila = 7
-    _escribir(hoja, f"A{fila}", "DATOS DEL OFERENTE", tamano=8, negrita=True, color=NARANJA)
-    _escribir(hoja, f"D{fila}", "CLIENTE / DIRECCIÓN", tamano=8, negrita=True, color=NARANJA)
+    (desde_oferente, hasta_oferente), (desde_cliente, hasta_cliente) = RECUADROS
+    _escribir(hoja, f"{desde_oferente}{fila}", "DATOS DEL OFERENTE", tamano=8, negrita=True, color=NARANJA)
+    _escribir(hoja, f"{desde_cliente}{fila}", "CLIENTE / DIRECCIÓN", tamano=8, negrita=True, color=NARANJA)
     oferente, cliente = _datos_oferente(), _datos_cliente(cotizacion)
     for i in range(max(len(oferente), len(cliente), 4)):
-        if i < len(oferente):
-            etiqueta, valor = oferente[i]
-            _escribir(hoja, f"A{fila + 1 + i}", f"{etiqueta}: {valor}" if etiqueta else valor, tamano=8.5, negrita=not etiqueta)
-        if i < len(cliente):
-            etiqueta, valor = cliente[i]
-            _escribir(hoja, f"D{fila + 1 + i}", f"{etiqueta}: {valor}" if etiqueta else valor, tamano=8.5, negrita=not etiqueta)
+        for columna, datos in ((desde_oferente, oferente), (desde_cliente, cliente)):
+            if i < len(datos):
+                etiqueta, valor = datos[i]
+                texto = f"{etiqueta}: {valor}" if etiqueta else valor
+                _escribir(hoja, f"{columna}{fila + 1 + i}", texto, tamano=8.5, negrita=not etiqueta)
     ultima = fila + max(len(oferente), len(cliente), 4)
-    _recuadro(hoja, f"A{fila}", f"C{ultima}")
-    _recuadro(hoja, f"D{fila}", f"F{ultima}")
+    _recuadro(hoja, f"{desde_oferente}{fila}", f"{hasta_oferente}{ultima}")
+    _recuadro(hoja, f"{desde_cliente}{fila}", f"{hasta_cliente}{ultima}")
 
     # Concepto y panel
     fila = ultima + 2
     _escribir(hoja, f"A{fila}", settings.PROFORMA_CONCEPTO.upper(), tamano=11, negrita=True)
     wp = _potencia_panel_wp(cotizacion)
-    if wp:
+    if wp is not None:
         fila += 1
         _escribir(hoja, f"A{fila}", f"PANEL: {wp} Wp", tamano=8.5, color=GRIS_TEXTO)
 
-    # Franja: potencia (A:B), paneles (C:D), plazo (E), garantía (F)
+    # Franja: potencia, paneles, plazo y garantía en casillas del mismo ancho
     fila += 2
-    for (desde, hasta), (etiqueta, valor) in zip((("A", "B"), ("C", "D"), ("E", "E"), ("F", "F")), _franja(cotizacion)):
+    for (desde, hasta), (etiqueta, valor) in zip(CASILLAS_FRANJA, _franja(cotizacion)):
         _escribir(hoja, f"{desde}{fila}", etiqueta, tamano=7, negrita=True, color=NARANJA)
         _escribir(hoja, f"{desde}{fila + 1}", valor, tamano=9.5, negrita=True)
-        for columna in COLUMNAS[COLUMNAS.index(desde) : COLUMNAS.index(hasta) + 1]:
+        for columna in _rango(desde, hasta):
             hoja[f"{columna}{fila}"].fill = _relleno(DURAZNO)
             hoja[f"{columna}{fila + 1}"].fill = _relleno(DURAZNO)
     fila += 3
@@ -623,9 +641,12 @@ def generar_excel(cotizacion: Cotizacion) -> bytes:
 
     # Materiales: total = cantidad × precio unitario
     fila += 1
-    for columna, texto in zip(COLUMNAS, ("Código", "Cantidad", "Uni", "Descripción", "P. Unit.", "Total")):
-        celda = _escribir(hoja, f"{columna}{fila}", texto, alineacion="center", tamano=9, negrita=True, color="FFFFFF")
-        celda.fill = _relleno(NARANJA)
+    encabezados = (("A", "Código"), ("B", "Cantidad"), ("C", "Uni"), ("D", "Descripción"), ("F", "P. Unit."), ("G", "Total"))
+    for columna, texto in encabezados:
+        _escribir(hoja, f"{columna}{fila}", texto, alineacion="center", tamano=9, negrita=True, color="FFFFFF")
+    for columna in COLUMNAS:
+        hoja[f"{columna}{fila}"].fill = _relleno(NARANJA)
+    hoja.merge_cells(f"D{fila}:E{fila}")
     linea = Side(style="thin", color="D9D9D9")
     primera_fila_material = fila + 1
     for material in _materiales_en_orden(cotizacion):
@@ -634,66 +655,77 @@ def generar_excel(cotizacion: Cotizacion) -> bytes:
         _escribir(hoja, f"B{fila}", material.cantidad, alineacion="right", tamano=8).number_format = FORMATO_CANTIDAD_EXCEL
         _escribir(hoja, f"C{fila}", _unidad(material), alineacion="center", tamano=8)
         _escribir(hoja, f"D{fila}", _descripcion(material), ajustar=True, tamano=7.5)
-        _escribir(hoja, f"E{fila}", float(material.precio_unitario), alineacion="right", tamano=8).number_format = FORMATO_MONEDA_EXCEL
-        _escribir(hoja, f"F{fila}", f"=B{fila}*E{fila}", alineacion="right", tamano=8).number_format = FORMATO_MONEDA_EXCEL
+        hoja.merge_cells(f"D{fila}:E{fila}")
+        _escribir(hoja, f"F{fila}", float(material.precio_unitario), alineacion="right", tamano=8).number_format = FORMATO_MONEDA_EXCEL
+        _escribir(hoja, f"G{fila}", f"=B{fila}*F{fila}", alineacion="right", tamano=8).number_format = FORMATO_MONEDA_EXCEL
         for columna in COLUMNAS:
             hoja[f"{columna}{fila}"].border = Border(bottom=linea)
     ultima_fila_material = fila
 
-    # Notas (A:D) y resumen (E:F)
+    # Notas (A:E) y resumen (F:G)
     fila += 2
     _escribir(hoja, f"A{fila}", "NOTAS", tamano=9, negrita=True, color=NARANJA)
-    _escribir(hoja, f"E{fila}", "RESUMEN", tamano=9, negrita=True, color=NARANJA)
-    for i, nota in enumerate(_notas_proforma(cotizacion)):
+    _escribir(hoja, f"F{fila}", "RESUMEN", tamano=9, negrita=True, color=NARANJA)
+    notas = _notas_proforma(cotizacion)
+    for i, nota in enumerate(notas):
         _escribir(hoja, f"A{fila + 1 + i}", nota, tamano=7.5, color=GRIS_TEXTO)
 
     fila_subtotal, fila_iva, fila_total, fila_precio = fila + 1, fila + 2, fila + 3, fila + 5
     iva_pct = cotizacion.iva_porcentaje or 0
     resumen = (
-        (fila_subtotal, "SUBTOTAL", f"=SUM(F{primera_fila_material}:F{ultima_fila_material})"),
+        (fila_subtotal, "SUBTOTAL", f"=SUM(G{primera_fila_material}:G{ultima_fila_material})"),
         (
             fila_iva,
             f"IVA {_porcentaje(cotizacion.iva_porcentaje)}" if cotizacion.iva_porcentaje is not None else "IVA",
-            f"=F{fila_subtotal}*{iva_pct}/100",
+            f"=G{fila_subtotal}*{iva_pct}/100",
         ),
-        (fila_total, "TOTAL", f"=F{fila_subtotal}+F{fila_iva}"),
+        (fila_total, "TOTAL", f"=G{fila_subtotal}+G{fila_iva}"),
     )
     for numero_fila, etiqueta, formula in resumen:
-        _escribir(hoja, f"E{numero_fila}", etiqueta, alineacion="right", tamano=9, negrita=etiqueta == "TOTAL")
-        _escribir(hoja, f"F{numero_fila}", formula, alineacion="right", tamano=9, negrita=etiqueta == "TOTAL").number_format = FORMATO_MONEDA_EXCEL
+        negrita = etiqueta == "TOTAL"
+        _escribir(hoja, f"F{numero_fila}", etiqueta, alineacion="right", tamano=9, negrita=negrita)
+        celda = _escribir(hoja, f"G{numero_fila}", formula, alineacion="right", tamano=9, negrita=negrita)
+        celda.number_format = FORMATO_MONEDA_EXCEL
     if cotizacion.precio_wp is not None:
-        _escribir(hoja, f"E{fila_precio}", "PRECIO USD/Wp:", alineacion="right", tamano=10, negrita=True)
+        _escribir(hoja, f"F{fila_precio}", "PRECIO USD/Wp:", alineacion="right", tamano=10, negrita=True)
         if cotizacion.potencia_kwp:
             # Fórmula sobre el subtotal: si Santiago cambia una cantidad, el precio por Wp cambia con ella
             potencia_wp = cotizacion.potencia_kwp * Decimal(1000)
-            precio = _escribir(hoja, f"F{fila_precio}", f"=F{fila_subtotal}/{potencia_wp}", alineacion="right", tamano=10, negrita=True)
+            precio = _escribir(hoja, f"G{fila_precio}", f"=G{fila_subtotal}/{potencia_wp}", alineacion="right", tamano=10, negrita=True)
             precio.number_format = FORMATO_PRECIO_WP_EXCEL
     for numero_fila in range(fila, fila_precio + 1):
-        for columna in ("E", "F"):
+        for columna in ("F", "G"):
             hoja[f"{columna}{numero_fila}"].fill = _relleno(DURAZNO)
-    fila = max(fila_precio, fila + len(_notas_proforma(cotizacion)))
+    fila = max(fila_precio, fila + len(notas))
 
-    # Forma de pago y valores sin IVA, con la vigencia al lado
+    # Forma de pago y valores sin IVA (A:D), con la vigencia al lado (E:G)
     fila += 2
     _escribir(hoja, f"A{fila}", "FORMA DE PAGO Y VALORES SIN IVA", tamano=9, negrita=True, color=NARANJA)
     fila += 1
-    for columna, texto in zip(("A", "B", "C"), ("Porcentaje", "Etapa", "Valor")):
-        _escribir(hoja, f"{columna}{fila}", texto, alineacion="center", tamano=8, negrita=True).fill = _relleno(DURAZNO)
-    _escribir(hoja, f"D{fila}", _vigencia(cotizacion), ajustar=True, tamano=9, negrita=True)
+    for columna, texto in (("A", "Porcentaje"), ("B", "Etapa"), ("D", "Valor")):
+        _escribir(hoja, f"{columna}{fila}", texto, alineacion="center", tamano=8, negrita=True)
+    for columna in _rango("A", "D"):
+        hoja[f"{columna}{fila}"].fill = _relleno(DURAZNO)
+    hoja.merge_cells(f"B{fila}:C{fila}")
+    _escribir(hoja, f"E{fila}", _vigencia(cotizacion), ajustar=True, tamano=9, negrita=True)
+    hoja.merge_cells(f"E{fila}:G{fila}")
     primera_fila_pago = fila + 1
     for etiqueta, pct, _ in pagos:
         fila += 1
         _escribir(hoja, f"A{fila}", _porcentaje(pct), alineacion="center", tamano=8)
         _escribir(hoja, f"B{fila}", etiqueta, alineacion="center", tamano=8)
-        pago = _escribir(hoja, f"C{fila}", f"=F{fila_subtotal}*{pct}/100", alineacion="right", tamano=8)
+        hoja.merge_cells(f"B{fila}:C{fila}")
+        pago = _escribir(hoja, f"D{fila}", f"=G{fila_subtotal}*{pct}/100", alineacion="center", tamano=8)
         pago.number_format = FORMATO_MONEDA_EXCEL
     if pagos:
         fila += 1
         _escribir(hoja, f"A{fila}", "Total", alineacion="center", tamano=8, negrita=True)
         _escribir(hoja, f"B{fila}", "Total sin I.V.A.", alineacion="center", tamano=8, negrita=True)
-        total_pagos = _escribir(hoja, f"C{fila}", f"=SUM(C{primera_fila_pago}:C{fila - 1})", alineacion="right", tamano=8, negrita=True)
+        hoja.merge_cells(f"B{fila}:C{fila}")
+        formula = f"=SUM(D{primera_fila_pago}:D{fila - 1})"
+        total_pagos = _escribir(hoja, f"D{fila}", formula, alineacion="center", tamano=8, negrita=True)
         total_pagos.number_format = FORMATO_MONEDA_EXCEL
-        for columna in ("A", "B", "C"):
+        for columna in _rango("A", "D"):
             hoja[f"{columna}{fila}"].fill = _relleno(DURAZNO)
 
     if settings.HEXTRUCTURE_BANCO:
@@ -708,7 +740,7 @@ def generar_excel(cotizacion: Cotizacion) -> bytes:
             if valor:
                 fila += 1
                 _escribir(hoja, f"A{fila}", etiqueta, tamano=8.5, negrita=True)
-                _escribir(hoja, f"B{fila}", valor, tamano=8.5)
+                _escribir(hoja, f"C{fila}", valor, tamano=8.5)
 
     # Figura referencial y distribución de los bloques
     fila += 2
@@ -738,7 +770,7 @@ def generar_excel(cotizacion: Cotizacion) -> bytes:
     for columna in COLUMNAS:
         hoja[f"{columna}{fila}"].border = Border(top=Side(style="thin", color=NARANJA))
     _escribir(hoja, f"A{fila}", _pie(), tamano=8, color=GRIS_TEXTO)
-    hoja.print_area = f"A1:F{fila}"
+    hoja.print_area = f"A1:G{fila}"
 
     salida = io.BytesIO()
     libro.save(salida)
