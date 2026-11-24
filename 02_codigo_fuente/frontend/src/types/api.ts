@@ -753,7 +753,7 @@ export interface Tablero {
 
 // ─── Boceto del cliente (Módulo 2 — RF-04 y RF-05) ──────
 
-export type FormatoBoceto = "pdf" | "png" | "jpg" | "dxf";
+export type FormatoBoceto = "pdf" | "png" | "jpg" | "dxf" | "dwg";
 export type OrientacionBloque = "vertical" | "horizontal";
 
 /** Espejo de `BloqueBocetoEditar`: un tipo de bloque como lo deja el Gerente */

@@ -13,7 +13,7 @@ const ruta = (proyectoId: number) => `/api/proyectos/${proyectoId}/boceto`;
 const TIMEOUT_CARGA_MS = 180_000;
 
 export const TAMANO_MAXIMO_BYTES = 10 * 1024 * 1024;
-export const EXTENSIONES_ADMITIDAS = [".pdf", ".jpg", ".jpeg", ".png", ".dxf"];
+export const EXTENSIONES_ADMITIDAS = [".pdf", ".jpg", ".jpeg", ".png", ".dxf", ".dwg"];
 
 /** El boceto cargado, o `null` si el proyecto todavía no tiene. */
 export async function obtenerBoceto(proyectoId: number): Promise<Boceto | null> {

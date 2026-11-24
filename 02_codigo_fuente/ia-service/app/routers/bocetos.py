@@ -10,7 +10,7 @@ y si no con la API de Claude; las imágenes, con la API de Claude.
 Errores:
   401  falta el secreto compartido
   413  el archivo supera 10 MB
-  415  formato no admitido (incluido DWG: hay que exportarlo a DXF)
+  415  formato no admitido (o un DWG sin el convertidor instalado)
   422  archivo vacío, o DXF sin paneles reconocibles
   502  la IA respondió con error o con un resultado inválido
   503  la IA no está configurada (falta la clave de Anthropic)
@@ -49,6 +49,8 @@ def interpretar(archivo: UploadFile = File(...)) -> ResultadoInterpretacion:
 
     try:
         return interpretar_boceto(contenido, formato)
+    except FormatoNoAdmitido as exc:
+        raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, str(exc)) from exc
     except DxfIlegible as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
     except IaNoConfigurada as exc:

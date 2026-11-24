@@ -2,7 +2,7 @@
 Boceto del cliente — RF-04 (carga y lectura) y RF-05 (confirmación).
 
 Flujo:
-  1. El Gerente carga el archivo que envió el cliente (PDF, imagen o DXF).
+  1. El Gerente carga el archivo que envió el cliente (PDF, imagen, DXF o DWG).
   2. ia-service lo interpreta: los DXF se leen directo de la geometría,
      los PDF e imágenes con la IA. Devuelve los tipos de bloque en
      notación L, A, B.
@@ -63,7 +63,7 @@ class _BloqueRecibido(BaseModel):
 
 
 class _ResultadoRecibido(BaseModel):
-    formato: str = Field(pattern="^(pdf|png|jpg|dxf)$")
+    formato: str = Field(pattern="^(pdf|png|jpg|dxf|dwg)$")
     metodo: str = Field(pattern="^(dxf|pdf|ia)$")
     bloques: list[_BloqueRecibido]
     advertencias: list[str] = []
