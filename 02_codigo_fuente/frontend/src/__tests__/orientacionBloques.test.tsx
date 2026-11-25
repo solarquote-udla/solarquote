@@ -3,7 +3,7 @@
  * norte, o paralelos a un lado del terreno, como en los planos de
  * HEXtructure de terrenos en diagonal.
  */
-import { act, cleanup, fireEvent, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { LayoutPage } from "@/pages/LayoutPage";
@@ -28,7 +28,7 @@ vi.mock("@/services/equipo", () => ({
   listarPanelesReferencia: vi.fn(async () => []),
 }));
 vi.mock("@/services/layout", () => ({
-  obtenerLayout: vi.fn(async () => null),
+  obtenerLayout: vi.fn(async () => null as unknown),
   // No resuelve: solo interesa con qué parámetros se llamó
   generarLayout: vi.fn(() => new Promise(() => {})),
   guardarBloques: vi.fn(),
@@ -72,5 +72,39 @@ describe("Orientación de los bloques", () => {
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "Generar layout" })));
 
     expect(vi.mocked(layout.generarLayout).mock.calls[0][1]).toMatchObject({ lado_bloques: 1 });
+  });
+});
+
+/** Layout guardado con un lado elegido y el giro con que se generó. */
+const LAYOUT = (lado: number, anguloNorte: number) => ({
+  proyecto_id: 5,
+  parametros: { paneles_largo: 4, pasillo_m: 2, tolerancia_proporcion: 0.2, capacidad_deseada_kwp: null, paneles_ancho_minimo: 1, lado_bloques: lado },
+  bloques: [],
+  tipos: [],
+  total_paneles: 0, potencia_kwp: 0, paneles_ancho_ideal: 24, largo_bloque_m: 9.112, ancho_bloque_m: 27.216,
+  separacion_este_oeste_m: 2, separacion_norte_sur_m: 2, area_util_m2: 6000, area_ocupada_m2: 0, capacidad: null,
+  inversores: [], inversores_sugeridos: 1, advertencias: [], angulo_norte: anguloNorte, lado_menor_m: 1.134,
+  ediciones_manuales: 0, desactualizado: false, created_at: "2026-11-23T10:00:00Z", updated_at: "2026-11-23T10:00:00Z",
+});
+
+describe("Lado guardado", () => {
+  it("si sigue siendo el mismo lado del terreno, se conserva", async () => {
+    // Rectángulo recto: el lado 2 es vertical y los bloques quedaron sin girar
+    vi.mocked(layout.obtenerLayout).mockResolvedValueOnce(LAYOUT(1, 0) as never);
+    paso3();
+    const selector = (await screen.findByLabelText("Orientación de los bloques")) as HTMLSelectElement;
+    await waitFor(() => expect(selector.value).toBe("1"));
+    expect(screen.queryByText(/ya no es el que se eligió/)).toBeNull();
+  });
+
+  it("si el terreno cambió y el número apunta a otro lado, vuelve al norte y avisa", async () => {
+    // Se generó girado 30°, pero el lado 2 del terreno actual no está a 30°
+    vi.mocked(layout.obtenerLayout).mockResolvedValueOnce(LAYOUT(1, 30) as never);
+    paso3();
+    expect(await screen.findByText(/el lado 2 ya no es el que se eligió/)).toBeTruthy();
+    expect((screen.getByLabelText("Orientación de los bloques") as HTMLSelectElement).value).toBe("");
+
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Volver a generar" })));
+    expect(vi.mocked(layout.generarLayout).mock.calls[0][1]).toMatchObject({ lado_bloques: null });
   });
 });
