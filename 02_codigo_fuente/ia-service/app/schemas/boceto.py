@@ -10,7 +10,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-Formato = Literal["pdf", "png", "jpg", "dxf"]
+Formato = Literal["pdf", "png", "jpg", "dxf", "dwg"]
 Metodo = Literal["dxf", "pdf", "ia"]  # pdf: geometría del PDF, sin IA
 Orientacion = Literal["vertical", "horizontal"]
 

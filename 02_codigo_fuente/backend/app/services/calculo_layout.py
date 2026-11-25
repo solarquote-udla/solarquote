@@ -39,6 +39,12 @@ del terreno indica hacia dónde apunta el norte, en grados medidos en
 sentido horario desde el eje +Y del canvas. Si no está definida, se toma
 el eje +Y como norte y se advierte.
 
+Los bloques también se pueden alinear con un lado del terreno, como en
+los planos de HEXtructure de terrenos en diagonal (Envasur): se aprovecha
+mejor el área a cambio de una orientación un poco peor. Se giran lo
+mínimo para quedar paralelos a ese lado (como mucho 45°), así las filas
+siguen lo más cerca posible de norte-sur.
+
 Algoritmo
 ---------
 1. Área útil = terreno − unión de caminos.
@@ -246,7 +252,8 @@ class ResultadoLayout:
     advertencias: list[str] = field(default_factory=list)
     # Necesarios para editar bloques después (SQ-64): con la orientación
     # y el ancho de un panel, un bloque se reconstruye a partir de su
-    # esquina suroeste y su A.
+    # esquina suroeste y su A. Es el giro de los bloques: el norte, o el
+    # norte más el giro hacia el lado elegido.
     angulo_norte: float = 0.0
     lado_menor_m: float = 0.0
     separacion_largo_m: float = 0.0
@@ -681,6 +688,30 @@ def agrupar_por_tipo(bloques: list[Bloque]) -> tuple[list[Bloque], list[TipoBloq
 # ─── Punto de entrada ───────────────────────────────────────────────
 
 
+def giro_hacia_lado(terreno: Sequence[Sequence[float]], lado: int, angulo_norte: float) -> float:
+    """
+    Grados que hay que sumar al norte para que los bloques queden
+    paralelos al lado `lado` del terreno (del vértice `lado` al siguiente).
+
+    Un bloque es un rectángulo: queda paralelo al lado con las filas a lo
+    largo de él o de través. Se elige el giro más chico, entre −45° y 45°,
+    para que las filas sigan lo más cerca posible de norte-sur.
+    """
+    if not 0 <= lado < len(terreno):
+        raise LayoutImposible(
+            f"El terreno tiene {len(terreno)} lados y se pidió el lado {lado + 1}. "
+            f"Elige de nuevo el lado para alinear los bloques."
+        )
+    (x0, y0), (x1, y1) = terreno[lado][:2], terreno[(lado + 1) % len(terreno)][:2]
+    if math.hypot(x1 - x0, y1 - y0) < _EPS:
+        raise LayoutImposible(f"El lado {lado + 1} del terreno no tiene largo.")
+    # Dirección del lado en el mismo sentido que el norte: grados en
+    # sentido horario desde +Y.
+    direccion = math.degrees(math.atan2(x1 - x0, y1 - y0))
+    giro = (direccion - angulo_norte + 45) % 90 - 45
+    return round(giro, 6)
+
+
 def generar_layout(
     terreno: list[list[float]],
     caminos: list[list[list[float]]],
@@ -689,7 +720,12 @@ def generar_layout(
     *,
     orientacion_norte: float | None = None,
     latitud: float | None = None,
+    lado_bloques: int | None = None,
 ) -> ResultadoLayout:
+    """
+    `lado_bloques`: índice del lado del terreno con el que se alinean los
+    bloques. Sin valor, los bloques siguen el norte.
+    """
     if parametros.paneles_largo < 2 or parametros.paneles_largo % 2:
         raise LayoutImposible("L debe ser un número par mayor o igual a 2.")
     if parametros.paneles_ancho_minimo < 1:
@@ -751,8 +787,18 @@ def generar_layout(
             "del plano como norte. Defínela en la pestaña Terreno para un layout fiel."
         )
     angulo = orientacion_norte or 0.0
+    if lado_bloques is not None:
+        giro = giro_hacia_lado(terreno, lado_bloques, angulo)
+        angulo += giro
+        if abs(giro) >= 0.05:
+            advertencias.append(
+                f"Los bloques están girados {abs(giro):.1f}° respecto del norte para quedar "
+                f"paralelos al lado {lado_bloques + 1} del terreno: se aprovecha mejor el área, "
+                f"con una orientación un poco distinta a la ideal."
+            )
     # Norte a θ° en sentido horario desde +Y; girar θ° antihorario lo
-    # lleva a +Y. Al final se deshace con −θ.
+    # lleva a +Y. Al final se deshace con −θ. Con un lado elegido, θ
+    # incluye el giro hacia ese lado.
     util_local = rotate(util, angulo, origin=(0, 0))
 
     # ─── Búsqueda del mejor desfase ──────────────────────────────

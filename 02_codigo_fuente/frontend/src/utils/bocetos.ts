@@ -17,13 +17,13 @@ const extension = (nombre: string) => {
 export const rutaCargarBoceto = (proyectoId: number) => `/bocetos/${proyectoId}`;
 export const rutaConfirmacionBoceto = (proyectoId: number) => `/bocetos/${proyectoId}/confirmacion`;
 
-export const esDxf = (nombre: string) => extension(nombre) === ".dxf";
+/** Plano de AutoCAD (DXF o DWG): se lee de la geometría, sin IA. */
+export const esDxf = (nombre: string) => [".dxf", ".dwg"].includes(extension(nombre));
 
 /** Por qué no se puede cargar el archivo, o null si está bien. */
 export function problemaDelArchivo(archivo: File): string | null {
   const ext = extension(archivo.name);
-  if (ext === ".dwg") return "Los DWG no se pueden leer: en AutoCAD usa Guardar como > DXF y carga ese archivo.";
-  if (!EXTENSIONES_ADMITIDAS.includes(ext)) return "Formato no admitido. Carga un PDF, JPG, PNG o DXF.";
+  if (!EXTENSIONES_ADMITIDAS.includes(ext)) return "Formato no admitido. Carga un PDF, JPG, PNG, DXF o DWG.";
   if (archivo.size === 0) return "El archivo está vacío.";
   if (archivo.size > TAMANO_MAXIMO_BYTES) return "El archivo supera el máximo de 10 MB.";
   return null;

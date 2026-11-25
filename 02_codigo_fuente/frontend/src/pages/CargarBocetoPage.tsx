@@ -178,7 +178,7 @@ export function CargarBocetoPage() {
     { clave: "subiendo", texto: "Subiendo el archivo" },
     {
       clave: "leyendo",
-      texto: lecturaDxf ? "Leyendo la geometría del DXF" : "Analizando el boceto con IA (puede tardar hasta un minuto)",
+      texto: lecturaDxf ? "Leyendo la geometría del plano de AutoCAD" : "Analizando el boceto con IA (puede tardar hasta un minuto)",
     },
     { clave: "listo", texto: "Abriendo la confirmación" },
   ];
@@ -294,8 +294,7 @@ export function CargarBocetoPage() {
               ) : (
                 <>
                   <p className="text-base font-semibold text-acero-800">Arrastra el boceto aquí o haz clic para elegirlo</p>
-                  <p className="mt-1 text-sm text-acero-500">PDF, JPG, PNG o DXF · hasta 10 MB</p>
-                  <p className="mt-4 text-xs text-acero-400">¿Tienes un DWG? En AutoCAD usa Guardar como &gt; DXF.</p>
+                  <p className="mt-1 text-sm text-acero-500">PDF, JPG, PNG o AutoCAD (DXF o DWG) · hasta 10 MB</p>
                 </>
               )}
             </div>
@@ -314,7 +313,7 @@ export function CargarBocetoPage() {
               ))}
             </ul>
             <p className="mt-3 text-xs text-acero-500">
-              Los DXF se leen directo de la geometría, sin IA. En todos los casos revisas y corriges el resultado antes de
+              Los planos de AutoCAD (DXF o DWG) se leen directo de la geometría, sin IA. En todos los casos revisas y corriges el resultado antes de
               cotizar.
             </p>
           </div>

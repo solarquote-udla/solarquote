@@ -158,6 +158,7 @@ def generar(db: Session, proyecto: Proyecto, datos: LayoutGenerar) -> Layout:
         ),
         orientacion_norte=terreno.orientacion_norte,
         latitud=float(proyecto.latitud) if proyecto.latitud is not None else None,
+        lado_bloques=datos.lado_bloques,
     )
     asignacion = asignar_inversores(
         [(b.vertices, b.paneles) for b in resultado.bloques],
@@ -191,6 +192,8 @@ def generar(db: Session, proyecto: Proyecto, datos: LayoutGenerar) -> Layout:
         "capacidad": asdict(resultado.capacidad) if resultado.capacidad else None,
         "advertencias": resultado.advertencias,
         "angulo_norte": resultado.angulo_norte,
+        # Sin columna propia: es un parámetro más, y así no hace falta migración.
+        "lado_bloques": datos.lado_bloques,
         "lado_menor_m": resultado.lado_menor_m,
         "separacion_paneles_ancho_m": resultado.separacion_ancho_m,
         "bloque_compacto": resultado.bloque_compacto,
@@ -526,6 +529,7 @@ def a_respuesta(layout: Layout, huella: str, equipo: ConfiguracionEquipo | None)
             paneles_ancho=layout.paneles_ancho,
             separacion_paneles_largo_m=layout.separacion_paneles_largo_m,
             separacion_paneles_ancho_m=layout.separacion_paneles_ancho_m,
+            lado_bloques=resumen.get("lado_bloques"),
         ),
         bloques=[
             BloqueLeer(

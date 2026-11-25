@@ -479,6 +479,8 @@ export interface LayoutGenerar {
   separacion_paneles_largo_m: number;
   /** Separación entre paneles a lo ancho (clamp intermedio), en metros */
   separacion_paneles_ancho_m: number;
+  /** Lado del terreno (0 = del primer vértice al segundo) con el que se alinean los bloques. Null = norte. */
+  lado_bloques?: number | null;
 }
 
 /** Espejo de `BloqueLeer`. Vértices en metros, coordenadas del terreno. */
@@ -599,7 +601,7 @@ export interface Layout {
   /** Regla de HEXtructure: ~400 paneles por inversor */
   inversores_sugeridos: number;
   advertencias: string[];
-  /** Grados del norte usados al generar; la edición arma los bloques con este ángulo */
+  /** Giro de los bloques usado al generar (el norte, o el norte más el giro hacia el lado elegido); la edición arma los bloques con este ángulo */
   angulo_norte: number;
   /** Lado menor del panel, en metros */
   lado_menor_m: number;
@@ -751,7 +753,7 @@ export interface Tablero {
 
 // ─── Boceto del cliente (Módulo 2 — RF-04 y RF-05) ──────
 
-export type FormatoBoceto = "pdf" | "png" | "jpg" | "dxf";
+export type FormatoBoceto = "pdf" | "png" | "jpg" | "dxf" | "dwg";
 export type OrientacionBloque = "vertical" | "horizontal";
 
 /** Espejo de `BloqueBocetoEditar`: un tipo de bloque como lo deja el Gerente */
