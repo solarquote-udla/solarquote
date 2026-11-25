@@ -1,10 +1,12 @@
 """
 Documentos de la proforma en Word y Excel — RF-07.
 
-Formato institucional calcado de la proforma real (CT-129-2025): datos
-del oferente, concepto, notas con L/A/bloques de cada ítem, materiales en
-el orden de esa proforma, condiciones, tabla de pagos y datos bancarios
-con la firma — todos con `settings`, nunca hardcodeados en `documentos.py`.
+Formato de la proforma de HEXtructure (CT519 y CT521A): logo, recuadros
+del oferente y del cliente, franja con potencia, paneles, plazo y
+garantía, materiales con los códigos y descripciones de HEXtructure en el
+orden de esa proforma, resumen, notas con la distribución de bloques,
+pagos sin IVA, vigencia, figura de los elementos y firma. Los datos del
+oferente salen de `settings`, nunca hardcodeados en `documentos.py`.
 El Excel es editable: subtotales y totales son fórmulas.
 
 Dos niveles: el servicio (`app.services.documentos`) genera los bytes a
@@ -27,7 +29,14 @@ from app.core.permisos import Permiso
 from app.models.cotizacion import Cotizacion, ItemCotizacion, MaterialCotizado, TramoPagoCotizacion
 from app.models.material import Material
 from app.services import documentos
-from app.services.documentos import _moneda, _numero, _pluralizar, _porcentaje, settings
+from app.services.documentos import (
+    DESCRIPCIONES_PROFORMA,
+    _moneda,
+    _numero,
+    _pluralizar,
+    _porcentaje,
+    settings,
+)
 from tests.fabricas import crear_usuario, perfil_personalizado
 from tests.test_varios_inversores import _cabecera, api, h  # noqa: F401
 
@@ -232,103 +241,153 @@ def test_material_fuera_del_orden_conocido_cae_al_final(db: Session) -> None:
     assert [m.material.codigo for m in ordenados] == ["VAR1650", "ZZZ_NUEVO"]
 
 
+# ─── Formato de HEXtructure: códigos, descripciones y unidades ────────
+
+
+def test_codigos_y_descripciones_de_la_proforma_de_hextructure() -> None:
+    """En el documento salen VARL1/VARL2/HEX1_B, como en CT519, no los códigos internos."""
+    var1650 = MaterialCotizado(material=Material(codigo="VAR1650", nombre="Varilla 1650", unidad="unidad"), cantidad=1)
+    nuevo = MaterialCotizado(material=Material(codigo="ZZZ_NUEVO", nombre="Material nuevo", unidad="kg"), cantidad=1)
+
+    assert documentos._codigo(var1650) == "VARL1"
+    assert documentos._descripcion(var1650) == DESCRIPCIONES_PROFORMA["VAR1650"]
+    # Un material que la tabla no conoce sale con su código y su nombre en mayúsculas
+    assert documentos._codigo(nuevo) == "ZZZ_NUEVO"
+    assert documentos._descripcion(nuevo) == "MATERIAL NUEVO"
+
+
+@pytest.mark.parametrize("unidad, esperada", [("unidad", "u"), ("Unidades", "u"), ("kg", "kg"), ("m²", "m²")])
+def test_la_unidad_sale_del_material(unidad, esperada) -> None:
+    """La columna "Uni" lee la unidad configurada del material; "unidad" se abrevia como en CT519."""
+    material = MaterialCotizado(material=Material(codigo="X", nombre="X", unidad=unidad), cantidad=1)
+    assert documentos._unidad(material) == esperada
+
+
 # ─── Servicio: generar_word ────────────────────────────────────────────
 
 
-def test_word_incluye_encabezado_concepto_potencia_y_cliente(db: Session, datos_oferente) -> None:
-    cotizacion = _cotizacion_con_materiales(db)
+def _texto_word(documento) -> str:
+    """Párrafos, celdas de las tablas y pie de página: el formato nuevo pone casi todo en tablas."""
+    partes = [p.text for p in documento.paragraphs]
+    partes += [c.text for tabla in documento.tables for fila in tabla.rows for c in fila.cells]
+    partes += [p.text for p in documento.sections[0].footer.paragraphs]
+    return "\n".join(partes)
+
+
+def _filas_word(documento) -> list[list[str]]:
+    return [[c.text for c in fila.cells] for tabla in documento.tables for fila in tabla.rows]
+
+
+def test_word_encabezado_recuadros_concepto_y_franja(db: Session, datos_oferente) -> None:
+    cotizacion = _cotizacion_con_materiales(db, total_paneles=80)
 
     documento = Document(io.BytesIO(documentos.generar_word(cotizacion)))
-    texto = "\n".join(p.text for p in documento.paragraphs)
+    texto = _texto_word(documento)
 
+    assert "PROFORMA" in texto
+    assert "No. CT-130-2026" in texto
+    assert "26 de octubre de 2026" in texto
+    assert "DATOS DEL OFERENTE" in texto and "CLIENTE / DIRECCIÓN" in texto
     assert "Empresa de prueba S.A.S." in texto
-    assert "Actividad de prueba" in texto
     assert "RUC: 0000000000001" in texto
-    assert "Dirección de prueba, Ciudad" in texto
-    assert "+593 900000000" in texto and "prueba@example.com" in texto
-    assert "Proforma CT-130-2026" in texto
-    assert "Concepto: Estructura de soporte reusable para la instalación en piso de módulos fotovoltaicos" in texto
-    assert "Potencia: 45,20 kWp" in texto
-    assert "SolarAndes Instalaciones" in texto
-    assert "Planta El Carmen" in texto
+    assert "Teléfono: +593 900000000" in texto and "Correo: prueba@example.com" in texto
+    assert "SolarAndes Instalaciones" in texto and "Proyecto: Planta El Carmen" in texto
+    assert "ESTRUCTURA DE SOPORTE REUSABLE PARA LA INSTALACIÓN EN PISO DE MÓDULOS FOTOVOLTAICOS" in texto
+    # 45,20 kWp ÷ 80 paneles = 565 Wp cada uno
+    assert "PANEL: 565 Wp" in texto
+    assert ["POTENCIA", "N. PANELES", "PLAZO", "GARANTÍA"] in _filas_word(documento)
+    assert ["45,20 KWp", "80 u", "20 días", "10 años"] in _filas_word(documento)
+    assert "Dirección de prueba, Ciudad" in texto and "Producto fabricado en Ecuador" in texto
 
 
-def test_word_materiales_en_orden_con_moneda_ecuador(db: Session, datos_oferente) -> None:
+def test_word_materiales_en_orden_con_codigos_y_descripciones(db: Session, datos_oferente) -> None:
     cotizacion = _cotizacion_con_materiales(db)
 
+    filas = _filas_word(Document(io.BytesIO(documentos.generar_word(cotizacion))))
+
+    assert ["Código", "Cantidad", "Uni", "Descripción", "P. Unit.", "Total"] in filas
+    indice_var = next(i for i, f in enumerate(filas) if f and f[0] == "VARL1")
+    indice_hex = next(i for i, f in enumerate(filas) if f and f[0] == "HEX1_B")
+    assert indice_var < indice_hex, "VARL1 debe listarse antes que HEX1_B, como en la proforma real"
+    assert ["VARL1", "120,00", "u", DESCRIPCIONES_PROFORMA["VAR1650"], "$ 2,50", "$ 300,00"] in filas
+    assert ["HEX1_B", "400,00", "u", DESCRIPCIONES_PROFORMA["HEX_V18MM"], "$ 0,35", "$ 140,00"] in filas
+
+
+def test_word_resumen_notas_pagos_y_vigencia(db: Session, datos_oferente) -> None:
+    cotizacion = _cotizacion_con_materiales(db, precio_wp=Decimal("0.0380"))
+
     documento = Document(io.BytesIO(documentos.generar_word(cotizacion)))
-    filas = [[c.text for c in fila.cells] for tabla in documento.tables for fila in tabla.rows]
+    texto = _texto_word(documento)
+    filas = _filas_word(documento)
 
-    assert ["Código", "Material", "Cantidad", "Precio unitario", "Subtotal"] in filas
-    indice_var = next(i for i, f in enumerate(filas) if f and f[0] == "VAR1650")
-    indice_hex = next(i for i, f in enumerate(filas) if f and f[0] == "HEX_V18MM")
-    assert indice_var < indice_hex, "VAR1650 debe listarse antes que HEX_V18MM, como en la proforma real"
-    assert ["VAR1650", "Varilla 1650 (u)", "120", "$ 2,50", "$ 300,00"] in filas
-    assert ["HEX_V18MM", "Perfil HEX 18mm (u)", "400", "$ 0,35", "$ 140,00"] in filas
+    assert "SUBTOTAL: $ 440,00" in texto
+    assert "IVA 15%: $ 66,00" in texto
+    assert "TOTAL: $ 506,00" in texto
+    assert "PRECIO: $ 0,0380 USD/Wp" in texto
 
-
-def test_word_totales_notas_condiciones_y_pagos(db: Session, datos_oferente) -> None:
-    cotizacion = _cotizacion_con_materiales(db)
-
-    documento = Document(io.BytesIO(documentos.generar_word(cotizacion)))
-    texto = "\n".join(p.text for p in documento.paragraphs)
-    filas = [[c.text for c in fila.cells] for tabla in documento.tables for fila in tabla.rows]
-
-    assert "Subtotal: $ 440,00" in texto
-    assert "IVA (15%): $ 66,00" in texto
-    assert "Total: $ 506,00" in texto
-
-    # Notas fijas + configuración del ítem debajo de la primera
+    # Notas de la configuración, con la distribución de bloques debajo de la primera
     assert "Las cantidades se calcularon en base al diseño de bloques configurados por el cliente." in texto
-    assert "L=4 A=28 BLOQUES=12" in texto
+    assert "- Distribución: L=4 PANELES; A=28 PANELES; 12 BLOQUES." in texto
     assert "Las estructuras se entregarán en bodegas de HEXtructure S.A.S. – Ibarra." in texto
 
-    assert "Plazo de entrega: 20 días." in texto
-    assert "Validez de la oferta: 90 días." in texto
-    assert "Garantía: 10 años." in texto
+    assert "FORMA DE PAGO: [30%] ANTICIPO - [40%] ENTREGA - [30%] A 60 DÍAS DE LA ENTREGA" in texto
+    # Sobre el subtotal (sin IVA), no el total: "FORMA DE PAGO Y VALORES SIN IVA"
+    assert ["Porcentaje", "Etapa", "Valor"] in filas
+    assert ["30%", "Anticipo", "$ 132,00"] in filas
+    assert ["40%", "Entrega", "$ 176,00"] in filas
+    assert ["30%", "A 60 días de la entrega", "$ 132,00"] in filas
+    assert ["Total", "Total sin I.V.A.", "$ 440,00"] in filas
 
-    # Sobre el subtotal (sin IVA), no el total — "FORMA DE PAGO Y VALORES SIN IVA".
-    assert ["Tramo", "Porcentaje", "Monto"] in filas
-    assert ["Anticipo", "30%", "$ 132,00"] in filas
-    assert ["Entrega", "40%", "$ 176,00"] in filas
-    assert ["A 60 días de la entrega", "30%", "$ 132,00"] in filas
-
+    assert "VIGENCIA DE LA OFERTA: 90 DÍAS." in texto
     assert "Banco: Banco de Prueba" in texto
     assert "Número de cuenta: 0000000000" in texto
-    assert "Representante de Prueba" in texto
-    assert "Representante legal" in texto
+    assert "Representante de Prueba" in texto and "REPRESENTANTE LEGAL" in texto
 
-    # Fila final de la tabla de pagos, como en CT519 y CT521A.
-    assert ["Total sin IVA", "", "$ 440,00"] in filas
+
+def test_word_figura_de_elementos_y_distribucion(db: Session, datos_oferente) -> None:
+    cotizacion = _cotizacion_con_materiales(db)
+
+    documento = Document(io.BytesIO(documentos.generar_word(cotizacion)))
+
+    # El logo y la figura referencial
+    assert len(documento.inline_shapes) == 2
+    assert "FIG. REFERENCIAL ELEMENTOS" in _texto_word(documento)
+    assert "L=4 ; A=28 : 12 BLOQUES" in _texto_word(documento)
+
+
+def test_word_vigencia_con_la_nota_configurada(db: Session, datos_oferente, monkeypatch) -> None:
+    monkeypatch.setattr(settings, "PROFORMA_NOTA_VIGENCIA", "Precios sujetos al costo del acero")
+    cotizacion = _cotizacion_con_materiales(db)
+
+    texto = _texto_word(Document(io.BytesIO(documentos.generar_word(cotizacion))))
+
+    assert "VIGENCIA DE LA OFERTA: 90 DÍAS - Precios sujetos al costo del acero" in texto
 
 
 def test_word_sin_tramos_propios_usa_los_de_la_configuracion(db: Session, datos_oferente) -> None:
     """Una cotización de antes de SQ-213 no tiene tramos_pago_cotizacion: la tabla no debe salir vacía."""
     cotizacion = _cotizacion_con_materiales(db, pagos=[])
 
-    documento = Document(io.BytesIO(documentos.generar_word(cotizacion)))
-    filas = [[c.text for c in fila.cells] for tabla in documento.tables for fila in tabla.rows]
+    filas = _filas_word(Document(io.BytesIO(documentos.generar_word(cotizacion))))
 
-    assert ["Anticipo", "30%", "$ 132,00"] in filas
-    assert ["Entrega", "40%", "$ 176,00"] in filas
-    assert ["A 60 días de la entrega", "30%", "$ 132,00"] in filas
-    assert ["Total sin IVA", "", "$ 440,00"] in filas
+    assert ["30%", "Anticipo", "$ 132,00"] in filas
+    assert ["40%", "Entrega", "$ 176,00"] in filas
+    assert ["30%", "A 60 días de la entrega", "$ 132,00"] in filas
+    assert ["Total", "Total sin I.V.A.", "$ 440,00"] in filas
 
 
 def test_word_sin_datos_del_oferente_no_falla_y_omite_las_secciones(db: Session, sin_datos_oferente) -> None:
     """Como en CI: nada configurado todavía. El documento se genera igual, sin esas líneas."""
     cotizacion = _cotizacion_con_materiales(db)
 
-    documento = Document(io.BytesIO(documentos.generar_word(cotizacion)))
-    texto = "\n".join(p.text for p in documento.paragraphs)
+    texto = _texto_word(Document(io.BytesIO(documentos.generar_word(cotizacion))))
 
     assert "RUC:" not in texto
     assert "Banco" not in texto
-    # Sin representante, tampoco hay bloque de firma
-    assert "Representante legal" not in texto
-    # El resto del documento se genera de todas formas
-    assert "Proforma CT-130-2026" in texto
-    assert "Total: $ 506,00" in texto
+    # Sin representante, tampoco hay firma
+    assert "Atentamente" not in texto
+    assert "No. CT-130-2026" in texto
+    assert "TOTAL: $ 506,00" in texto
 
 
 def test_word_sin_proforma_ni_datos_opcionales_del_cliente_no_falla(db: Session, sin_datos_oferente) -> None:
@@ -337,30 +396,37 @@ def test_word_sin_proforma_ni_datos_opcionales_del_cliente_no_falla(db: Session,
         db, numero_proforma=None, cliente_email=None, cliente_telefono=None, proyecto_nombre=None
     )
 
-    documento = Document(io.BytesIO(documentos.generar_word(cotizacion)))
-    texto = "\n".join(p.text for p in documento.paragraphs)
+    texto = _texto_word(Document(io.BytesIO(documentos.generar_word(cotizacion))))
 
     assert "Proforma (borrador)" in texto
-    assert "Proyecto" not in texto
+    assert "Proyecto:" not in texto
 
 
-def test_word_sin_potencia_kwp_no_la_muestra(db: Session, sin_datos_oferente) -> None:
+def test_word_cero_paneles_o_cero_potencia_se_muestran_como_cero(db: Session, sin_datos_oferente) -> None:
+    """Cero es un valor, no "sin configurar": la franja muestra 0 y no "—"."""
+    cotizacion = _cotizacion_con_materiales(db, potencia_kwp=Decimal("0"), total_paneles=0)
+
+    filas = _filas_word(Document(io.BytesIO(documentos.generar_word(cotizacion))))
+
+    assert ["0,00 KWp", "0 u", "20 días", "10 años"] in filas
+
+
+def test_word_sin_potencia_ni_paneles_deja_la_franja_con_guion(db: Session, sin_datos_oferente) -> None:
     cotizacion = _cotizacion_con_materiales(db, potencia_kwp=None)
 
     documento = Document(io.BytesIO(documentos.generar_word(cotizacion)))
-    texto = "\n".join(p.text for p in documento.paragraphs)
 
-    assert "Potencia" not in texto
+    assert ["—", "—", "20 días", "10 años"] in _filas_word(documento)
+    assert "PANEL:" not in _texto_word(documento)
 
 
 # ─── Servicio: generar_excel (editable, con fórmulas) ─────────────────
 
 
-def _fila_con_etiqueta(hoja, etiqueta: str, columna: str = "D") -> int:
-    for fila in hoja.iter_rows():
-        for celda in fila:
-            if celda.coordinate.startswith(columna) and celda.value == etiqueta:
-                return celda.row
+def _fila_con_etiqueta(hoja, etiqueta: str, columna: str) -> int:
+    for celda in hoja[columna]:
+        if celda.value == etiqueta:
+            return celda.row
     raise AssertionError(f"No se encontró la etiqueta {etiqueta!r} en la columna {columna}")
 
 
@@ -368,114 +434,129 @@ def test_excel_subtotales_y_totales_son_formulas(db: Session, datos_oferente) ->
     """Si Santiago cambia una cantidad, todo lo demás debe recalcularse solo."""
     cotizacion = _cotizacion_con_materiales(db)
 
-    libro = load_workbook(io.BytesIO(documentos.generar_excel(cotizacion)), data_only=False)
-    hoja = libro.active
+    hoja = load_workbook(io.BytesIO(documentos.generar_excel(cotizacion)), data_only=False).active
 
-    # Cada material: cantidad × precio, no el valor ya calculado.
-    fila_hex, fila_var = (
-        next(f.row for f in hoja["A"] if f.value == "HEX_V18MM"),
-        next(f.row for f in hoja["A"] if f.value == "VAR1650"),
-    )
-    assert hoja[f"E{fila_hex}"].value == f"=C{fila_hex}*D{fila_hex}"
-    assert hoja[f"E{fila_var}"].value == f"=C{fila_var}*D{fila_var}"
+    # Cada material: cantidad × precio, no el valor ya calculado
+    fila_var = _fila_con_etiqueta(hoja, "VARL1", "A")
+    fila_hex = _fila_con_etiqueta(hoja, "HEX1_B", "A")
+    assert fila_var < fila_hex
+    assert hoja[f"G{fila_var}"].value == f"=B{fila_var}*F{fila_var}"
+    assert hoja[f"G{fila_hex}"].value == f"=B{fila_hex}*F{fila_hex}"
 
-    fila_subtotal = _fila_con_etiqueta(hoja, "Subtotal")
-    assert hoja[f"E{fila_subtotal}"].value == f"=SUM(E{min(fila_hex, fila_var)}:E{max(fila_hex, fila_var)})"
+    fila_subtotal = _fila_con_etiqueta(hoja, "SUBTOTAL", "F")
+    assert hoja[f"G{fila_subtotal}"].value == f"=SUM(G{fila_var}:G{fila_hex})"
 
-    fila_iva = _fila_con_etiqueta(hoja, "IVA (15%)")
-    assert hoja[f"E{fila_iva}"].value == f"=E{fila_subtotal}*15.00/100"
+    fila_iva = _fila_con_etiqueta(hoja, "IVA 15%", "F")
+    assert hoja[f"G{fila_iva}"].value == f"=G{fila_subtotal}*15.00/100"
 
-    fila_total = _fila_con_etiqueta(hoja, "Total")
-    assert hoja[f"E{fila_total}"].value == f"=E{fila_subtotal}+E{fila_iva}"
+    fila_total = _fila_con_etiqueta(hoja, "TOTAL", "F")
+    assert hoja[f"G{fila_total}"].value == f"=G{fila_subtotal}+G{fila_iva}"
 
-    # Sobre el subtotal (sin IVA), no el total — "FORMA DE PAGO Y VALORES SIN IVA".
-    for etiqueta, pct in [("Anticipo", "30.00"), ("Entrega", "40.00"), ("A 60 días de la entrega", "30.00")]:
-        fila_pago = _fila_con_etiqueta(hoja, etiqueta, columna="A")
-        assert hoja[f"C{fila_pago}"].value == f"=E{fila_subtotal}*{pct}/100", etiqueta
+    # Sobre el subtotal (sin IVA), no el total
+    for etapa, pct in [("Anticipo", "30.00"), ("Entrega", "40.00"), ("A 60 días de la entrega", "30.00")]:
+        fila_pago = _fila_con_etiqueta(hoja, etapa, "B")
+        assert hoja[f"D{fila_pago}"].value == f"=G{fila_subtotal}*{pct}/100", etapa
 
 
 def test_excel_precio_por_wp_es_formula_sobre_el_subtotal(db: Session, datos_oferente) -> None:
     """Si Santiago cambia una cantidad, el precio por Wp debe cambiar con ella."""
     cotizacion = _cotizacion_con_materiales(db, precio_wp=Decimal("0.0380"))
 
-    libro = load_workbook(io.BytesIO(documentos.generar_excel(cotizacion)), data_only=False)
-    hoja = libro.active
+    hoja = load_workbook(io.BytesIO(documentos.generar_excel(cotizacion)), data_only=False).active
 
-    fila_precio_wp = _fila_con_etiqueta(hoja, "Precio por Wp:", columna="A")
-    fila_subtotal = _fila_con_etiqueta(hoja, "Subtotal")
+    fila_precio = _fila_con_etiqueta(hoja, "PRECIO USD/Wp:", "F")
+    fila_subtotal = _fila_con_etiqueta(hoja, "SUBTOTAL", "F")
     # potencia_kwp = 45.20 (valor por defecto de la fábrica de prueba) × 1000
-    assert hoja[f"B{fila_precio_wp}"].value == f"=E{fila_subtotal}/45200.00"
+    assert hoja[f"G{fila_precio}"].value == f"=G{fila_subtotal}/45200.00"
 
 
 def test_excel_sin_potencia_no_rompe_el_precio_por_wp(db: Session, datos_oferente) -> None:
     """No debería pasar en la práctica (precio_wp sale de dividir por la potencia), pero no debe romper el documento."""
     cotizacion = _cotizacion_con_materiales(db, precio_wp=Decimal("0.0380"), potencia_kwp=None)
 
-    libro = load_workbook(io.BytesIO(documentos.generar_excel(cotizacion)))
-    fila_precio_wp = _fila_con_etiqueta(libro.active, "Precio por Wp:", columna="A")
+    hoja = load_workbook(io.BytesIO(documentos.generar_excel(cotizacion))).active
+    fila_precio = _fila_con_etiqueta(hoja, "PRECIO USD/Wp:", "F")
 
-    assert libro.active[f"B{fila_precio_wp}"].value is None
+    assert hoja[f"G{fila_precio}"].value is None
 
 
 def test_excel_total_sin_iva_suma_los_tramos_de_pago(db: Session, datos_oferente) -> None:
     """Fila final de la tabla de pagos, como en CT519 y CT521A: suma de los tramos, también en fórmula."""
     cotizacion = _cotizacion_con_materiales(db)
 
-    libro = load_workbook(io.BytesIO(documentos.generar_excel(cotizacion)), data_only=False)
-    hoja = libro.active
+    hoja = load_workbook(io.BytesIO(documentos.generar_excel(cotizacion)), data_only=False).active
 
-    primera_fila_pago = _fila_con_etiqueta(hoja, "Anticipo", columna="A")
-    ultima_fila_pago = _fila_con_etiqueta(hoja, "A 60 días de la entrega", columna="A")
-    fila_total = _fila_con_etiqueta(hoja, "Total sin IVA", columna="A")
+    primera = _fila_con_etiqueta(hoja, "Anticipo", "B")
+    ultima = _fila_con_etiqueta(hoja, "A 60 días de la entrega", "B")
+    fila_total = _fila_con_etiqueta(hoja, "Total sin I.V.A.", "B")
 
-    assert fila_total == ultima_fila_pago + 1
-    assert hoja[f"C{fila_total}"].value == f"=SUM(C{primera_fila_pago}:C{ultima_fila_pago})"
+    assert fila_total == ultima + 1
+    assert hoja[f"D{fila_total}"].value == f"=SUM(D{primera}:D{ultima})"
 
 
 def test_excel_sin_tramos_propios_usa_los_de_la_configuracion(db: Session, datos_oferente) -> None:
     cotizacion = _cotizacion_con_materiales(db, pagos=[])
 
-    libro = load_workbook(io.BytesIO(documentos.generar_excel(cotizacion)), data_only=False)
-    hoja = libro.active
-    fila_subtotal = _fila_con_etiqueta(hoja, "Subtotal")
+    hoja = load_workbook(io.BytesIO(documentos.generar_excel(cotizacion)), data_only=False).active
+    fila_subtotal = _fila_con_etiqueta(hoja, "SUBTOTAL", "F")
 
-    # Los valores de la configuración, sin pasar por la base de datos, no
-    # tienen por qué tener la misma precisión decimal que un tramo guardado
-    # (ver test_excel_subtotales_y_totales_son_formulas): el monto es el
-    # mismo, aunque "30" y "30.00" se vean distinto como texto de fórmula.
-    for etiqueta, pct in [
+    # Los valores de la configuración no tienen por qué tener la misma
+    # precisión que un tramo guardado: "30" y "30.00" dan el mismo monto.
+    for etapa, pct in [
         ("Anticipo", settings.PROFORMA_PAGO_ANTICIPO_PCT),
         ("Entrega", settings.PROFORMA_PAGO_ENTREGA_PCT),
         ("A 60 días de la entrega", settings.PROFORMA_PAGO_60_DIAS_PCT),
     ]:
-        fila_pago = _fila_con_etiqueta(hoja, etiqueta, columna="A")
-        assert hoja[f"C{fila_pago}"].value == f"=E{fila_subtotal}*{pct}/100", etiqueta
+        fila_pago = _fila_con_etiqueta(hoja, etapa, "B")
+        assert hoja[f"D{fila_pago}"].value == f"=G{fila_subtotal}*{pct}/100", etapa
 
 
-def test_excel_incluye_encabezado_materiales_en_orden_y_datos_bancarios(db: Session, datos_oferente) -> None:
+def test_excel_incluye_encabezado_materiales_figura_y_datos_bancarios(db: Session, datos_oferente) -> None:
     cotizacion = _cotizacion_con_materiales(db)
 
-    libro = load_workbook(io.BytesIO(documentos.generar_excel(cotizacion)))
-    filas = [list(fila) for fila in libro.active.iter_rows(values_only=True) if any(v is not None for v in fila)]
+    hoja = load_workbook(io.BytesIO(documentos.generar_excel(cotizacion))).active
+    filas = [list(fila) for fila in hoja.iter_rows(values_only=True) if any(v is not None for v in fila)]
     aplanado = [v for fila in filas for v in fila if isinstance(v, str)]
 
+    assert "No. CT-130-2026" in aplanado
     assert "Empresa de prueba S.A.S." in aplanado
     assert "RUC: 0000000000001" in aplanado
-    assert ["Código", "Material", "Cantidad", "Precio unitario", "Subtotal"] in filas
-
-    indice_var = next(i for i, f in enumerate(filas) if f[0] == "VAR1650")
-    indice_hex = next(i for i, f in enumerate(filas) if f[0] == "HEX_V18MM")
-    assert indice_var < indice_hex
-
+    # La descripción ocupa D:E combinadas: la celda E queda vacía
+    assert ["Código", "Cantidad", "Uni", "Descripción", "P. Unit.", "Total"] in [
+        [v for v in fila if v is not None] for fila in filas
+    ]
+    assert DESCRIPCIONES_PROFORMA["VAR1650"] in aplanado
     assert "Banco" in aplanado and "Banco de Prueba" in aplanado
     assert "Representante de Prueba" in aplanado
+    # El logo y la figura referencial
+    assert len(hoja._images) == 2
+
+
+def test_excel_recuadros_y_franja_simetricos() -> None:
+    """Los recuadros del oferente y del cliente, y las casillas de la franja, miden casi lo mismo, como en el Word."""
+    ancho = lambda desde, hasta: sum(documentos.ANCHOS[c] for c in documentos._rango(desde, hasta))  # noqa: E731
+
+    oferente, cliente = (ancho(*r) for r in documentos.RECUADROS)
+    assert abs(oferente - cliente) <= 0.1 * max(oferente, cliente)
+
+    casillas = [ancho(*c) for c in documentos.CASILLAS_FRANJA]
+    assert max(casillas) - min(casillas) <= 0.3 * max(casillas)
+
+
+def test_excel_descripcion_en_dos_columnas_combinadas(db: Session, datos_oferente) -> None:
+    cotizacion = _cotizacion_con_materiales(db)
+
+    hoja = load_workbook(io.BytesIO(documentos.generar_excel(cotizacion))).active
+    fila_var = _fila_con_etiqueta(hoja, "VARL1", "A")
+
+    assert f"D{fila_var}:E{fila_var}" in {str(r) for r in hoja.merged_cells.ranges}
 
 
 def test_excel_sin_datos_del_oferente_no_falla(db: Session, sin_datos_oferente) -> None:
     cotizacion = _cotizacion_con_materiales(db)
 
-    libro = load_workbook(io.BytesIO(documentos.generar_excel(cotizacion)))
-    aplanado = [v for fila in libro.active.iter_rows(values_only=True) for v in fila if isinstance(v, str)]
+    hoja = load_workbook(io.BytesIO(documentos.generar_excel(cotizacion))).active
+    aplanado = [v for fila in hoja.iter_rows(values_only=True) for v in fila if isinstance(v, str)]
 
     assert not any(v.startswith("RUC:") for v in aplanado)
     assert "Banco" not in aplanado

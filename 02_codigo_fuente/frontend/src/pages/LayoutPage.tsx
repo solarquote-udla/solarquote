@@ -212,11 +212,28 @@ function posicionCentrada(terreno: Punto[], direccion: Direccion): string {
 }
 
 /**
+ * El lado guardado sigue siendo el mismo lado físico del terreno. Se
+ * guarda por su número, y si el terreno se editó en el Paso 1 (por
+ * ejemplo, con un vértice nuevo) ese número puede apuntar a otro lado.
+ * Los bloques se generaron paralelos al lado, así que su giro y la
+ * dirección del lado coinciden módulo 90°: si no coinciden, el lado
+ * cambió.
+ */
+function ladoVigente(l: Layout, terreno: Punto[] | null | undefined): boolean {
+  const lado = l.parametros.lado_bloques;
+  if (lado == null || !terreno || lado >= terreno.length) return false;
+  const [p, q] = [terreno[lado], terreno[(lado + 1) % terreno.length]];
+  const direccion = (Math.atan2(q[0] - p[0], q[1] - p[1]) * 180) / Math.PI;
+  const diferencia = (((direccion - l.angulo_norte) % 90) + 90) % 90;
+  return Math.min(diferencia, 90 - diferencia) < 0.01;
+}
+
+/**
  * Parámetros del formulario. La capacidad deseada parte de la potencia
  * objetivo del Paso 2 si no hay layout o si el layout quedó desactualizado
  * (por ejemplo, porque esa potencia cambió); si no, de la del layout.
  */
-function desdeLayout(l: Layout | null, objetivoKwp: number | null = null): Parametros {
+function desdeLayout(l: Layout | null, objetivoKwp: number | null, terreno: Punto[] | null | undefined): Parametros {
   const objetivo = objetivoKwp == null ? "" : String(objetivoKwp);
   if (!l) return { ...PARAMETROS_DEFECTO, kwp: objetivo };
   const usarObjetivo = l.desactualizado && objetivoKwp != null;
@@ -233,7 +250,8 @@ function desdeLayout(l: Layout | null, objetivoKwp: number | null = null): Param
     aMinimo: String(l.parametros.paneles_ancho_minimo ?? 1),
     sepLargo: String(Math.round((l.parametros.separacion_paneles_largo_m ?? 0) * 1000) / 10),
     sepAncho: String(Math.round((l.parametros.separacion_paneles_ancho_m ?? 0) * 1000) / 10),
-    lado: l.parametros.lado_bloques == null ? "" : String(l.parametros.lado_bloques),
+    // Un lado que ya no es el mismo vuelve al norte (ver ladoVigente)
+    lado: ladoVigente(l, terreno) ? String(l.parametros.lado_bloques) : "",
   };
 }
 
@@ -336,6 +354,9 @@ export function LayoutPage() {
   const ladoMasLargo = ladosTerreno.reduce((mejor, largo, i) => (largo > ladosTerreno[mejor] ? i : mejor), 0);
   const [equipo, setEquipo] = useState<ConfiguracionEquipo | null>(null);
   const [layout, setLayout] = useState<Layout | null>(null);
+  // Lado guardado que, tras editar el terreno, ya no es el mismo lado físico
+  const ladoCambiado =
+    layout !== null && layout.parametros.lado_bloques != null && terreno !== null && !ladoVigente(layout, terreno.vertices);
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
 
@@ -580,7 +601,7 @@ export function LayoutPage() {
         setTerreno(t);
         setEquipo(e);
         setLayout(l);
-        setParametros(desdeLayout(l, e?.potencia_objetivo_kwp ?? null));
+        setParametros(desdeLayout(l, e?.potencia_objetivo_kwp ?? null, t?.vertices));
         if (editarAlCargar.current && l && !l.desactualizado) {
           setBorrador(l.bloques.map((b, i) => ({ clave: i, origen: b.vertices[3], paneles_ancho: b.paneles_ancho, inversor: b.inversor })));
         }
@@ -752,7 +773,7 @@ export function LayoutPage() {
     try {
       const nuevo = await generarLayout(proyectoId, resultado.datos);
       setLayout(nuevo);
-      setParametros(desdeLayout(nuevo, equipo?.potencia_objetivo_kwp ?? null));
+      setParametros(desdeLayout(nuevo, equipo?.potencia_objetivo_kwp ?? null, terreno?.vertices));
     } catch (e) {
       setError(mensajeDeError(e, "No se pudo generar el layout"));
     } finally {
@@ -775,7 +796,9 @@ export function LayoutPage() {
 
   const parametrosCambiados =
     JSON.stringify(aPeticion(parametros, ladosTerreno.length)) !==
-    JSON.stringify(aPeticion(desdeLayout(layout, equipo?.potencia_objetivo_kwp ?? null), ladosTerreno.length));
+    JSON.stringify(
+      aPeticion(desdeLayout(layout, equipo?.potencia_objetivo_kwp ?? null, terreno?.vertices), ladosTerreno.length),
+    );
   const caminoACargar = formCamino !== null && JSON.stringify(formCamino) !== JSON.stringify(formCaminoInicial);
   const caminoDibujado = caminoMapa !== null && caminoMapa.eje.length > 0;
   const sinGuardar = borrador !== null || caminoACargar || caminoDibujado || parametrosCambiados || encabezadoSucio;
@@ -907,6 +930,12 @@ export function LayoutPage() {
                     ))}
                   </select>
                 </Entrada>
+                {ladoCambiado && (
+                  <p role="status" className="mt-1 text-xs text-amber-800">
+                    El terreno cambió y el lado {(layout?.parametros.lado_bloques ?? 0) + 1} ya no es el que se eligió.
+                    Los bloques vuelven al norte; elige de nuevo el lado si quieres alinearlos.
+                  </p>
+                )}
               </div>
             </div>
             {indicadorBloque && (
