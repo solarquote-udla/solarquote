@@ -645,6 +645,7 @@ def test_dos_desactivaciones_simultaneas_no_dejan_sin_gerente(_engine):
     resultado: dict[str, object] = {}
     primera = Sesion(_engine)
     segunda = Sesion(_engine)
+    a_punto_de_bloquear = threading.Event()
     try:
 
         # La primera transacción cuenta (y bloquea) antes de desactivar
@@ -654,6 +655,10 @@ def test_dos_desactivaciones_simultaneas_no_dejan_sin_gerente(_engine):
             try:
                 actor_b = segunda.get(Usuario, ids[1])
                 objetivo_a = segunda.get(Usuario, ids[0])
+                # Señal justo antes de la consulta que debería bloquear: evita que
+                # el assert de abajo dependa de cuánto tarde el hilo en arrancar
+                # (antes era un time.sleep(0.5) fijo, intermitente bajo carga en CI).
+                a_punto_de_bloquear.set()
                 seguridad.actualizar_usuario(segunda, actor_b, objetivo_a, UsuarioActualizar(activo=False))
                 resultado["segunda"] = "desactivó"
             except seguridad.Conflicto as exc:
@@ -663,7 +668,11 @@ def test_dos_desactivaciones_simultaneas_no_dejan_sin_gerente(_engine):
 
         hilo = threading.Thread(target=b_desactiva_a_a)
         hilo.start()
-        time.sleep(0.5)
+        assert a_punto_de_bloquear.wait(timeout=5), "el hilo no llegó a intentar el bloqueo"
+        # A partir de aquí ya no es una carrera contra el reloj: con el FOR
+        # UPDATE de la primera transacción todavía sin commit, el hilo solo
+        # puede seguir bloqueado (no hay nada que lo libere antes de tiempo).
+        time.sleep(0.3)
         assert hilo.is_alive(), "la segunda transacción debía esperar el bloqueo"
 
         objetivo_b = primera.get(Usuario, ids[1])
