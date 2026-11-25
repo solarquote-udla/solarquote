@@ -663,6 +663,8 @@ def test_dos_desactivaciones_simultaneas_no_dejan_sin_gerente(_engine):
                 resultado["segunda"] = "desactivó"
             except seguridad.Conflicto as exc:
                 resultado["segunda"] = exc.mensaje
+            except Exception as exc:  # noqa: BLE001 - diagnóstico si el hilo no se bloqueó
+                resultado["error"] = repr(exc)
             finally:
                 segunda.rollback()
 
@@ -672,8 +674,12 @@ def test_dos_desactivaciones_simultaneas_no_dejan_sin_gerente(_engine):
         # A partir de aquí ya no es una carrera contra el reloj: con el FOR
         # UPDATE de la primera transacción todavía sin commit, el hilo solo
         # puede seguir bloqueado (no hay nada que lo libere antes de tiempo).
+        # Si este assert llega a fallar, no es por llegar tarde a chequear
+        # (eso ya no depende del reloj): es que el hilo ya terminó, sea
+        # porque no se bloqueó o porque murió con una excepción que no es
+        # Conflicto (ver `resultado`, capturado arriba para diagnosticarlo).
         time.sleep(0.3)
-        assert hilo.is_alive(), "la segunda transacción debía esperar el bloqueo"
+        assert hilo.is_alive(), f"la segunda transacción debía esperar el bloqueo: {resultado}"
 
         objetivo_b = primera.get(Usuario, ids[1])
         objetivo_b.activo = False
