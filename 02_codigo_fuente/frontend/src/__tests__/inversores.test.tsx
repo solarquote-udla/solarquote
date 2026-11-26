@@ -11,7 +11,7 @@ import { EquipoPage } from "@/pages/EquipoPage";
 import { LayoutPage } from "@/pages/LayoutPage";
 import * as equipo from "@/services/equipo";
 import * as layout from "@/services/layout";
-import { sugerenciaInversores } from "@/utils/inversores";
+import { analizarInversores, ocupacionTerreno, panelesParaPotencia } from "@/utils/inversores";
 
 import { montar } from "./utilidades";
 
@@ -48,7 +48,7 @@ const CONFIG = (cantidad = 1) => ({
   angulo_montaje: 15,
   inversores: Array.from({ length: cantidad }, () => INVERSOR),
   potencia_objetivo_kwp: null,
-  calculos: { area_panel_m2: 2.58, separacion: null, strings: Array(cantidad).fill(null), sugerencia: null, advertencias: [] },
+  calculos: { area_panel_m2: 2.58, strings: Array(cantidad).fill(null), inversores: null, ocupacion: null, advertencias: [] },
 });
 
 afterEach(() => {
@@ -64,10 +64,10 @@ const tarjeta = (n: number) => screen.getByLabelText(`Inversor ${n}`);
 const camposDe = (n: number) => within(tarjeta(n)).getAllByRole("textbox");
 const escribir = (campo: HTMLElement, valor: string) => fireEvent.change(campo, { target: { value: valor } });
 
-/** Potencia objetivo (va primero, aparte de los inversores) y panel (8 campos), en el orden de la pantalla. */
+/** Potencia objetivo (va primero, aparte de los inversores) y panel (7 campos; el ángulo es fijo), en el orden de la pantalla. */
 function llenarPanel(objetivo = "") {
   const textos = screen.getAllByRole("textbox");
-  [objetivo, "A", "B", "550", "2278", "1134", "52", "43", "15"].forEach((v, i) => escribir(textos[i], v));
+  [objetivo, "A", "B", "550", "2278", "1134", "52", "43"].forEach((v, i) => escribir(textos[i], v));
 }
 
 function llenarInversor(n: number, marca = "Huawei", modelo = "SUN2000", potencia = "160") {
@@ -77,24 +77,51 @@ function llenarInversor(n: number, marca = "Huawei", modelo = "SUN2000", potenci
   escribir(p, potencia);
 }
 
-describe("Sugerencia de inversores", () => {
-  it("coincide con el ejemplo del prototipo y con el backend", () => {
-    // 316 kWp con paneles de 550 Wp: 575 paneles, 2 inversores de ~288
-    expect(sugerenciaInversores(316, 550)).toMatchObject({ paneles: 575, inversores: 2, panelesPorInversor: 288 });
-    expect(sugerenciaInversores(220, 550)).toMatchObject({ paneles: 400, inversores: 1 });
-    expect(sugerenciaInversores(0, 550)).toBeNull();
-    expect(sugerenciaInversores(316, Number.NaN)).toBeNull();
+describe("Análisis de inversores (mismas cuentas que el backend)", () => {
+  const SUN2000_330 = { potenciaKw: 300, vmaxV: 1500, vminV: 500, mppts: 6, stringsPorMppt: 4 };
+
+  it("el caso de Anita: 6 × 300 kW para 1.500 kWp deja reserva, y se sugieren 4", () => {
+    const paneles = panelesParaPotencia(1500, 720);
+    expect(paneles).toBe(2084);
+    const a = analizarInversores(paneles, 720, Array(6).fill(SUN2000_330), 49.6, 41.3);
+    expect(a?.estado).toBe("reserva");
+    expect(a?.relacion).toBeCloseTo(0.834, 3);
+    // 6 MPPT × 4 strings × floor(1500 / 49,6) = 720 paneles por inversor
+    expect(a?.admiteModelo).toBe(720);
+    expect(a?.porPotencia).toBeCloseTo(3.847, 3);
+    expect(a?.sugeridos).toBe(4);
+  });
+
+  it("con pocos inversores los paneles recortan y faltan entradas", () => {
+    const a = analizarInversores(2084, 720, [SUN2000_330], 49.6, 41.3);
+    expect(a?.estado).toBe("recorte");
+    expect(a?.admitidos).toBe(720);
+  });
+
+  it("sin datos eléctricos sugiere solo por potencia; sin paneles no hay análisis", () => {
+    expect(analizarInversores(2084, 720, [{ potenciaKw: 300 }])?.porEntradas).toBeNull();
+    expect(analizarInversores(0, 720, [{ potenciaKw: 300 }])).toBeNull();
+  });
+
+  it("ocupación: 2.084 paneles no caben en 3.536 m²; entran como máximo 1.138", () => {
+    const o = ocupacionTerreno(2084, 2384, 1303, 3536);
+    expect(o?.cabe).toBe(false);
+    expect(o?.areaPanelesM2).toBeCloseTo(6473.64, 2);
+    expect(o?.maximoPaneles).toBe(1138);
   });
 });
 
 describe("Paso 2: varios inversores", () => {
-  it("la sugerencia aparece al escribir la potencia objetivo y 'Usar 2 inversores' agrega uno copiando el anterior", async () => {
+  it("la relación DC/AC aparece al escribir la potencia objetivo y 'Usar 2 inversores' agrega uno copiando el anterior", async () => {
     paso2();
     await screen.findByText("Panel solar");
     llenarPanel("316");
     llenarInversor(1);
 
-    expect(screen.getByText(/Con 575 paneles/)).toBeTruthy();
+    // 316 kWp ÷ 550 Wp = 575 paneles (316,25 kWp) para 160 kW: relación 1,98; se sugieren 2
+    expect(screen.getByText(/Relación DC\/AC: 1,98/)).toBeTruthy();
+    // El terreno de prueba tiene 1 m² útil: avisa que no caben, con la cuenta
+    expect(screen.getByText(/No caben: 575 paneles ocupan 1\.485 m² y el terreno útil tiene 1 m²/)).toBeTruthy();
     fireEvent.click(screen.getByText("Usar 2 inversores"));
 
     const [marca, modelo, potencia] = camposDe(2);
@@ -122,6 +149,9 @@ describe("Paso 2: varios inversores", () => {
     expect(equipo.guardarEquipo).toHaveBeenCalledOnce();
     const [, datos] = vi.mocked(equipo.guardarEquipo).mock.calls[0];
     expect(datos.potencia_objetivo_kwp).toBe(316);
+    // El ángulo no se escribe: es el de las aletas de la estructura
+    expect(datos.angulo_montaje).toBe(7.5);
+    expect(screen.getByLabelText("Ángulo de montaje").textContent).toBe("7,5°");
     expect(datos.inversores.map((i) => [i.marca, i.potencia_kw])).toEqual([
       ["Huawei", 160],
       ["SMA", 100],
@@ -224,6 +254,11 @@ const LAYOUT = (inversores = 2) => ({
   separacion_este_oeste_m: 2, separacion_norte_sur_m: 2, area_util_m2: 10000, area_ocupada_m2: 600, capacidad: null,
   inversores: inversores === 2 ? [inversorLayout(1, 2, 136), inversorLayout(2, 1, 96)] : [inversorLayout(1, 3, 232)],
   inversores_sugeridos: 1, advertencias: [], angulo_norte: 0, lado_menor_m: 1.134, ediciones_manuales: 0,
+  // 134,56 kWp con 2 inversores de 160 kW: relación 0,42, reserva
+  analisis_inversores: {
+    paneles: 232, potencia_dc_kwp: 134.56, potencia_ac_kw: 320, relacion_dc_ac: 0.42, estado: "reserva",
+    relacion_maxima: 1.3, paneles_admitidos: null, sugeridos: 1, cuenta: "", mensajes: [],
+  },
   desactualizado: false, created_at: "2026-10-16T10:00:00Z", updated_at: "2026-10-16T10:00:00Z",
 });
 
@@ -240,7 +275,7 @@ describe("Paso 3: bloques por inversor", () => {
     expect(screen.getByText("Inversor 1 · Huawei SUN2000")).toBeTruthy();
     expect(screen.getByText(/2 bloques · 136 paneles/)).toBeTruthy();
     expect(screen.getByText(/1 bloque · 96 paneles/)).toBeTruthy();
-    // Se sugiere 1 (232 paneles) y hay 2: avisa y enlaza al Paso 2
+    // Relación DC/AC 0,42: los inversores dejan reserva; avisa y enlaza al Paso 2
     expect(screen.getByText("Ajustar en el Paso 2")).toBeTruthy();
   });
 

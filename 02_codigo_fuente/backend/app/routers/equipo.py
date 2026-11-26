@@ -50,14 +50,14 @@ def _proyecto_o_404(db: Session, proyecto_id: int):
 )
 def consultar_equipo(proyecto_id: int, db: Session = Depends(get_db)) -> ConfiguracionEquipoLeer:
     """Configuración de panel e inversor, con los valores calculados."""
-    proyecto = _proyecto_o_404(db, proyecto_id)
+    _proyecto_o_404(db, proyecto_id)
     configuracion = servicio.obtener_configuracion(db, proyecto_id)
     if configuracion is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"El proyecto {proyecto_id} todavía no tiene equipo configurado",
         )
-    return servicio.a_respuesta(configuracion, proyecto)
+    return servicio.a_respuesta(configuracion, db)
 
 
 @router.put(
@@ -75,7 +75,7 @@ def guardar_equipo(
     """
     proyecto = _proyecto_o_404(db, proyecto_id)
     configuracion = servicio.guardar_configuracion(db, proyecto, datos)
-    return servicio.a_respuesta(configuracion, proyecto)
+    return servicio.a_respuesta(configuracion, db)
 
 
 @router.get(

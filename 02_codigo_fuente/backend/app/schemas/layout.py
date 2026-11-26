@@ -8,7 +8,7 @@ from decimal import Decimal
 from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.cotizacion import CondicionesProforma
-from app.schemas.equipo import MAX_INVERSORES
+from app.schemas.equipo import MAX_INVERSORES, AnalisisInversoresLeer
 from app.services.calculo_layout import (
     PANELES_ANCHO_MINIMO_DEFECTO,
     PANELES_LARGO_DEFECTO,
@@ -204,7 +204,12 @@ class LayoutLeer(BaseModel):
 
     capacidad: CapacidadLeer | None
     inversores: list[InversorLayoutLeer]
-    inversores_sugeridos: int = Field(description="Regla de HEXtructure: ~400 paneles por inversor")
+    inversores_sugeridos: int = Field(
+        description="Con el modelo del inversor 1, por potencia (DC/AC hasta 1,3) y por entradas (ver analisis_inversores)"
+    )
+    analisis_inversores: AnalisisInversoresLeer | None = Field(
+        default=None, description="Relación DC/AC, entradas y la cuenta de la sugerencia con los paneles del layout"
+    )
     advertencias: list[str]
 
     # Para que el plano pueda editar bloques con la misma geometría que el backend

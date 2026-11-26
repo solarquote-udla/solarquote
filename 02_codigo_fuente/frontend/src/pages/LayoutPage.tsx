@@ -1377,10 +1377,12 @@ export function LayoutPage() {
                   </li>
                 ))}
               </ul>
-              {layout.inversores.length > 0 && layout.inversores.length !== layout.inversores_sugeridos && (
+              {layout.analisis_inversores && layout.analisis_inversores.estado !== "normal" && (
                 <p className="mt-3 text-xs text-amber-800">
-                  Con {numero(layout.total_paneles, 0)} paneles se sugieren {layout.inversores_sugeridos} inversor
-                  {layout.inversores_sugeridos === 1 ? "" : "es"} (~400 paneles c/u) y hay {layout.inversores.length}.{" "}
+                  Relación DC/AC {numero(layout.analisis_inversores.relacion_dc_ac, 2)} con {numero(layout.total_paneles, 0)} paneles:{" "}
+                  {layout.analisis_inversores.estado === "reserva"
+                    ? "los inversores dejan reserva para ampliaciones."
+                    : `los inversores recortarían la producción; con el modelo del inversor 1 se sugieren ${layout.analisis_inversores.sugeridos}.`}{" "}
                   <Link to={rutaPaso(proyecto.id, 2)} className="font-semibold underline">
                     Ajustar en el Paso 2
                   </Link>
@@ -1553,7 +1555,11 @@ export function LayoutPage() {
                   </ul>
                 )}
                 <dl className="mt-4 space-y-2 border-t border-acero-200 pt-3">
-                  <Fila nombre="Inversores sugeridos (~400 paneles c/u)" valor={layout.inversores_sugeridos} />
+                  <Fila
+                    nombre="Relación DC/AC"
+                    valor={layout.analisis_inversores ? numero(layout.analisis_inversores.relacion_dc_ac, 2) : "—"}
+                  />
+                  <Fila nombre="Inversores sugeridos (modelo del inversor 1)" valor={layout.inversores_sugeridos} />
                 </dl>
               </Tarjeta>
 

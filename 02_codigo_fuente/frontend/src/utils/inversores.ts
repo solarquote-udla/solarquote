@@ -44,32 +44,92 @@ export function colorInversor(indice: number): ColorInversor {
   return PALETA[((indice % PALETA.length) + PALETA.length) % PALETA.length];
 }
 
-/** Igual que PANELES_POR_INVERSOR en backend/app/services/calculo_equipo.py */
-export const PANELES_POR_INVERSOR = 400;
+/** Igual que RELACION_DC_AC_MAXIMA en backend/app/services/calculo_equipo.py */
+export const RELACION_DC_AC_MAXIMA = 1.3;
 
-export interface Sugerencia {
+/** Paneles necesarios para una potencia: kWp × 1000 ÷ Wp, hacia arriba. */
+export function panelesParaPotencia(potenciaKwp: number, potenciaPanelWp: number): number {
+  return Math.ceil((potenciaKwp * 1000) / potenciaPanelWp - 1e-9);
+}
+
+export interface InversorElectrico {
+  potenciaKw: number;
+  vmaxV?: number | null;
+  vminV?: number | null;
+  mppts?: number | null;
+  stringsPorMppt?: number | null;
+}
+
+/** MPPT × strings por MPPT × floor(Vmax ÷ Voc). Null si faltan datos; 0 si el panel no entra en el rango de voltaje. */
+export function panelesQueAdmite(inv: InversorElectrico, voc: number | null, vmp: number | null): number | null {
+  if (!inv.mppts || !inv.stringsPorMppt || !inv.vmaxV || !inv.vminV || !voc || !vmp) return null;
+  const maximo = Math.floor(inv.vmaxV / voc + 1e-9);
+  const minimo = Math.ceil(inv.vminV / vmp - 1e-9);
+  if (maximo < 1 || minimo > maximo) return 0;
+  return inv.mppts * inv.stringsPorMppt * maximo;
+}
+
+export interface Analisis {
   paneles: number;
-  potenciaKwp: number;
-  inversores: number;
-  panelesPorInversor: number;
-  kwpPorInversor: number;
+  potenciaDcKwp: number;
+  potenciaAcKw: number;
+  relacion: number;
+  estado: "reserva" | "normal" | "recorte";
+  admitidos: number | null;
+  sugeridos: number;
+  porPotencia: number;
+  porEntradas: number | null;
+  admiteModelo: number | null;
 }
 
 /**
- * Copia de `sugerencia_inversores` del backend, para que la "Sugerencia
- * automática" responda mientras se escribe. El backend la vuelve a
- * calcular al guardar y la usa para sus advertencias.
+ * Copia de `analizar_inversores` del backend, para que el Paso 2 responda
+ * mientras se escribe. El backend la vuelve a calcular al guardar y la
+ * usa en sus avisos y en el Paso 3.
  */
-export function sugerenciaInversores(potenciaObjetivoKwp: number, potenciaPanelWp: number): Sugerencia | null {
-  if (!(potenciaObjetivoKwp > 0) || !(potenciaPanelWp > 0)) return null;
-  const paneles = Math.ceil((potenciaObjetivoKwp * 1000) / potenciaPanelWp - 1e-9);
-  const inversores = Math.max(Math.ceil(paneles / PANELES_POR_INVERSOR), 1);
-  const panelesPorInversor = Math.ceil(paneles / inversores);
+export function analizarInversores(
+  paneles: number,
+  potenciaPanelWp: number,
+  inversores: InversorElectrico[],
+  voc: number | null = null,
+  vmp: number | null = null,
+  relacionMaxima = RELACION_DC_AC_MAXIMA,
+): Analisis | null {
+  if (!(paneles > 0) || inversores.length === 0 || !(potenciaPanelWp > 0)) return null;
+  const potenciaDcKwp = (paneles * potenciaPanelWp) / 1000;
+  const potenciaAcKw = inversores.reduce((s, i) => s + i.potenciaKw, 0);
+  if (!(potenciaAcKw > 0)) return null;
+  const relacion = potenciaDcKwp / potenciaAcKw;
+  const estado = relacion < 1 - 1e-9 ? "reserva" : relacion > relacionMaxima + 1e-9 ? "recorte" : "normal";
+  const admiten = inversores.map((i) => panelesQueAdmite(i, voc, vmp));
+  const admitidos = admiten.every((a) => a !== null) ? admiten.reduce<number>((s, a) => s + (a ?? 0), 0) : null;
+  const porPotencia = potenciaDcKwp / (inversores[0].potenciaKw * relacionMaxima);
+  const admiteModelo = admiten[0] || null;
+  const porEntradas = admiteModelo ? paneles / admiteModelo : null;
+  const sugeridos = Math.max(Math.ceil(porPotencia - 1e-9), porEntradas ? Math.ceil(porEntradas - 1e-9) : 0, 1);
+  return { paneles, potenciaDcKwp, potenciaAcKw, relacion, estado, admitidos, sugeridos, porPotencia, porEntradas, admiteModelo };
+}
+
+export interface OcupacionTerreno {
+  paneles: number;
+  areaPanelesM2: number;
+  areaTerrenoM2: number;
+  porcentaje: number;
+  cabe: boolean;
+  maximoPaneles: number;
+}
+
+/** Copia de `ocupacion_terreno`: superficie de los paneles frente al área útil del terreno. */
+export function ocupacionTerreno(paneles: number, largoMm: number, anchoMm: number, areaTerrenoM2: number): OcupacionTerreno | null {
+  if (!(paneles > 0) || !(areaTerrenoM2 > 0) || !(largoMm > 0) || !(anchoMm > 0)) return null;
+  const areaPanel = (largoMm / 1000) * (anchoMm / 1000);
+  const areaPanelesM2 = paneles * areaPanel;
   return {
     paneles,
-    potenciaKwp: (paneles * potenciaPanelWp) / 1000,
-    inversores,
-    panelesPorInversor,
-    kwpPorInversor: (panelesPorInversor * potenciaPanelWp) / 1000,
+    areaPanelesM2,
+    areaTerrenoM2,
+    porcentaje: (areaPanelesM2 / areaTerrenoM2) * 100,
+    cabe: areaPanelesM2 <= areaTerrenoM2 + 1e-9,
+    maximoPaneles: Math.floor(areaTerrenoM2 / areaPanel + 1e-9),
   };
 }

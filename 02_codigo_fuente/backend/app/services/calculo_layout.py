@@ -71,11 +71,12 @@ por eso es el que se busca.
 
 Separaciones
 ------------
-Norte-sur: el pasillo. Este-oeste: el mayor entre el pasillo y la sombra
-que proyecta un bloque inclinado (fórmula de RF-02, tomando toda la
-profundidad L como un plano). En Ecuador, con el sol alto, la sombra casi
-nunca supera los 2 m del pasillo, pero se calcula igual para que el
-criterio quede explícito.
+Entre bloques, el pasillo, en las dos direcciones. Hasta el 25 de
+noviembre la separación este-oeste podía crecer con la sombra calculada
+con la latitud; se quitó porque la estructura va a 7,5° y en Ecuador el
+sol pasa alto (nunca superaba el pasillo), el cliente no la usa y el
+cálculo aplicaba la sombra del mediodía en la dirección equivocada. La
+latitud ya no cambia el layout.
 """
 
 import math
@@ -90,7 +91,7 @@ from shapely.geometry import Point, Polygon, box
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union
 
-from app.services.calculo_equipo import limites_string, separacion_entre_filas
+from app.services.calculo_equipo import limites_string
 
 # Bloque compacto (antisísmico): A = 3 · L, en paneles.
 RELACION_OBJETIVO = 3.0
@@ -757,21 +758,11 @@ def generar_layout(
     largo_planta = largo_nominal * math.cos(beta)
 
     # ─── Separaciones ────────────────────────────────────────────
+    # Solo los pasillos: la sombra entre bloques se dejó de calcular
+    # (revisión del 25 de noviembre). Con la estructura a 7,5° y el sol de
+    # Ecuador no cambiaba nada, y el cliente no la usa.
     separacion_ns = parametros.pasillo_m
     separacion_eo = parametros.pasillo_m
-    if latitud is None:
-        advertencias.append(
-            "El proyecto no tiene latitud: la separación este-oeste usa solo el "
-            "pasillo, sin verificar la sombra entre bloques."
-        )
-    else:
-        sombra = separacion_entre_filas(largo_nominal, panel.angulo_montaje, latitud).sombra_m
-        if sombra > separacion_eo:
-            separacion_eo = sombra
-            advertencias.append(
-                f"La sombra entre bloques ({sombra:.2f} m) supera el pasillo: se usa "
-                f"como separación este-oeste."
-            )
 
     # ─── Área útil, rotada con el norte hacia +Y ─────────────────
     poligono_terreno = Polygon(terreno)
