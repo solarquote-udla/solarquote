@@ -95,10 +95,19 @@ class Inversor(BaseModel):
 #: inversores de 400 paneles. Evita listas absurdas por error.
 MAX_INVERSORES = 50
 
+# Los soportes A y V de HEXtructure tienen aletas a 7,5° (ficha técnica
+# Hex001): es el ángulo de la estructura, no un dato que se elija.
+ANGULO_MONTAJE_HEXTRUCTURE = 7.5
+
 
 class ConfiguracionEquipoGuardar(BaseModel):
     panel: Panel
-    angulo_montaje: float = Field(ge=0, le=90, description="Inclinación en grados")
+    angulo_montaje: float = Field(
+        default=ANGULO_MONTAJE_HEXTRUCTURE,
+        ge=0,
+        le=90,
+        description="Inclinación en grados: 7,5°, el ángulo de las aletas de los soportes A y V (ficha Hex001)",
+    )
     inversores: list[Inversor] = Field(
         min_length=1,
         max_length=MAX_INVERSORES,
@@ -115,21 +124,6 @@ class ConfiguracionEquipoGuardar(BaseModel):
 # ─── Resultados calculados ──────────────────────────────────────────
 
 
-class SeparacionFilas(BaseModel):
-    """Para un panel en posición vertical. Longitudes en metros."""
-
-    elevacion_solar_grados: float = Field(
-        description="Altura del sol al mediodía del peor día del año en la latitud del proyecto",
-    )
-    altura_m: float
-    proyeccion_m: float = Field(description="Lo que ocupa la fila en planta")
-    sombra_m: float = Field(description="Hueco libre mínimo hasta la fila siguiente")
-    paso_minimo_m: float = Field(description="De borde frontal a borde frontal")
-    factor_sombra: float = Field(
-        description="Sombra por metro de profundidad de fila; RF-03 lo escala por paneles en profundidad",
-    )
-
-
 class LimitesStringLeer(BaseModel):
     paneles_min: int
     paneles_max: int
@@ -137,28 +131,47 @@ class LimitesStringLeer(BaseModel):
     motivo: str | None
 
 
-class SugerenciaLeer(BaseModel):
-    """La "Sugerencia automática" del prototipo, a partir de la potencia objetivo."""
+class AnalisisInversoresLeer(BaseModel):
+    """Relación DC/AC, entradas y sugerencia de inversores (referencia: nunca bloquea)."""
 
     paneles: int
-    potencia_kwp: float
-    inversores: int
-    paneles_por_inversor: int
-    kwp_por_inversor: float
+    potencia_dc_kwp: float
+    potencia_ac_kw: float
+    relacion_dc_ac: float = Field(description="kWp de paneles ÷ kW de inversores")
+    estado: str = Field(description="reserva (DC/AC < 1), normal o recorte (DC/AC > relacion_maxima)")
+    relacion_maxima: float
+    paneles_admitidos: int | None = Field(
+        description="MPPT × strings por MPPT × paneles por string, sumado; null si faltan datos de algún inversor"
+    )
+    sugeridos: int = Field(description="Con el modelo del inversor 1: el mayor entre la cuenta por potencia y por entradas")
+    cuenta: str = Field(description="La cuenta de la sugerencia, para mostrarla")
+    mensajes: list[str]
+
+
+class OcupacionLeer(BaseModel):
+    """Si los paneles de la potencia objetivo caben en el terreno."""
+
+    paneles: int
+    area_paneles_m2: float
+    area_terreno_m2: float = Field(description="Área útil: terreno menos caminos")
+    porcentaje: float
+    cabe: bool
+    maximo_paneles: int = Field(description="Paneles que entran pegados, sin pasillos: cota superior")
+    mensaje: str | None
 
 
 class CalculosEquipo(BaseModel):
     """
     Derivados de la configuración. No se guardan: se recalculan en cada
-    lectura, así un cambio en la latitud del proyecto se refleja solo.
+    lectura, así un cambio en el terreno se refleja solo.
     """
 
     area_panel_m2: float
-    separacion: SeparacionFilas | None
     strings: list[LimitesStringLeer | None] = Field(
         description="Límites de string de cada inversor, en el mismo orden; null si le faltan los voltajes",
     )
-    sugerencia: SugerenciaLeer | None = Field(description="Null si no hay potencia objetivo")
+    inversores: AnalisisInversoresLeer | None = Field(description="Null si no hay potencia objetivo")
+    ocupacion: OcupacionLeer | None = Field(description="Null si no hay potencia objetivo o terreno")
     advertencias: list[str]
 
 

@@ -116,3 +116,53 @@ describe("Descarga de la proforma (RF-07)", () => {
     expect(screen.getByText("Planta El Carmen")).toBeTruthy();
   });
 });
+
+describe('Botón "Enviar cotización" (idea de Anita, 25 de noviembre)', () => {
+  it("el enlace de correo lleva el destinatario y el asunto con el número de proforma", async () => {
+    montar(<CotizacionDetallePage />, "/cotizaciones/7", ["/cotizaciones/:cotizacionId"]);
+    await screen.findByText("SolarAndes Instalaciones");
+
+    const enlace = screen.getByText("Enviar por correo") as HTMLAnchorElement;
+    expect(enlace.href).toMatch(/^mailto:proyectos@solarandes\.ec\?/);
+    expect(decodeURIComponent(enlace.href)).toContain("subject=Cotización CT-130-2026 - HEXtructure");
+  });
+
+  it("el enlace de WhatsApp antepone el código de país al celular ecuatoriano", async () => {
+    montar(<CotizacionDetallePage />, "/cotizaciones/7", ["/cotizaciones/:cotizacionId"]);
+    await screen.findByText("SolarAndes Instalaciones");
+
+    const enlace = screen.getByText("Enviar por WhatsApp") as HTMLAnchorElement;
+    expect(enlace.href).toMatch(/^https:\/\/wa\.me\/593991234567\?text=/);
+  });
+
+  it("sin correo ni teléfono del cliente, los enlaces quedan deshabilitados", async () => {
+    obtenerCotizacion.mockResolvedValueOnce({
+      id: 8,
+      numero_proforma: null,
+      estado: "cotizada",
+      cliente_id: null,
+      cliente_nombre: "Cliente sin contacto",
+      cliente_email: null,
+      cliente_telefono: null,
+      proyecto_id: null,
+      proyecto_nombre: null,
+      subtotal: null,
+      iva_porcentaje: null,
+      iva_monto: null,
+      total: null,
+      created_at: "2026-10-26T15:00:00Z",
+      updated_at: "2026-10-26T15:00:00Z",
+      items: [],
+      materiales: [],
+    } as never);
+    montar(<CotizacionDetallePage />, "/cotizaciones/8", ["/cotizaciones/:cotizacionId"]);
+    await screen.findByText("Cliente sin contacto");
+
+    const correo = screen.getByText("Enviar por correo") as HTMLAnchorElement;
+    const whatsapp = screen.getByText("Enviar por WhatsApp") as HTMLAnchorElement;
+    expect(correo.getAttribute("href")).toBeNull();
+    expect(whatsapp.getAttribute("href")).toBeNull();
+    expect(correo.getAttribute("aria-disabled")).toBe("true");
+    expect(whatsapp.getAttribute("aria-disabled")).toBe("true");
+  });
+});

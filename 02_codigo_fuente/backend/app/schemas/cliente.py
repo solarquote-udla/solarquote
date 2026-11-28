@@ -24,6 +24,15 @@ def _validar_telefono_o_none(valor: str | None) -> str | None:
     return valor
 
 
+def _validar_telefono_requerido(valor: str) -> str:
+    valor = valor.strip()
+    if not valor:
+        raise ValueError("telefono no puede quedar vacío")
+    if not validar_telefono(valor):
+        raise ValueError(f"'{valor}' no es un teléfono válido")
+    return valor
+
+
 class ClienteLeer(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -41,11 +50,13 @@ class ClienteLeer(BaseModel):
 
 
 class ClienteCrear(BaseModel):
+    # Correo y teléfono son obligatorios desde el pedido de Anita del 25
+    # de noviembre: hacen falta para el botón "Enviar cotización".
     nombre: str = Field(min_length=3, max_length=150)
     tipo_identificacion: TipoIdentificacion
     identificacion: str = Field(min_length=1, max_length=20)
-    email: EmailStr | None = None
-    telefono: str | None = Field(default=None, max_length=30)
+    email: EmailStr
+    telefono: str = Field(min_length=1, max_length=30)
     direccion: str | None = Field(default=None, max_length=255)
 
     @field_validator("nombre", mode="before")
@@ -60,8 +71,8 @@ class ClienteCrear(BaseModel):
 
     @field_validator("telefono")
     @classmethod
-    def _telefono_valido(cls, valor: str | None) -> str | None:
-        return _validar_telefono_o_none(valor)
+    def _telefono_valido(cls, valor: str) -> str:
+        return _validar_telefono_requerido(valor)
 
     @model_validator(mode="after")
     def _identificacion_valida(self) -> "ClienteCrear":

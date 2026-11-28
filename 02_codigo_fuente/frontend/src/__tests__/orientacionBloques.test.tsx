@@ -1,7 +1,8 @@
 /**
- * Orientación de los bloques en el Paso 3 (revisión del 23 de noviembre):
- * norte, o paralelos a un lado del terreno, como en los planos de
- * HEXtructure de terrenos en diagonal.
+ * Orientación de los bloques en el Paso 3 (revisión del 25 de noviembre):
+ * norte, o alineados al terreno (el backend prueba cada lado y se queda
+ * con el que más paneles ubica). La pantalla muestra cuántos entran con
+ * cada una para que se elija la mejor.
  */
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -48,63 +49,51 @@ afterEach(() => {
 const paso3 = () => montar(<LayoutPage />, "/generar/5/layout", ["/generar/:proyectoId/layout"]);
 
 describe("Orientación de los bloques", () => {
-  it("parte en el norte y lista cada lado del terreno con su largo", async () => {
+  it("parte en el norte, tiene solo dos opciones y la envía al generar", async () => {
     paso3();
     const selector = (await screen.findByLabelText("Orientación de los bloques")) as HTMLSelectElement;
-    expect(selector.value).toBe("");
-
-    const opciones = [...selector.options].map((o) => o.textContent);
-    expect(opciones).toEqual([
-      "Norte (filas de norte a sur)",
-      "Paralelo al lado 1 (100 m), el más largo",
-      "Paralelo al lado 2 (60 m)",
-      "Paralelo al lado 3 (100 m)",
-      "Paralelo al lado 4 (60 m)",
-    ]);
+    expect(selector.value).toBe("norte");
+    expect([...selector.options].map((o) => o.textContent)).toEqual(["Norte (filas de norte a sur)", "Alineado al terreno"]);
 
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "Generar layout" })));
-    expect(vi.mocked(layout.generarLayout).mock.calls[0][1]).toMatchObject({ lado_bloques: null });
+    expect(vi.mocked(layout.generarLayout).mock.calls[0][1]).toMatchObject({ orientacion_bloques: "norte" });
   });
 
-  it("envía el lado elegido al generar", async () => {
+  it("envía alineado al terreno si se elige", async () => {
     paso3();
-    fireEvent.change(await screen.findByLabelText("Orientación de los bloques"), { target: { value: "1" } });
+    fireEvent.change(await screen.findByLabelText("Orientación de los bloques"), { target: { value: "terreno" } });
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "Generar layout" })));
 
-    expect(vi.mocked(layout.generarLayout).mock.calls[0][1]).toMatchObject({ lado_bloques: 1 });
+    expect(vi.mocked(layout.generarLayout).mock.calls[0][1]).toMatchObject({ orientacion_bloques: "terreno" });
   });
 });
 
-/** Layout guardado con un lado elegido y el giro con que se generó. */
-const LAYOUT = (lado: number, anguloNorte: number) => ({
+/** Layout guardado con su orientación y los paneles de cada una. */
+const LAYOUT = (orientacion: "norte" | "terreno", porOrientacion: { norte: number; terreno: number } | null) => ({
   proyecto_id: 5,
-  parametros: { paneles_largo: 4, pasillo_m: 2, tolerancia_proporcion: 0.2, capacidad_deseada_kwp: null, paneles_ancho_minimo: 1, lado_bloques: lado },
+  parametros: { paneles_largo: 4, pasillo_m: 2, tolerancia_proporcion: 0.2, capacidad_deseada_kwp: null, paneles_ancho_minimo: 1, orientacion_bloques: orientacion },
   bloques: [],
   tipos: [],
   total_paneles: 0, potencia_kwp: 0, paneles_ancho_ideal: 24, largo_bloque_m: 9.112, ancho_bloque_m: 27.216,
   separacion_este_oeste_m: 2, separacion_norte_sur_m: 2, area_util_m2: 6000, area_ocupada_m2: 0, capacidad: null,
-  inversores: [], inversores_sugeridos: 1, advertencias: [], angulo_norte: anguloNorte, lado_menor_m: 1.134,
-  ediciones_manuales: 0, desactualizado: false, created_at: "2026-11-23T10:00:00Z", updated_at: "2026-11-23T10:00:00Z",
+  inversores: [], inversores_sugeridos: 1, advertencias: [], angulo_norte: 0, lado_menor_m: 1.134,
+  paneles_por_orientacion: porOrientacion,
+  ediciones_manuales: 0, desactualizado: false, created_at: "2026-11-25T10:00:00Z", updated_at: "2026-11-25T10:00:00Z",
 });
 
-describe("Lado guardado", () => {
-  it("si sigue siendo el mismo lado del terreno, se conserva", async () => {
-    // Rectángulo recto: el lado 2 es vertical y los bloques quedaron sin girar
-    vi.mocked(layout.obtenerLayout).mockResolvedValueOnce(LAYOUT(1, 0) as never);
+describe("Layout guardado", () => {
+  it("conserva la orientación con que se generó y muestra cuántos paneles entran con cada una", async () => {
+    vi.mocked(layout.obtenerLayout).mockResolvedValueOnce(LAYOUT("terreno", { norte: 0, terreno: 1680 }) as never);
     paso3();
     const selector = (await screen.findByLabelText("Orientación de los bloques")) as HTMLSelectElement;
-    await waitFor(() => expect(selector.value).toBe("1"));
-    expect(screen.queryByText(/ya no es el que se eligió/)).toBeNull();
+    await waitFor(() => expect(selector.value).toBe("terreno"));
+    expect(screen.getByText(/entran 0 paneles siguiendo el norte y 1\.680 alineados al terreno/)).toBeTruthy();
   });
 
-  it("si el terreno cambió y el número apunta a otro lado, vuelve al norte y avisa", async () => {
-    // Se generó girado 30°, pero el lado 2 del terreno actual no está a 30°
-    vi.mocked(layout.obtenerLayout).mockResolvedValueOnce(LAYOUT(1, 30) as never);
+  it("un layout de antes de este cambio no muestra la comparación", async () => {
+    vi.mocked(layout.obtenerLayout).mockResolvedValueOnce(LAYOUT("norte", null) as never);
     paso3();
-    expect(await screen.findByText(/el lado 2 ya no es el que se eligió/)).toBeTruthy();
-    expect((screen.getByLabelText("Orientación de los bloques") as HTMLSelectElement).value).toBe("");
-
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Volver a generar" })));
-    expect(vi.mocked(layout.generarLayout).mock.calls[0][1]).toMatchObject({ lado_bloques: null });
+    await screen.findByLabelText("Orientación de los bloques");
+    expect(screen.queryByText(/alineados al terreno\./)).toBeNull();
   });
 });

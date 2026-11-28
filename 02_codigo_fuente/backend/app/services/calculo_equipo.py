@@ -2,26 +2,31 @@
 Cálculos de la configuración de equipo — RF-02.
 
 Funciones puras, sin base de datos, para poder probarlas con números
-verificables a mano. Implementan lo que el documento de titulación pide
-en el proceso de RF-02:
+verificables a mano:
 
-  1. Área física por panel
-  2. Distancia mínima entre filas según el ángulo de montaje
-  3. Límites de paneles por string a partir de panel e inversor
+  1. Área física por panel.
+  2. Límites de paneles por string a partir de panel e inversor.
+  3. Paneles que admite un inversor por sus entradas (MPPT, strings).
+  4. Relación DC/AC y sugerencia de inversores.
+  5. Si la potencia objetivo cabe en el terreno.
 
-  4. Sugerencia de cuántos inversores usar (~400 paneles por inversor),
-     a partir de la potencia objetivo del sistema
+Revisión del 25 de noviembre (Lenin, Santi y Anita): los inversores no
+se cuentan con una regla fija de paneles, sino por su potencia y sus
+entradas; tener más potencia en inversores que en paneles es una reserva
+para ampliaciones, no un error; y los inversores los decide la ingeniería
+del proyecto, así que todo esto es una referencia que nunca bloquea. El
+cálculo del sol y la sombra se quitó: no cambia la estructura y el
+cliente no lo usa.
 """
 
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
 
-# Inclinación del eje terrestre. Fija el punto más bajo que alcanza el
-# sol al mediodía a lo largo del año.
-DECLINACION_MAXIMA = 23.44
-
-# Regla de dimensionamiento de HEXtructure (documento de titulación, RF-02).
-PANELES_POR_INVERSOR = 400
+# Relación DC/AC (kWp de paneles ÷ kW de inversores) desde la que los
+# inversores recortan producción en las horas de más sol. En plantas
+# grandes suele estar entre 1,13 y 1,30 (EIA, 2018) y NREL usa 1,28.
+RELACION_DC_AC_MAXIMA = 1.3
 
 # Tolerancia para evitar que 1100 / 50 = 21.999999… se redondee a 21.
 _EPSILON = 1e-9
@@ -32,82 +37,15 @@ def area_panel_m2(largo_mm: float, ancho_mm: float) -> float:
     return (largo_mm / 1000) * (ancho_mm / 1000)
 
 
-# ─── Separación entre filas ─────────────────────────────────────────
+def numero_es(valor: float, decimales: int = 0) -> str:
+    """Número con formato de Ecuador para los mensajes: 1.234,5."""
+    texto = f"{valor:,.{decimales}f}"
+    return texto.replace(",", "_").replace(".", ",").replace("_", ".")
 
 
-def elevacion_solar_minima(latitud: float) -> float:
-    """
-    Altura del sol al mediodía solar en el día más desfavorable del año.
-
-    Al mediodía la elevación es 90° − |φ − δ|. El peor caso se da en el
-    solsticio del hemisferio opuesto, cuando la declinación δ se aleja
-    todo lo posible de la latitud φ: 90° − (|φ| + 23,44°).
-
-    En Ecuador (φ entre −5° y +1,5°) resulta entre 61,5° y 66,5°: el sol
-    siempre pasa alto, y por eso las sombras entre filas son cortas.
-    """
-    return 90.0 - (abs(latitud) + DECLINACION_MAXIMA)
-
-
-@dataclass(frozen=True)
-class Separacion:
-    """
-    Geometría de una fila inclinada y la sombra que proyecta.
-
-    Todas las longitudes en metros, para un panel en posición vertical
-    (lado largo en dirección de la pendiente). RF-03 escala el resultado
-    por la cantidad de paneles que la fila tenga en profundidad, usando
-    `factor_sombra`.
-    """
-
-    elevacion_solar_grados: float
-    altura_m: float
-    proyeccion_m: float
-    sombra_m: float
-    paso_minimo_m: float
-    factor_sombra: float
-
-
-def separacion_entre_filas(
-    profundidad_m: float,
-    angulo_montaje: float,
-    latitud: float,
-) -> Separacion:
-    """
-    Distancia mínima para que una fila no sombree a la siguiente.
-
-    Para un panel de profundidad D inclinado un ángulo β, con el sol a
-    una elevación α:
-
-        altura      h = D · sen β
-        proyección  p = D · cos β       (lo que ocupa en planta)
-        sombra      s = h / tan α       (hueco libre hasta la otra fila)
-        paso        p + s               (de borde frontal a borde frontal)
-
-    Se evalúa al mediodía del peor día del año. Es el criterio más
-    común, pero no protege de las sombras de primera y última hora,
-    cuando el sol está bajo. Aceptarlo o ampliar la separación es una
-    decisión de diseño de cada proyecto.
-    """
-    alfa = elevacion_solar_minima(latitud)
-    beta = math.radians(angulo_montaje)
-    tan_alfa = math.tan(math.radians(alfa))
-
-    altura = profundidad_m * math.sin(beta)
-    proyeccion = profundidad_m * math.cos(beta)
-    sombra = altura / tan_alfa
-
-    return Separacion(
-        elevacion_solar_grados=alfa,
-        altura_m=altura,
-        proyeccion_m=proyeccion,
-        sombra_m=sombra,
-        paso_minimo_m=proyeccion + sombra,
-        # Sombra por metro de profundidad de la fila. Como todo es lineal
-        # en D, RF-03 obtiene la sombra de una fila de n paneles con
-        # n · D · factor, sin recalcular trigonometría.
-        factor_sombra=math.sin(beta) / tan_alfa,
-    )
+def paneles_para_potencia(potencia_kwp: float, potencia_panel_wp: float) -> int:
+    """Paneles necesarios para una potencia: kWp × 1000 ÷ Wp, hacia arriba."""
+    return math.ceil(potencia_kwp * 1000 / potencia_panel_wp - _EPSILON)
 
 
 # ─── Límites de string ──────────────────────────────────────────────
@@ -138,11 +76,9 @@ def limites_string(
     verá el inversor; el mínimo usa Vmp porque es el voltaje en
     operación, que debe alcanzar el umbral de arranque.
 
-    Limitación conocida: el Voc es el de la ficha, a 25 °C. En frío el
-    Voc sube, y un string en el límite puede superar el Vmax del
-    inversor en una madrugada fría. Se respeta la fórmula aprobada y se
-    advierte en la interfaz; el dimensionamiento eléctrico definitivo
-    corresponde al instalador.
+    El Voc es el de la ficha, a 25 °C. El dimensionamiento eléctrico
+    definitivo lo hace la ingeniería del proyecto (En el Power): aquí
+    sirve para estimar cuántos paneles admite cada inversor.
     """
     maximo = math.floor(vmax_inversor / voc_panel + _EPSILON)
     minimo = math.ceil(vmin_inversor / vmp_panel - _EPSILON)
@@ -178,43 +114,177 @@ def limites_string(
     )
 
 
-def inversores_sugeridos(total_paneles: int) -> int:
-    """
-    Regla de HEXtructure: aproximadamente un inversor cada 400 paneles.
-    """
-    if total_paneles <= 0:
-        return 0
-    return math.ceil(total_paneles / PANELES_POR_INVERSOR)
+# ─── Inversores ─────────────────────────────────────────────────────
 
 
 @dataclass(frozen=True)
-class Sugerencia:
-    """Cuántos inversores usar para la potencia objetivo, repartidos por igual."""
+class InversorElectrico:
+    potencia_kw: float
+    vmax_v: float | None = None
+    vmin_v: float | None = None
+    mppts: int | None = None
+    strings_por_mppt: int | None = None
 
+
+def paneles_que_admite(inversor: InversorElectrico, voc_panel: float | None, vmp_panel: float | None) -> int | None:
+    """
+    Paneles que admite el inversor por sus entradas:
+    MPPT × strings por MPPT × paneles por string (el máximo por voltaje).
+    None si faltan datos del inversor o del panel.
+    """
+    if not (inversor.mppts and inversor.strings_por_mppt and inversor.vmax_v and inversor.vmin_v):
+        return None
+    if not (voc_panel and vmp_panel):
+        return None
+    limites = limites_string(inversor.vmax_v, inversor.vmin_v, voc_panel, vmp_panel)
+    if not limites.compatible:
+        return 0
+    return inversor.mppts * inversor.strings_por_mppt * limites.paneles_max
+
+
+@dataclass(frozen=True)
+class AnalisisInversores:
     paneles: int
-    potencia_kwp: float
-    inversores: int
-    paneles_por_inversor: int
-    kwp_por_inversor: float
+    potencia_dc_kwp: float
+    potencia_ac_kw: float
+    relacion_dc_ac: float
+    # "reserva" (DC/AC < 1), "normal" o "recorte" (DC/AC > relacion_maxima)
+    estado: str
+    relacion_maxima: float
+    # Suma de lo que admiten las entradas; None si a algún inversor le faltan datos
+    paneles_admitidos: int | None
+    # Inversores sugeridos con el modelo del inversor 1, y la cuenta que lo explica
+    sugeridos: int
+    cuenta: str
+    mensajes: list[str]
 
 
-def sugerencia_inversores(potencia_objetivo_kwp: float, potencia_panel_wp: float) -> Sugerencia:
+def analizar_inversores(
+    paneles: int,
+    potencia_panel_wp: float,
+    inversores: Sequence[InversorElectrico],
+    voc_panel: float | None = None,
+    vmp_panel: float | None = None,
+    relacion_maxima: float = RELACION_DC_AC_MAXIMA,
+) -> AnalisisInversores | None:
     """
-    Paneles que hacen falta para la potencia objetivo y cuántos
-    inversores corresponden con la regla de los 400 paneles.
+    Relación DC/AC, entradas y sugerencia de inversores para `paneles`.
 
-    Es la "Sugerencia automática" del Paso 2 del prototipo: 316 kWp con
-    paneles de 550 Wp son 575 paneles y 2 inversores de ~288 paneles. El
-    número final de paneles lo fija el layout (Paso 3), según lo que
-    entre en el terreno.
+    - relación DC/AC = kWp de los paneles ÷ kW de los inversores.
+    - Menor que 1: los inversores dejan reserva para ampliaciones.
+    - Mayor que `relacion_maxima`: en las horas de más sol los inversores
+      recortarían la producción.
+    - Sugeridos (con el modelo del inversor 1): el mayor entre
+      kWp ÷ (kW × relacion_maxima) y paneles ÷ paneles que admite.
     """
-    paneles = math.ceil(potencia_objetivo_kwp * 1000 / potencia_panel_wp - _EPSILON)
-    inversores = max(inversores_sugeridos(paneles), 1)
-    por_inversor = math.ceil(paneles / inversores)
-    return Sugerencia(
+    if paneles <= 0 or not inversores or potencia_panel_wp <= 0:
+        return None
+    potencia_dc = paneles * potencia_panel_wp / 1000
+    potencia_ac = sum(i.potencia_kw for i in inversores)
+    if potencia_ac <= 0:
+        return None
+    relacion = potencia_dc / potencia_ac
+    estado = "reserva" if relacion < 1 - _EPSILON else "recorte" if relacion > relacion_maxima + _EPSILON else "normal"
+
+    admiten = [paneles_que_admite(i, voc_panel, vmp_panel) for i in inversores]
+    admitidos = sum(admiten) if all(a is not None for a in admiten) else None
+
+    modelo = inversores[0]
+    por_potencia = potencia_dc / (modelo.potencia_kw * relacion_maxima)
+    partes = [
+        f"{numero_es(potencia_dc, 1)} kWp ÷ ({numero_es(modelo.potencia_kw, 0)} kW × "
+        f"{numero_es(relacion_maxima, 1)}) = {numero_es(por_potencia, 2)}"
+    ]
+    sugeridos = math.ceil(por_potencia - _EPSILON)
+    admite_modelo = admiten[0]
+    if admite_modelo:
+        por_entradas = paneles / admite_modelo
+        partes.append(
+            f"{numero_es(paneles)} paneles ÷ {numero_es(admite_modelo)} que admite cada uno = "
+            f"{numero_es(por_entradas, 2)}"
+        )
+        sugeridos = max(sugeridos, math.ceil(por_entradas - _EPSILON))
+    sugeridos = max(sugeridos, 1)
+    cuenta = "; ".join(partes) + f". Se toma el mayor, hacia arriba: {sugeridos}."
+
+    mensajes: list[str] = []
+    if estado == "reserva":
+        mensajes.append(
+            f"Los inversores suman {numero_es(potencia_ac)} kW y los paneles {numero_es(potencia_dc, 1)} kWp "
+            f"(relación DC/AC {numero_es(relacion, 2)}): queda reserva para ampliaciones."
+        )
+    elif estado == "recorte":
+        mensajes.append(
+            f"Los paneles ({numero_es(potencia_dc, 1)} kWp) superan a los inversores ({numero_es(potencia_ac)} kW) "
+            f"en un {numero_es((relacion - 1) * 100)} % (relación DC/AC {numero_es(relacion, 2)}; lo habitual es hasta "
+            f"{numero_es(relacion_maxima, 1)}): en las horas de más sol los inversores recortarían la producción. "
+            f"Con el modelo del inversor 1 se sugieren {sugeridos}."
+        )
+    if admitidos is not None and paneles > admitidos:
+        mensajes.append(
+            f"Las entradas de los inversores admiten {numero_es(admitidos)} paneles (MPPT × strings por MPPT × "
+            f"paneles por string) y hay {numero_es(paneles)}: faltan entradas. Con el modelo del inversor 1 se "
+            f"sugieren {sugeridos}."
+        )
+    return AnalisisInversores(
         paneles=paneles,
-        potencia_kwp=paneles * potencia_panel_wp / 1000,
-        inversores=inversores,
-        paneles_por_inversor=por_inversor,
-        kwp_por_inversor=por_inversor * potencia_panel_wp / 1000,
+        potencia_dc_kwp=round(potencia_dc, 2),
+        potencia_ac_kw=round(potencia_ac, 2),
+        relacion_dc_ac=round(relacion, 3),
+        estado=estado,
+        relacion_maxima=relacion_maxima,
+        paneles_admitidos=admitidos,
+        sugeridos=sugeridos,
+        cuenta=cuenta,
+        mensajes=mensajes,
+    )
+
+
+# ─── Potencia objetivo frente al terreno ────────────────────────────
+
+
+@dataclass(frozen=True)
+class Ocupacion:
+    paneles: int
+    area_paneles_m2: float
+    area_terreno_m2: float
+    porcentaje: float
+    cabe: bool
+    # Paneles que entrarían en el terreno pegados, sin pasillos (cota superior)
+    maximo_paneles: int
+    mensaje: str | None
+
+
+def ocupacion_terreno(
+    paneles: int, largo_mm: float, ancho_mm: float, potencia_panel_wp: float, area_terreno_m2: float
+) -> Ocupacion | None:
+    """
+    Si los paneles de la potencia objetivo caben en el terreno.
+
+    Superficie de paneles = paneles × largo × ancho. Si supera el área
+    útil del terreno, no caben ni pegados unos a otros. Si cabe, el
+    número final lo da el Paso 3, porque los pasillos y la forma del
+    terreno reducen lo que entra.
+    """
+    if paneles <= 0 or area_terreno_m2 <= 0:
+        return None
+    area_panel = area_panel_m2(largo_mm, ancho_mm)
+    area_paneles = paneles * area_panel
+    maximo = math.floor(area_terreno_m2 / area_panel + _EPSILON)
+    cabe = area_paneles <= area_terreno_m2 + _EPSILON
+    mensaje = None
+    if not cabe:
+        mensaje = (
+            f"No caben: {numero_es(paneles)} paneles ocupan {numero_es(area_paneles)} m² y el terreno útil tiene "
+            f"{numero_es(area_terreno_m2)} m². Aun sin pasillos, entran como máximo {numero_es(maximo)} paneles "
+            f"({numero_es(maximo * potencia_panel_wp / 1000, 1)} kWp)."
+        )
+    return Ocupacion(
+        paneles=paneles,
+        area_paneles_m2=round(area_paneles, 2),
+        area_terreno_m2=round(area_terreno_m2, 2),
+        porcentaje=round(area_paneles / area_terreno_m2 * 100, 1),
+        cabe=cabe,
+        maximo_paneles=maximo,
+        mensaje=mensaje,
     )

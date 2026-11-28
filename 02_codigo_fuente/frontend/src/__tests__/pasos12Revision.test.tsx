@@ -50,6 +50,8 @@ describe("Paso 1: nuevo cliente sin salir del asistente", () => {
     escribir(within(dialogo).getByLabelText(/^Nombre o razón social/), "Agrícola Imbabura");
     escribir(within(dialogo).getByLabelText(/^Tipo de identificación/), "cedula");
     escribir(within(dialogo).getByLabelText(/^Identificación/), "1710034065");
+    escribir(within(dialogo).getByLabelText(/^Correo/), "agricola@example.com");
+    escribir(within(dialogo).getByLabelText(/^Teléfono/), "0991234567");
     await act(async () => fireEvent.click(within(dialogo).getByText("Registrar cliente")));
 
     expect(clientes.crearCliente).toHaveBeenCalledOnce();
@@ -102,7 +104,6 @@ describe("Paso 2: errores junto al campo", () => {
     escribir(campo(/^Ancho/), "1134");
     escribir(campo(/^Voc/), "52");
     escribir(campo(/^Vmp/), "43");
-    escribir(campo(/^Ángulo de montaje/), "15");
     const inversor = within(screen.getByRole("listitem", { name: "Inversor 1" }));
     escribir(inversor.getByLabelText(/^Marca/), "Huawei");
     escribir(inversor.getByLabelText(/^Modelo/), "SUN2000");
@@ -114,7 +115,6 @@ describe("Paso 2: errores junto al campo", () => {
     await guardar();
     expect(errorDe(campo(/^Marca/))).toBe("Escribe la marca.");
     expect(errorDe(campo(/^Potencia\(Wp\)/))).toBe("Obligatorio.");
-    expect(errorDe(campo(/^Ángulo de montaje/))).toBe("Obligatorio.");
     expect(screen.getByText("Revisa los campos marcados en rojo.")).toBeTruthy();
     expect(equipo.guardarEquipo).not.toHaveBeenCalled();
   });
@@ -122,7 +122,6 @@ describe("Paso 2: errores junto al campo", () => {
   it.each([
     [/^Vmp/, "60", "El Vmp debe ser menor que el Voc. Revisa que no estén intercambiados."],
     [/^Ancho/, "3000", "El ancho no puede ser mayor que el largo: el largo es el lado mayor del panel."],
-    [/^Ángulo de montaje/, "95", "Debe estar entre 0 y 90°."],
     [/^Potencia\(Wp\)/, "-5", "Debe ser mayor que 0 y hasta 1500 Wp."],
     [/^Potencia objetivo/, "0", "Debe ser un número mayor que 0, o dejarse vacío."],
   ])("%s = %j: «%s»", async (etiqueta, valor, mensaje) => {
