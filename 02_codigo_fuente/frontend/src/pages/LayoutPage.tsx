@@ -224,7 +224,8 @@ function desdeLayout(l: Layout | null, objetivoKwp: number | null = null): Param
   return {
     L: String(l.parametros.paneles_largo),
     A: l.parametros.paneles_ancho == null ? "" : String(l.parametros.paneles_ancho),
-    pasillo: String(l.parametros.pasillo_m),
+    // Hasta que exista una pantalla con los dos pasillos, se editan juntos.
+    pasillo: String(l.parametros.pasillo_este_oeste_m),
     tolerancia: String(Math.round(l.parametros.tolerancia_proporcion * 100)),
     kwp: usarObjetivo
       ? objetivo
@@ -281,7 +282,9 @@ function aPeticion(p: Parametros): { datos: LayoutGenerar } | { error: string } 
       paneles_ancho: ancho,
       separacion_paneles_largo_m: (sepLargo as number) / 100,
       separacion_paneles_ancho_m: (sepAncho as number) / 100,
-      pasillo_m: pasillo,
+      // Hasta que exista una pantalla con los dos pasillos, se editan juntos.
+      pasillo_este_oeste_m: pasillo,
+      pasillo_norte_sur_m: pasillo,
       tolerancia_proporcion: tolerancia / 100,
       capacidad_deseada_kwp: kwp,
       paneles_ancho_minimo: aMinimo,

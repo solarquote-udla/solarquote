@@ -62,7 +62,17 @@ def test_el_avance_distingue_terreno_equipo_y_layout(api, db):
     # Mismo estado que antes: por eso el estado no sirve para elegir el paso
     assert avance() == (True, True, False, "en_diseno")
 
-    generado = api.post(f"/api/proyectos/{pid}/layout", headers=h, json={"paneles_largo": 4, "pasillo_m": 2, "tolerancia_proporcion": 0.2, "capacidad_deseada_kwp": None})
+    generado = api.post(
+        f"/api/proyectos/{pid}/layout",
+        headers=h,
+        json={
+            "paneles_largo": 4,
+            "pasillo_este_oeste_m": 2,
+            "pasillo_norte_sur_m": 2,
+            "tolerancia_proporcion": 0.2,
+            "capacidad_deseada_kwp": None,
+        },
+    )
     assert generado.status_code == 200
     assert avance()[:3] == (True, True, True)
 

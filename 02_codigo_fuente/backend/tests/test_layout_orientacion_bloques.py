@@ -86,8 +86,8 @@ def test_envasur_alineado_al_terreno_da_los_seis_bloques_de_la_ct203a():
     El pasillo de 1,5 m es el que deja el plano real.
     """
     parametros = ParametrosLayout(
-        paneles_largo=10, paneles_ancho=28, pasillo_m=1.5, separacion_largo_m=0.06, separacion_ancho_m=0.02,
-        paneles_ancho_minimo=28,
+        paneles_largo=10, paneles_ancho=28, pasillo_este_oeste_m=1.5, pasillo_norte_sur_m=1.5,
+        separacion_largo_m=0.06, separacion_ancho_m=0.02, paneles_ancho_minimo=28,
     )
     r = generar_layout(ENVASUR, [], PANEL_720, parametros, orientacion_norte=0, latitud=-1.05, orientacion_bloques="terreno")
 
@@ -100,7 +100,9 @@ def test_envasur_alineado_al_terreno_da_los_seis_bloques_de_la_ct203a():
 
 
 def test_siguiendo_el_norte_sin_lugar_sugiere_alinear():
-    parametros = ParametrosLayout(paneles_largo=10, paneles_ancho=28, pasillo_m=1.5, paneles_ancho_minimo=28)
+    parametros = ParametrosLayout(
+        paneles_largo=10, paneles_ancho=28, pasillo_este_oeste_m=1.5, pasillo_norte_sur_m=1.5, paneles_ancho_minimo=28,
+    )
     with pytest.raises(LayoutImposible, match="Alineando los bloques con el terreno sí entran"):
         generar_layout(ENVASUR, [], PANEL_720, parametros, orientacion_norte=0, latitud=-1.05)
 
@@ -136,7 +138,7 @@ def test_alineado_avisa_cuanto_se_giro_y_cuanto_entra_al_norte():
 
 def test_a_igualdad_de_paneles_elige_el_giro_mas_cercano_al_norte():
     """En un cuadrado, el norte y su giro de 90° empatan: se queda el norte."""
-    parametros = ParametrosLayout(paneles_largo=4, paneles_ancho=12, pasillo_m=2)
+    parametros = ParametrosLayout(paneles_largo=4, paneles_ancho=12, pasillo_este_oeste_m=2, pasillo_norte_sur_m=2)
     r = generar_layout(rectangulo(60, 60), [], PANEL_PLANO, parametros, orientacion_norte=0, orientacion_bloques="terreno")
     if r.paneles_terreno == r.paneles_norte:
         assert r.angulo_norte == 0
@@ -149,7 +151,14 @@ def test_orientacion_desconocida_se_rechaza():
 
 # ─── API ────────────────────────────────────────────────────────────
 
-PARAMETROS = {"paneles_largo": 4, "pasillo_m": 2, "tolerancia_proporcion": 0.2, "capacidad_deseada_kwp": None, **LAYOUT_CLASICO}
+PARAMETROS = {
+    "paneles_largo": 4,
+    "pasillo_este_oeste_m": 2,
+    "pasillo_norte_sur_m": 2,
+    "tolerancia_proporcion": 0.2,
+    "capacidad_deseada_kwp": None,
+    **LAYOUT_CLASICO,
+}
 
 
 @pytest.fixture

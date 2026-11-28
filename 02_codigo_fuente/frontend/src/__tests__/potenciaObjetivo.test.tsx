@@ -46,7 +46,7 @@ afterEach(() => {
 
 const LAYOUT = (desactualizado: boolean) => ({
   proyecto_id: 5,
-  parametros: { paneles_largo: 4, pasillo_m: 2, tolerancia_proporcion: 0.2, capacidad_deseada_kwp: 626, paneles_ancho_minimo: 1 },
+  parametros: { paneles_largo: 4, pasillo_este_oeste_m: 2, pasillo_norte_sur_m: 2, tolerancia_proporcion: 0.2, capacidad_deseada_kwp: 626, paneles_ancho_minimo: 1 },
   bloques: [],
   tipos: [],
   total_paneles: 0, potencia_kwp: 0, paneles_ancho_ideal: 24, largo_bloque_m: 9.112, ancho_bloque_m: 27.216,

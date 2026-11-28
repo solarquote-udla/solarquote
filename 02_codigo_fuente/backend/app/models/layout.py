@@ -48,7 +48,10 @@ class Layout(Base):
 
     # ─── Parámetros con los que se generó ───────────────────────
     paneles_largo: Mapped[int] = mapped_column(nullable=False)
-    pasillo_m: Mapped[float] = mapped_column(nullable=False)
+    # Pasillo entre franjas (este-oeste) y entre bloques de una misma
+    # franja (norte-sur); no tienen que medir lo mismo (SQ: dos pasillos).
+    pasillo_este_oeste_m: Mapped[float] = mapped_column(nullable=False)
+    pasillo_norte_sur_m: Mapped[float] = mapped_column(nullable=False)
     tolerancia_proporcion: Mapped[float] = mapped_column(nullable=False)
     capacidad_deseada_kwp: Mapped[float | None] = mapped_column(nullable=True)
     # A mínimo de los bloques cortos (SQ-170); 1 = sin mínimo

@@ -52,11 +52,17 @@ class LayoutGenerar(BaseModel):
         le=0.5,
         description="Separación entre paneles a lo ancho (clamp intermedio), en metros",
     )
-    pasillo_m: float = Field(
+    pasillo_este_oeste_m: float = Field(
         default=PASILLO_DEFECTO_M,
         ge=0,
         le=20,
-        description="Separación entre bloques, en metros",
+        description="Separación entre franjas de bloques, en metros",
+    )
+    pasillo_norte_sur_m: float = Field(
+        default=PASILLO_DEFECTO_M,
+        ge=0,
+        le=20,
+        description="Separación entre bloques de una misma franja, en metros",
     )
     tolerancia_proporcion: float = Field(
         default=TOLERANCIA_DEFECTO,

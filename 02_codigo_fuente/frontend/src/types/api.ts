@@ -481,7 +481,10 @@ export type Orientacion = "norte" | "terreno";
 export interface LayoutGenerar {
   /** L: paneles en la dirección de la pendiente. Siempre par. */
   paneles_largo: number;
-  pasillo_m: number;
+  /** Separación entre franjas de bloques, en metros */
+  pasillo_este_oeste_m: number;
+  /** Separación entre bloques de una misma franja, en metros */
+  pasillo_norte_sur_m: number;
   /** 0.2 = ±20 % respecto al bloque compacto A = 3 × L */
   tolerancia_proporcion: number;
   capacidad_deseada_kwp: number | null;
