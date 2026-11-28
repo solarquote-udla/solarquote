@@ -50,6 +50,8 @@ describe("Paso 1: nuevo cliente sin salir del asistente", () => {
     escribir(within(dialogo).getByLabelText(/^Nombre o razón social/), "Agrícola Imbabura");
     escribir(within(dialogo).getByLabelText(/^Tipo de identificación/), "cedula");
     escribir(within(dialogo).getByLabelText(/^Identificación/), "1710034065");
+    escribir(within(dialogo).getByLabelText(/^Correo/), "agricola@example.com");
+    escribir(within(dialogo).getByLabelText(/^Teléfono/), "0991234567");
     await act(async () => fireEvent.click(within(dialogo).getByText("Registrar cliente")));
 
     expect(clientes.crearCliente).toHaveBeenCalledOnce();

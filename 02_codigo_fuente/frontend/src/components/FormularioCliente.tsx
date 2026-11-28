@@ -60,8 +60,11 @@ function validar(f: Formulario): Errores {
   const errorId = errorIdentificacion(f.tipo_identificacion, f.identificacion);
   if (errorId) errores.identificacion = errorId;
 
-  if (f.email.trim() && !EMAIL.test(f.email.trim())) errores.email = "El correo no tiene un formato válido.";
-  if (f.telefono.trim() && !esTelefonoValido(f.telefono.trim())) {
+  if (!f.email.trim()) errores.email = "El correo es obligatorio.";
+  else if (!EMAIL.test(f.email.trim())) errores.email = "El correo no tiene un formato válido.";
+
+  if (!f.telefono.trim()) errores.telefono = "El teléfono es obligatorio.";
+  else if (!esTelefonoValido(f.telefono.trim())) {
     errores.telefono = "Usa solo números, espacios, guiones o paréntesis (7 a 15 dígitos).";
   }
   return errores;
@@ -74,8 +77,8 @@ function aCrear(f: Formulario): ClienteCrear {
     nombre: f.nombre.trim(),
     tipo_identificacion: f.tipo_identificacion,
     identificacion: f.identificacion.trim(),
-    email: opcional(f.email),
-    telefono: opcional(f.telefono),
+    email: f.email.trim(),
+    telefono: f.telefono.trim(),
     direccion: opcional(f.direccion),
   };
 }
@@ -212,11 +215,11 @@ export function FormularioCliente({ cliente, onGuardado, onCancelar, onCambiosSi
           <input className={clase("identificacion")} inputMode={formulario.tipo_identificacion === TipoIdentificacion.PASAPORTE ? "text" : "numeric"} value={formulario.identificacion} onChange={(e) => actualizar("identificacion", e.target.value)} onBlur={tocar("identificacion")} maxLength={20} />
         </Campo>
 
-        <Campo etiqueta="Correo" error={visible("email")} ayuda="Opcional">
+        <Campo etiqueta="Correo" error={visible("email")} ayuda="Para enviarle la cotización">
           <input className={clase("email")} type="email" value={formulario.email} onChange={(e) => actualizar("email", e.target.value)} onBlur={tocar("email")} maxLength={255} />
         </Campo>
 
-        <Campo etiqueta="Teléfono" error={visible("telefono")} ayuda="Opcional. Ej. 099 123 4567">
+        <Campo etiqueta="Teléfono" error={visible("telefono")} ayuda="Ej. 099 123 4567">
           <input className={clase("telefono")} inputMode="tel" value={formulario.telefono} onChange={(e) => actualizar("telefono", e.target.value)} onBlur={tocar("telefono")} maxLength={30} />
         </Campo>
 

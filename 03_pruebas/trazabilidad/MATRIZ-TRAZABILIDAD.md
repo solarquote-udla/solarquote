@@ -231,12 +231,13 @@ Evidencia: PR #30 a #33, #36 y el PR de SQ-135.
 
 | Regla del requisito | Pruebas |
 |---|---|
-| Registrar, consultar, actualizar, dar de baja | `test_cliente_servicio` (26 pruebas); `test_api_administracion`: `test_cliente_ciclo_completo` |
-| Correo y teléfono con formato válido; cédula y RUC | `test_validaciones_identificacion` (21 pruebas), paridad con `utils/identificacion.ts`; `test_api_administracion`: `test_cliente_errores_traducidos` |
+| Registrar, consultar, actualizar, dar de baja | `test_cliente_servicio` (31 pruebas); `test_api_administracion`: `test_cliente_ciclo_completo` |
+| Correo y teléfono obligatorios (pedido de Anita, 25 de noviembre: los necesita «Enviar cotización»), con formato válido; cédula y RUC | `test_cliente_servicio`: `test_rechaza_telefono_vacio`, `test_rechaza_telefono_faltante`, `test_rechaza_email_invalido`, `test_rechaza_email_faltante`, `test_rechaza_email_nulo`, `test_rechaza_telefono_nulo`; `test_validaciones_identificacion` (21 pruebas), paridad con `utils/identificacion.ts`; `test_api_administracion`: `test_cliente_errores_traducidos` |
 | La baja conserva las cotizaciones | `test_cliente_servicio`: `test_marca_inactivo`; `test_cotizacion_servicio`: `test_snapshot_del_cliente_viene_de_la_base_y_no_del_request` |
 | Solo con permiso | `test_api_administracion`: `test_clientes_lectura_y_administracion_por_permiso` |
 | Crear el cliente desde el Paso 1 (Lenin): el alta también la puede hacer quien tiene permiso de generar layout, no solo quien administra clientes | `test_api_administracion`: `test_crear_cliente_desde_el_proyecto` |
 | Pantalla: botón «Nuevo cliente» en el Paso 1 que registra y deja elegido al cliente sin salir del asistente | `pasos12Revision.test.tsx` (Paso 1) |
+| Botón «Enviar cotización» por correo o WhatsApp con el mensaje prellenado, desde el detalle de la cotización (idea de Esteban, pedido de Anita del 25 de noviembre); el documento se descarga aparte, no se adjunta solo | `cotizacion-detalle.test.tsx` (3 pruebas) |
 
 Evidencia: PR #17, #18, #22, el PR de SQ-135 y el de crear cliente desde el proyecto.
 

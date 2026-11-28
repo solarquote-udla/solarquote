@@ -85,6 +85,8 @@ describe("Clientes", () => {
     fireEvent.click(await screen.findByText("Nuevo cliente"));
     fireEvent.change(screen.getByLabelText(/Nombre o razón social/), { target: { value: "Solar SA" } });
     fireEvent.change(screen.getByLabelText(/^Identificación/), { target: { value: "1710034065001" } });
+    fireEvent.change(screen.getByLabelText(/^Correo/), { target: { value: "solar@example.com" } });
+    fireEvent.change(screen.getByLabelText(/^Teléfono/), { target: { value: "0991234567" } });
     const registrar = screen.getByText("Registrar cliente");
     await act(async () => {
       fireEvent.click(registrar);
