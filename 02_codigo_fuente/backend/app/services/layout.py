@@ -157,7 +157,7 @@ def generar(db: Session, proyecto: Proyecto, datos: LayoutGenerar) -> Layout:
         ),
         orientacion_norte=terreno.orientacion_norte,
         latitud=float(proyecto.latitud) if proyecto.latitud is not None else None,
-        lado_bloques=datos.lado_bloques,
+        orientacion_bloques=datos.orientacion_bloques,
     )
     asignacion = asignar_inversores(
         [(b.vertices, b.paneles) for b in resultado.bloques],
@@ -191,8 +191,9 @@ def generar(db: Session, proyecto: Proyecto, datos: LayoutGenerar) -> Layout:
         "capacidad": asdict(resultado.capacidad) if resultado.capacidad else None,
         "advertencias": resultado.advertencias,
         "angulo_norte": resultado.angulo_norte,
-        # Sin columna propia: es un parámetro más, y así no hace falta migración.
-        "lado_bloques": datos.lado_bloques,
+        # Sin columna propia: son parámetros más, y así no hace falta migración.
+        "orientacion_bloques": datos.orientacion_bloques,
+        "paneles_por_orientacion": {"norte": resultado.paneles_norte, "terreno": resultado.paneles_terreno},
         "lado_menor_m": resultado.lado_menor_m,
         "separacion_paneles_ancho_m": resultado.separacion_ancho_m,
         "bloque_compacto": resultado.bloque_compacto,
@@ -245,6 +246,13 @@ def _angulo_del_layout(layout: Layout) -> float:
         return 0.0
     se, _, _, so = layout.bloques[0].vertices
     return -math.degrees(math.atan2(se[1] - so[1], se[0] - so[0]))
+
+
+def _orientacion_del_layout(resumen: dict) -> str:
+    """Los layouts del #104 guardaban el lado elegido (`lado_bloques`): eso era alinearlos al terreno."""
+    if "orientacion_bloques" in resumen:
+        return resumen["orientacion_bloques"]
+    return "terreno" if resumen.get("lado_bloques") is not None else "norte"
 
 
 def _separacion_ancho_del_layout(layout: Layout) -> float:
@@ -530,7 +538,7 @@ def a_respuesta(layout: Layout, huella: str, equipo: ConfiguracionEquipo | None)
             paneles_ancho=layout.paneles_ancho,
             separacion_paneles_largo_m=layout.separacion_paneles_largo_m,
             separacion_paneles_ancho_m=layout.separacion_paneles_ancho_m,
-            lado_bloques=resumen.get("lado_bloques"),
+            orientacion_bloques=_orientacion_del_layout(resumen),
         ),
         bloques=[
             BloqueLeer(
@@ -577,6 +585,7 @@ def a_respuesta(layout: Layout, huella: str, equipo: ConfiguracionEquipo | None)
         bloque_compacto=cumple_proporcion(
             proporcion_bloque(layout.paneles_largo, resumen["paneles_ancho_ideal"]), layout.tolerancia_proporcion
         ),
+        paneles_por_orientacion=resumen.get("paneles_por_orientacion"),
         ediciones_manuales=resumen.get("ediciones_manuales", 0),
         desactualizado=layout.huella != huella,
         created_at=layout.created_at,

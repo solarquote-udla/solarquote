@@ -39,11 +39,12 @@ del terreno indica hacia dónde apunta el norte, en grados medidos en
 sentido horario desde el eje +Y del canvas. Si no está definida, se toma
 el eje +Y como norte y se advierte.
 
-Los bloques también se pueden alinear con un lado del terreno, como en
-los planos de HEXtructure de terrenos en diagonal (Envasur): se aprovecha
-mejor el área a cambio de una orientación un poco peor. Se giran lo
-mínimo para quedar paralelos a ese lado (como mucho 45°), así las filas
-siguen lo más cerca posible de norte-sur.
+Los bloques también se pueden alinear con el terreno, como en los planos
+reales de HEXtructure (Envasur, Ecuahielos): se aprovecha mejor el área a
+cambio de una orientación distinta a la del norte. Para cada dirección de
+lado del terreno se prueban las dos posiciones del bloque, con las filas a
+lo largo del lado y de través, y se queda la que ubica más paneles. Las
+dos orientaciones se calculan siempre, para avisar cuál conviene.
 
 Algoritmo
 ---------
@@ -261,6 +262,10 @@ class ResultadoLayout:
     separacion_ancho_m: float = 0.0
     # El bloque completo cumple A = 3 · L dentro de la tolerancia.
     bloque_compacto: bool = True
+    # Orientación usada y paneles que entran con cada una (para sugerir)
+    orientacion_bloques: str = "norte"
+    paneles_norte: int = 0
+    paneles_terreno: int = 0
 
 
 # ─── Geometría del bloque ───────────────────────────────────────────
@@ -689,28 +694,91 @@ def agrupar_por_tipo(bloques: list[Bloque]) -> tuple[list[Bloque], list[TipoBloq
 # ─── Punto de entrada ───────────────────────────────────────────────
 
 
-def giro_hacia_lado(terreno: Sequence[Sequence[float]], lado: int, angulo_norte: float) -> float:
-    """
-    Grados que hay que sumar al norte para que los bloques queden
-    paralelos al lado `lado` del terreno (del vértice `lado` al siguiente).
+ORIENTACIONES = ("norte", "terreno")
+# Lados más cortos que esta fracción del mayor no proponen una dirección:
+# un quiebre de pocos metros no ordena los bloques.
+LADO_MINIMO_FRACCION = 0.1
+# Direcciones distintas que se prueban, de los lados más largos a los más
+# cortos. Cada una son dos generaciones completas (filas a lo largo y de
+# través del lado).
+MAX_DIRECCIONES = 6
 
-    Un bloque es un rectángulo: queda paralelo al lado con las filas a lo
-    largo de él o de través. Se elige el giro más chico, entre −45° y 45°,
-    para que las filas sigan lo más cerca posible de norte-sur.
+
+def _girar_180(angulo: float) -> float:
+    """El mismo giro en [−90, 90): un bloque girado 180° es el mismo bloque."""
+    return (angulo + 90) % 180 - 90
+
+
+def angulos_del_terreno(terreno: Sequence[Sequence[float]]) -> list[float]:
     """
-    if not 0 <= lado < len(terreno):
-        raise LayoutImposible(
-            f"El terreno tiene {len(terreno)} lados y se pidió el lado {lado + 1}. "
-            f"Elige de nuevo el lado para alinear los bloques."
+    Giros que alinean los bloques con el terreno, en grados en sentido
+    horario desde +Y (la misma convención que `orientacion_norte`).
+
+    Por cada dirección de lado (sin repetir las paralelas), las dos
+    posiciones del bloque: las filas (A) a lo largo del lado o de través.
+    En Envasur las filas van de través a la franja; en otros terrenos, a lo
+    largo: por eso se prueban las dos.
+    """
+    lados = []
+    n = len(terreno)
+    for i in range(n):
+        (x0, y0), (x1, y1) = terreno[i][:2], terreno[(i + 1) % n][:2]
+        largo = math.hypot(x1 - x0, y1 - y0)
+        if largo > _EPS:
+            lados.append((largo, math.degrees(math.atan2(x1 - x0, y1 - y0))))
+    if not lados:
+        return []
+    mayor = max(largo for largo, _ in lados)
+    angulos: list[float] = []
+    direcciones = 0
+    for largo, direccion in sorted(lados, reverse=True):
+        if largo < LADO_MINIMO_FRACCION * mayor or direcciones >= MAX_DIRECCIONES:
+            break
+        nuevos = [_girar_180(direccion), _girar_180(direccion + 90)]
+        if any(min(abs(a - b), 180 - abs(a - b)) < 0.5 for a in nuevos for b in angulos):
+            continue
+        angulos.extend(nuevos)
+        direcciones += 1
+    return [round(a, 6) for a in angulos]
+
+
+def _mejor_desfase(
+    util_local: BaseGeometry,
+    *,
+    largo_planta: float,
+    separacion_eo: float,
+    ancho_bloque: float,
+    lado_menor: float,
+    separacion_ns: float,
+    a_ideal: int,
+    paneles_ancho_minimo: int,
+    separacion_paneles_m: float,
+    paneles_largo: int,
+) -> tuple[list[_BloqueLocal], tuple[int, int]]:
+    """El desfase de la primera franja que ubica más paneles, en el marco ya girado."""
+    paso_x = largo_planta + separacion_eo
+    mejor: list[_BloqueLocal] = []
+    mejor_clave = (0, 0)
+    for k in range(DESFASES):
+        candidatos = _distribuir(
+            util_local,
+            desfase=paso_x * k / DESFASES,
+            ancho_franja=largo_planta,
+            paso_x=paso_x,
+            alto_bloque=ancho_bloque,
+            lado_menor_m=lado_menor,
+            separacion_y=separacion_ns,
+            paneles_ancho=a_ideal,
+            paneles_ancho_minimo=paneles_ancho_minimo,
+            separacion_paneles_m=separacion_paneles_m,
         )
-    (x0, y0), (x1, y1) = terreno[lado][:2], terreno[(lado + 1) % len(terreno)][:2]
-    if math.hypot(x1 - x0, y1 - y0) < _EPS:
-        raise LayoutImposible(f"El lado {lado + 1} del terreno no tiene largo.")
-    # Dirección del lado en el mismo sentido que el norte: grados en
-    # sentido horario desde +Y.
-    direccion = math.degrees(math.atan2(x1 - x0, y1 - y0))
-    giro = (direccion - angulo_norte + 45) % 90 - 45
-    return round(giro, 6)
+        paneles = sum(paneles_largo * b.paneles_ancho for b in candidatos)
+        cortos = sum(1 for b in candidatos if b.paneles_ancho != a_ideal)
+        # Más paneles primero; a igualdad, menos bloques fuera de medida.
+        clave = (paneles, -cortos)
+        if paneles and (not mejor or clave > mejor_clave):
+            mejor, mejor_clave = candidatos, clave
+    return mejor, mejor_clave
 
 
 def generar_layout(
@@ -721,12 +789,14 @@ def generar_layout(
     *,
     orientacion_norte: float | None = None,
     latitud: float | None = None,
-    lado_bloques: int | None = None,
+    orientacion_bloques: str = "norte",
 ) -> ResultadoLayout:
     """
-    `lado_bloques`: índice del lado del terreno con el que se alinean los
-    bloques. Sin valor, los bloques siguen el norte.
+    `orientacion_bloques`: "norte" (filas de norte a sur) o "terreno"
+    (alineados con el lado del terreno que más paneles ubica).
     """
+    if orientacion_bloques not in ORIENTACIONES:
+        raise LayoutImposible("La orientación de los bloques debe ser norte o terreno.")
     if parametros.paneles_largo < 2 or parametros.paneles_largo % 2:
         raise LayoutImposible("L debe ser un número par mayor o igual a 2.")
     if parametros.paneles_ancho_minimo < 1:
@@ -777,50 +847,66 @@ def generar_layout(
             "El terreno no tiene orientación del norte: se tomó la parte superior "
             "del plano como norte. Defínela en la pestaña Terreno para un layout fiel."
         )
-    angulo = orientacion_norte or 0.0
-    if lado_bloques is not None:
-        giro = giro_hacia_lado(terreno, lado_bloques, angulo)
-        angulo += giro
-        if abs(giro) >= 0.05:
-            advertencias.append(
-                f"Los bloques están girados {abs(giro):.1f}° respecto del norte para quedar "
-                f"paralelos al lado {lado_bloques + 1} del terreno: se aprovecha mejor el área, "
-                f"con una orientación un poco distinta a la ideal."
-            )
-    # Norte a θ° en sentido horario desde +Y; girar θ° antihorario lo
-    # lleva a +Y. Al final se deshace con −θ. Con un lado elegido, θ
-    # incluye el giro hacia ese lado.
-    util_local = rotate(util, angulo, origin=(0, 0))
+    angulo_norte = orientacion_norte or 0.0
+    medidas = {
+        "largo_planta": largo_planta,
+        "separacion_eo": separacion_eo,
+        "ancho_bloque": ancho_bloque,
+        "lado_menor": lado_menor,
+        "separacion_ns": separacion_ns,
+        "a_ideal": a_ideal,
+        "paneles_ancho_minimo": parametros.paneles_ancho_minimo,
+        "separacion_paneles_m": sep_ancho,
+        "paneles_largo": L,
+    }
 
-    # ─── Búsqueda del mejor desfase ──────────────────────────────
-    paso_x = largo_planta + separacion_eo
-    mejor: list[_BloqueLocal] = []
-    mejor_clave = (-1, 0)
-    for k in range(DESFASES):
-        candidatos = _distribuir(
-            util_local,
-            desfase=paso_x * k / DESFASES,
-            ancho_franja=largo_planta,
-            paso_x=paso_x,
-            alto_bloque=ancho_bloque,
-            lado_menor_m=lado_menor,
-            separacion_y=separacion_ns,
-            paneles_ancho=a_ideal,
-            paneles_ancho_minimo=parametros.paneles_ancho_minimo,
-            separacion_paneles_m=sep_ancho,
+    def probar(giro: float) -> tuple[list[_BloqueLocal], tuple[int, int]]:
+        # Norte (o el giro) a θ° en sentido horario desde +Y; girar θ°
+        # antihorario lo lleva a +Y. Al final se deshace con −θ.
+        return _mejor_desfase(rotate(util, giro, origin=(0, 0)), **medidas)
+
+    # ─── Las dos orientaciones: norte y alineada al terreno ──────
+    bloques_norte, clave_norte = probar(angulo_norte)
+    terreno_elegido: tuple[tuple[int, int, float], float, list[_BloqueLocal]] | None = None
+    for giro in angulos_del_terreno(terreno):
+        bloques_giro, clave_giro = probar(giro)
+        if not bloques_giro:
+            continue
+        # Más paneles, menos bloques fuera de medida y, a igualdad, el giro
+        # más cercano al norte.
+        clave = (clave_giro[0], clave_giro[1], -abs(_girar_180(giro - angulo_norte)))
+        if terreno_elegido is None or clave > terreno_elegido[0]:
+            terreno_elegido = (clave, giro, bloques_giro)
+    paneles_norte = clave_norte[0]
+    paneles_terreno = terreno_elegido[0][0] if terreno_elegido else 0
+
+    orientacion_usada = "terreno" if orientacion_bloques == "terreno" and terreno_elegido is not None else "norte"
+    if orientacion_usada == "terreno":
+        angulo, mejor = terreno_elegido[1], terreno_elegido[2]
+        giro = _girar_180(angulo - angulo_norte)
+        advertencias.append(
+            f"Bloques alineados con el terreno, girados {abs(giro):.1f}° respecto del norte: "
+            f"entran {paneles_terreno} paneles; siguiendo el norte entrarían {paneles_norte}."
         )
-        paneles = sum(L * b.paneles_ancho for b in candidatos)
-        cortos = sum(1 for b in candidatos if b.paneles_ancho != a_ideal)
-        # Más paneles primero; a igualdad, menos bloques fuera de medida.
-        clave = (paneles, -cortos)
-        if clave > mejor_clave:
-            mejor, mejor_clave = candidatos, clave
+    else:
+        angulo, mejor = angulo_norte, bloques_norte
+        if paneles_terreno > paneles_norte:
+            advertencias.append(
+                f"Alineando los bloques con el terreno entrarían {paneles_terreno} paneles, "
+                f"{paneles_terreno - paneles_norte} más que siguiendo el norte. Cámbialo en "
+                f"«Orientación de los bloques»."
+            )
 
     if not mejor:
+        sugerencia = (
+            f" Alineando los bloques con el terreno sí entran {paneles_terreno} paneles."
+            if orientacion_bloques == "norte" and paneles_terreno
+            else ""
+        )
         raise LayoutImposible(
             f"No entra ningún bloque de {L} paneles de largo ({largo_planta:.2f} m en "
             f"planta) en el área útil. Prueba con un L menor, un pasillo más angosto "
-            f"o revisa que los caminos no cubran todo el terreno."
+            f"o revisa que los caminos no cubran todo el terreno.{sugerencia}"
         )
 
     # ─── Capacidad deseada ───────────────────────────────────────
@@ -898,6 +984,9 @@ def generar_layout(
         separacion_largo_m=sep_largo,
         separacion_ancho_m=sep_ancho,
         bloque_compacto=compacto,
+        orientacion_bloques=orientacion_usada,
+        paneles_norte=paneles_norte,
+        paneles_terreno=paneles_terreno,
     )
 
 

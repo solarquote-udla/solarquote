@@ -473,6 +473,9 @@ export interface PanelReferencia extends Panel {
 // ─── Layout (Módulo 1 — RF-03) ──────────────────────────
 
 /** Espejo de `LayoutGenerar` (backend/app/schemas/layout.py) */
+/** Orientación de los bloques del layout (RF-03). */
+export type Orientacion = "norte" | "terreno";
+
 export interface LayoutGenerar {
   /** L: paneles en la dirección de la pendiente. Siempre par. */
   paneles_largo: number;
@@ -488,8 +491,8 @@ export interface LayoutGenerar {
   separacion_paneles_largo_m: number;
   /** Separación entre paneles a lo ancho (clamp intermedio), en metros */
   separacion_paneles_ancho_m: number;
-  /** Lado del terreno (0 = del primer vértice al segundo) con el que se alinean los bloques. Null = norte. */
-  lado_bloques?: number | null;
+  /** norte: filas de norte a sur. terreno: alineados con el lado del terreno que más paneles ubica. */
+  orientacion_bloques?: Orientacion;
 }
 
 /** Espejo de `BloqueLeer`. Vértices en metros, coordenadas del terreno. */
@@ -612,8 +615,10 @@ export interface Layout {
   inversores_sugeridos: number;
   analisis_inversores?: AnalisisInversores | null;
   advertencias: string[];
-  /** Giro de los bloques usado al generar (el norte, o el norte más el giro hacia el lado elegido); la edición arma los bloques con este ángulo */
+  /** Giro de los bloques usado al generar (el norte, o el giro que los alinea con el terreno); la edición arma los bloques con este ángulo */
   angulo_norte: number;
+  /** Paneles que entran siguiendo el norte y alineados al terreno, para sugerir la mejor */
+  paneles_por_orientacion?: { norte: number; terreno: number } | null;
   /** Lado menor del panel, en metros */
   lado_menor_m: number;
   /** El bloque mide A · lado_menor_m + (A − 1) · separacion_paneles_ancho_m */

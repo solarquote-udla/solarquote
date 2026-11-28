@@ -1,10 +1,12 @@
 """
 Orientación de los bloques — RF-03.
 
-Revisión del 23 de noviembre: en los planos de HEXtructure de terrenos en
-diagonal (Envasur) los bloques van paralelos al terreno, no al norte.
-`lado_bloques` alinea los bloques con un lado del terreno, girándolos lo
-mínimo (como mucho 45°) para que las filas sigan cerca de norte-sur.
+Revisión del 25 de noviembre: en los planos reales de HEXtructure los
+bloques siguen el terreno (Envasur, Ecuahielos), no siempre el norte, y no
+siempre con las filas en la misma dirección. "Alineado al terreno" prueba
+cada dirección de lado con las filas a lo largo y de través, y se queda con
+la que más paneles ubica. Las dos orientaciones se calculan siempre para
+sugerir la mejor.
 """
 
 import math
@@ -19,10 +21,23 @@ from app.core.database import get_db
 from app.core.security import crear_access_token
 from app.main import app
 from app.models.cliente import Cliente, TipoIdentificacion
-from app.services.calculo_layout import LayoutImposible, ParametrosLayout, generar_layout, giro_hacia_lado
+from app.services.calculo_layout import (
+    LayoutImposible,
+    PanelLayout,
+    ParametrosLayout,
+    angulos_del_terreno,
+    generar_layout,
+)
 from tests.fabricas import LAYOUT_CLASICO, crear_usuario
 from tests.test_layout import PANEL_PLANO, rectangulo
 from tests.test_proyecto_avance import EQUIPO
+
+# Panel de 720 Wp de la CT203A y la CT521A
+PANEL_720 = PanelLayout(largo_mm=2384, ancho_mm=1303, potencia_wp=720, angulo_montaje=7.5)
+
+# Planta de Envasur (CT203A, 1.209,6 kWp): puntos P7, P8, P6 y P5 del plano
+# 1899-ARQ-PL-001, coordenadas UTM redondeadas al metro, llevadas a P7.
+ENVASUR = [[0, 0], [29, -26], [122, 100], [92, 122]]
 
 
 def _girado(vertices: list[list[float]], grados: float) -> list[list[float]]:
@@ -40,68 +55,96 @@ def _paralelo_o_perpendicular(a: float, b: float) -> bool:
     return min(diferencia, 90 - diferencia) < 0.01
 
 
-# ─── giro_hacia_lado ────────────────────────────────────────────────
+# ─── angulos_del_terreno ────────────────────────────────────────────
 
 
-def test_terreno_recto_no_gira_con_ningun_lado():
-    terreno = rectangulo(100, 60)
-    assert [giro_hacia_lado(terreno, i, 0) for i in range(4)] == [0, 0, 0, 0]
+def test_rectangulo_recto_propone_norte_y_su_giro_de_90():
+    """Filas a lo largo de un lado o de través: dos posiciones por dirección."""
+    assert sorted(angulos_del_terreno(rectangulo(100, 60))) == [-90, 0]
 
 
-@pytest.mark.parametrize("grados, esperado", [(30, -30), (-20, 20), (60, 30), (44, -44)])
-def test_el_giro_es_el_minimo_entre_menos_45_y_45(grados, esperado):
-    """Un terreno girado 60° se alinea girando 30° hacia el otro lado, no 60°."""
-    terreno = _girado(rectangulo(100, 60), grados)
-    assert giro_hacia_lado(terreno, 0, 0) == pytest.approx(esperado, abs=1e-3)
+def test_lados_paralelos_no_repiten_direccion():
+    """Un rectángulo girado tiene 4 lados pero una sola dirección (y su perpendicular)."""
+    angulos = angulos_del_terreno(_girado(rectangulo(100, 60), 30))
+    assert len(angulos) == 2
 
 
-def test_el_giro_se_mide_desde_el_norte_del_terreno():
-    """Con el norte ya girado igual que el terreno, no hace falta girar más."""
-    terreno = _girado(rectangulo(100, 60), -25)
-    assert giro_hacia_lado(terreno, 0, 25) == pytest.approx(0, abs=1e-3)
+def test_lado_muy_corto_no_propone_direccion():
+    """Un quiebre de 2 m en un terreno de 100 m no ordena los bloques."""
+    terreno = [[0, 0], [100, 0], [100, 60], [2, 60], [0, 58]]
+    assert len(angulos_del_terreno(terreno)) == 2
 
 
-def test_lado_que_no_existe_se_rechaza():
-    with pytest.raises(LayoutImposible, match="4 lados"):
-        giro_hacia_lado(rectangulo(100, 60), 4, 0)
+# ─── generar_layout ─────────────────────────────────────────────────
 
 
-# ─── generar_layout con lado_bloques ────────────────────────────────
-
-
-def test_terreno_en_diagonal_alineado_entra_como_el_recto():
+def test_envasur_alineado_al_terreno_da_los_seis_bloques_de_la_ct203a():
     """
-    El rectángulo de 100 × 60 (1764 paneles con el norte hacia arriba)
-    girado 30°: siguiendo el norte entran menos; alineado con su lado
-    largo, entran los mismos 1764.
+    Con el terreno real de Envasur, L = 10 y A = 28, siguiendo el norte no
+    entra ningún bloque; alineados con la franja y con las filas de través,
+    entran los 6 bloques de 10 × 28 de la proforma CT203A (1.680 paneles).
+    El pasillo de 1,5 m es el que deja el plano real.
     """
+    parametros = ParametrosLayout(
+        paneles_largo=10, paneles_ancho=28, pasillo_m=1.5, separacion_largo_m=0.06, separacion_ancho_m=0.02,
+        paneles_ancho_minimo=28,
+    )
+    r = generar_layout(ENVASUR, [], PANEL_720, parametros, orientacion_norte=0, latitud=-1.05, orientacion_bloques="terreno")
+
+    assert r.total_paneles == 1680
+    assert [(t.paneles_largo, t.paneles_ancho, t.repeticiones) for t in r.tipos] == [(10, 28, 6)]
+    assert r.paneles_norte == 0 and r.paneles_terreno == 1680
+    assert r.orientacion_bloques == "terreno"
+    poligono = Polygon(ENVASUR).buffer(1e-3)
+    assert all(poligono.contains(Polygon(b.vertices)) for b in r.bloques)
+
+
+def test_siguiendo_el_norte_sin_lugar_sugiere_alinear():
+    parametros = ParametrosLayout(paneles_largo=10, paneles_ancho=28, pasillo_m=1.5, paneles_ancho_minimo=28)
+    with pytest.raises(LayoutImposible, match="Alineando los bloques con el terreno sí entran"):
+        generar_layout(ENVASUR, [], PANEL_720, parametros, orientacion_norte=0, latitud=-1.05)
+
+
+def test_terreno_girado_alineado_entra_como_el_recto():
+    """El rectángulo de 100 × 60 girado 30°: alineado entra lo mismo que recto, y los bloques quedan paralelos."""
     terreno = _girado(rectangulo(100, 60), 30)
     parametros = ParametrosLayout(paneles_ancho=24)
 
     al_norte = generar_layout(terreno, [], PANEL_PLANO, parametros, orientacion_norte=0)
-    alineado = generar_layout(terreno, [], PANEL_PLANO, parametros, orientacion_norte=0, lado_bloques=0)
+    alineado = generar_layout(terreno, [], PANEL_PLANO, parametros, orientacion_norte=0, orientacion_bloques="terreno")
 
-    assert alineado.total_paneles == 1764
+    assert alineado.total_paneles >= 1764
     assert al_norte.total_paneles < alineado.total_paneles
-    assert alineado.angulo_norte == pytest.approx(-30, abs=1e-3)
-
     lado = _angulo_lado(terreno[0], terreno[1])
-    poligono = Polygon(terreno).buffer(1e-3)
     for b in alineado.bloques:
-        assert poligono.contains(Polygon(b.vertices))
         assert _paralelo_o_perpendicular(_angulo_lado(b.vertices[0], b.vertices[1]), lado)
 
 
-def test_avisa_cuanto_se_giraron_los_bloques():
+def test_siguiendo_el_norte_avisa_si_alineado_entran_mas():
     terreno = _girado(rectangulo(100, 60), 30)
-    r = generar_layout(terreno, [], PANEL_PLANO, ParametrosLayout(paneles_ancho=24), orientacion_norte=0, lado_bloques=0)
-    assert any("girados 30.0° respecto del norte" in a and "lado 1" in a for a in r.advertencias)
+    r = generar_layout(terreno, [], PANEL_PLANO, ParametrosLayout(paneles_ancho=24), orientacion_norte=0)
+    assert r.orientacion_bloques == "norte"
+    assert r.paneles_terreno > r.paneles_norte
+    assert any("Alineando los bloques con el terreno entrarían" in a for a in r.advertencias)
 
 
-def test_sin_giro_no_avisa():
-    r = generar_layout(rectangulo(100, 60), [], PANEL_PLANO, ParametrosLayout(paneles_ancho=24), orientacion_norte=0, lado_bloques=2)
-    assert r.total_paneles == 1764
-    assert not any("girados" in a for a in r.advertencias)
+def test_alineado_avisa_cuanto_se_giro_y_cuanto_entra_al_norte():
+    terreno = _girado(rectangulo(100, 60), 30)
+    r = generar_layout(terreno, [], PANEL_PLANO, ParametrosLayout(paneles_ancho=24), orientacion_norte=0, orientacion_bloques="terreno")
+    assert any("Bloques alineados con el terreno, girados" in a and "siguiendo el norte entrarían" in a for a in r.advertencias)
+
+
+def test_a_igualdad_de_paneles_elige_el_giro_mas_cercano_al_norte():
+    """En un cuadrado, el norte y su giro de 90° empatan: se queda el norte."""
+    parametros = ParametrosLayout(paneles_largo=4, paneles_ancho=12, pasillo_m=2)
+    r = generar_layout(rectangulo(60, 60), [], PANEL_PLANO, parametros, orientacion_norte=0, orientacion_bloques="terreno")
+    if r.paneles_terreno == r.paneles_norte:
+        assert r.angulo_norte == 0
+
+
+def test_orientacion_desconocida_se_rechaza():
+    with pytest.raises(LayoutImposible, match="norte o terreno"):
+        generar_layout(rectangulo(100, 60), [], PANEL_PLANO, ParametrosLayout(), orientacion_norte=0, orientacion_bloques="este")
 
 
 # ─── API ────────────────────────────────────────────────────────────
@@ -142,36 +185,38 @@ def proyecto(api, db):
     return pid, h
 
 
-def test_sin_lado_los_bloques_siguen_el_norte(api, proyecto):
+def test_por_defecto_los_bloques_siguen_el_norte_y_se_informa_la_alternativa(api, proyecto):
     pid, h = proyecto
     r = api.post(f"/api/proyectos/{pid}/layout", headers=h, json=PARAMETROS)
     assert r.status_code == 200
-    assert r.json()["parametros"]["lado_bloques"] is None
+    assert r.json()["parametros"]["orientacion_bloques"] == "norte"
     assert r.json()["angulo_norte"] == 0
+    por_orientacion = r.json()["paneles_por_orientacion"]
+    assert por_orientacion["terreno"] > por_orientacion["norte"] == r.json()["total_paneles"]
 
 
-def test_con_lado_se_alinean_y_el_lado_se_guarda(api, proyecto):
+def test_alineado_al_terreno_se_guarda(api, proyecto):
     pid, h = proyecto
-    r = api.post(f"/api/proyectos/{pid}/layout", headers=h, json={**PARAMETROS, "lado_bloques": 0})
+    r = api.post(f"/api/proyectos/{pid}/layout", headers=h, json={**PARAMETROS, "orientacion_bloques": "terreno"})
     assert r.status_code == 200
-    assert r.json()["total_paneles"] == 1764
-    assert r.json()["angulo_norte"] == pytest.approx(-30, abs=1e-3)
+    assert r.json()["total_paneles"] >= 1764
+    assert _paralelo_o_perpendicular(r.json()["angulo_norte"], -30)
 
     guardado = api.get(f"/api/proyectos/{pid}/layout", headers=h).json()
-    assert guardado["parametros"]["lado_bloques"] == 0
+    assert guardado["parametros"]["orientacion_bloques"] == "terreno"
 
 
 def test_editar_conserva_el_giro_de_los_bloques(api, proyecto):
     """Al editar, el backend rehace cada bloque con el giro con que se generó."""
     pid, h = proyecto
-    generado = api.post(f"/api/proyectos/{pid}/layout", headers=h, json={**PARAMETROS, "lado_bloques": 0}).json()
+    generado = api.post(f"/api/proyectos/{pid}/layout", headers=h, json={**PARAMETROS, "orientacion_bloques": "terreno"}).json()
     bloques = [{"origen": b["vertices"][3], "paneles_ancho": b["paneles_ancho"]} for b in generado["bloques"][:-1]]
 
     r = api.put(f"/api/proyectos/{pid}/layout/bloques", headers=h, json={"bloques": bloques})
 
     assert r.status_code == 200, r.text
-    assert r.json()["angulo_norte"] == pytest.approx(-30, abs=1e-3)
-    assert r.json()["parametros"]["lado_bloques"] == 0
+    assert r.json()["angulo_norte"] == pytest.approx(generado["angulo_norte"], abs=1e-6)
+    assert r.json()["parametros"]["orientacion_bloques"] == "terreno"
 
     def esquinas(bloques):
         return sorted(tuple(round(c, 2) for punto in b["vertices"] for c in punto) for b in bloques)
@@ -179,8 +224,7 @@ def test_editar_conserva_el_giro_de_los_bloques(api, proyecto):
     assert esquinas(r.json()["bloques"]) == esquinas(generado["bloques"][:-1])
 
 
-def test_lado_que_no_existe_responde_422(api, proyecto):
+def test_orientacion_invalida_responde_422(api, proyecto):
     pid, h = proyecto
-    r = api.post(f"/api/proyectos/{pid}/layout", headers=h, json={**PARAMETROS, "lado_bloques": 7})
+    r = api.post(f"/api/proyectos/{pid}/layout", headers=h, json={**PARAMETROS, "orientacion_bloques": "este"})
     assert r.status_code == 422
-    assert "4 lados" in r.json()["detail"]
