@@ -6,7 +6,9 @@ basta con encontrar los paneles y agruparlos en bloques.
 
 1. Se recorren las entidades del espacio modelo, incluidos los bloques
    insertados (INSERT), y se toman los rectángulos: polilíneas cerradas de
-   cuatro vértices con ángulos rectos.
+   cuatro vértices con ángulos rectos. Las polilíneas 3D se proyectan al
+   plano: en los planos reales de HEXtructure (Incubandina, Ecuahielos) el
+   panel está dibujado inclinado, con cada esquina a su altura.
 2. El panel es el rectángulo más repetido. Se descartan los que no tienen
    su tamaño (contorno del terreno, caminos, rótulos, marcos).
 3. Se gira el dibujo para que el lado mayor del panel quede horizontal.
@@ -15,8 +17,13 @@ basta con encontrar los paneles y agruparlos en bloques.
    panel son L y las posiciones distintas a lo ancho son A, igual que en la
    notación de HEXtructure (el panel va con su lado mayor en la dirección
    de L).
-5. Los bloques con el mismo L, A y orientación se agrupan como un tipo
+5. Un bloque escalonado (columnas de distinto largo, como los que siguen
+   las curvas de nivel en Incubandina) se parte en bloques rectangulares:
+   las columnas seguidas con las mismas filas forman un bloque.
+6. Los bloques con el mismo L, A y orientación se agrupan como un tipo
    con su número de repeticiones (B).
+7. Si los paneles están en zonas muy separadas (por ejemplo, la fase 1 y
+   la fase 2 en el mismo plano), se avisa con los paneles de cada zona.
 """
 
 import math
@@ -38,6 +45,9 @@ HUECO_MAXIMO_LARGO = 0.30
 HUECO_MAXIMO_CORTO = 0.50
 # Profundidad máxima de bloques anidados (INSERT dentro de INSERT)
 PROFUNDIDAD_MAXIMA = 4
+# Bloques a más de esta distancia entre sí están en zonas distintas del
+# plano (fases o etapas), no separados por un pasillo o un camino.
+SEPARACION_ZONAS_M = 40.0
 
 
 class DxfIlegible(ValueError):
@@ -84,7 +94,8 @@ def _puntos(entidad) -> list[tuple[float, float]] | None:
         puntos = [(x, y) for x, y in entidad.get_points("xy")]
         cerrada = entidad.closed or (len(puntos) > 1 and math.dist(puntos[0], puntos[-1]) < 1e-9)
         return puntos if cerrada else None
-    if tipo == "POLYLINE" and not entidad.is_3d_polyline:
+    if tipo == "POLYLINE" and (entidad.is_2d_polyline or entidad.is_3d_polyline):
+        # Una polilínea 3D se proyecta al plano (se descarta la altura)
         puntos = [(v.dxf.location.x, v.dxf.location.y) for v in entidad.vertices]
         cerrada = entidad.is_closed or (len(puntos) > 1 and math.dist(puntos[0], puntos[-1]) < 1e-9)
         return puntos if cerrada else None
@@ -159,14 +170,89 @@ def _agrupar_en_bloques(paneles: list[tuple[float, float]], largo: float, corto:
     return list(grupos.values())
 
 
-def _posiciones(valores: list[float], tolerancia: float) -> int:
-    """Cuántas posiciones distintas hay, uniendo las que difieren menos que la tolerancia."""
-    ordenados = sorted(valores)
-    distintas = 1
-    for anterior, actual in zip(ordenados, ordenados[1:]):
-        if actual - anterior > tolerancia:
-            distintas += 1
-    return distintas
+def _indices(valores: list[float], lado: float) -> list[int]:
+    """
+    Posición (0, 1, 2…) de cada valor en la grilla de paneles. Los valores
+    a menos de medio lado son la misma posición; el paso de la grilla es la
+    distancia típica entre posiciones vecinas, así que un panel que falta
+    deja un hueco en la numeración (y parte la columna en dos tramos).
+    """
+    ordenados = sorted(set(valores))
+    centros = [[ordenados[0]]]
+    for v in ordenados[1:]:
+        if v - centros[-1][-1] > lado * 0.5:
+            centros.append([v])
+        else:
+            centros[-1].append(v)
+    medios = [sum(c) / len(c) for c in centros]
+    pasos = sorted(b - a for a, b in zip(medios, medios[1:]) if b - a < lado * 1.5)
+    paso = pasos[len(pasos) // 2] if pasos else lado
+    def indice(v: float) -> int:
+        return round((v - medios[0]) / paso)
+    return [indice(v) for v in valores]
+
+
+def rectangulos_de_grupo(posiciones: list[tuple[float, float]], largo: float, corto: float) -> list[tuple[int, int]]:
+    """
+    (L, A) de los bloques rectangulares que forman un grupo de paneles
+    pegados. Un grupo completo es un solo bloque. Uno escalonado se parte:
+    las columnas seguidas (a lo largo de L) con el mismo tramo de filas
+    forman un bloque, y cada panel queda en uno solo.
+    """
+    columnas = _indices([x for x, _ in posiciones], largo)
+    filas = _indices([y for _, y in posiciones], corto)
+    por_columna: dict[int, set[int]] = defaultdict(set)
+    for c, f in zip(columnas, filas):
+        por_columna[c].add(f)
+
+    def tramos(filas_columna: set[int]) -> list[tuple[int, int]]:
+        ordenadas = sorted(filas_columna)
+        resultado = [[ordenadas[0], ordenadas[0]]]
+        for f in ordenadas[1:]:
+            if f == resultado[-1][1] + 1:
+                resultado[-1][1] = f
+            else:
+                resultado.append([f, f])
+        return [(a, b) for a, b in resultado]
+
+    bloques: list[tuple[int, int]] = []
+    abiertos: dict[tuple[int, int], int] = {}  # tramo de filas → columnas seguidas
+    anterior = None
+    for c in sorted(por_columna):
+        actuales = set(tramos(por_columna[c]))
+        seguida = anterior is not None and c == anterior + 1
+        for tramo, n in list(abiertos.items()):
+            if not seguida or tramo not in actuales:
+                bloques.append((n, tramo[1] - tramo[0] + 1))
+                del abiertos[tramo]
+        for tramo in actuales:
+            abiertos[tramo] = abiertos.get(tramo, 0) + 1
+        anterior = c
+    bloques.extend((n, tramo[1] - tramo[0] + 1) for tramo, n in abiertos.items())
+    return bloques
+
+
+def _zonas(cajas: list[tuple[float, float, float, float, int]]) -> list[int]:
+    """Paneles de cada zona del plano (bloques a menos de SEPARACION_ZONAS_M), de mayor a menor."""
+    padre = list(range(len(cajas)))
+
+    def raiz(i: int) -> int:
+        while padre[i] != i:
+            padre[i] = padre[padre[i]]
+            i = padre[i]
+        return i
+
+    for i, a in enumerate(cajas):
+        for j in range(i + 1, len(cajas)):
+            b = cajas[j]
+            dx = max(a[0] - b[2], b[0] - a[2], 0)
+            dy = max(a[1] - b[3], b[1] - a[3], 0)
+            if math.hypot(dx, dy) < SEPARACION_ZONAS_M:
+                padre[raiz(i)] = raiz(j)
+    paneles: Counter = Counter()
+    for i, caja in enumerate(cajas):
+        paneles[raiz(i)] += caja[4]
+    return sorted(paneles.values(), reverse=True)
 
 
 def _letra(indice: int) -> str:
@@ -217,7 +303,10 @@ def bloques_desde_rectangulos(rects: list[_Rect]) -> tuple[list[BloqueDetectado]
     descartados = len(rects) - len(paneles)
     tipos: Counter = Counter()
     sueltos = 0
-    incompletos = 0
+    escalonados = 0
+    partes_escalonadas = 0
+    cajas: list[tuple[float, float, float, float, int]] = []
+    angulos_grupos: list[float] = []
     # A corre perpendicular al lado mayor del panel: vertical si ese lado es horizontal
     orientacion = "vertical" if abs(math.cos(math.radians(angulo))) >= math.sqrt(0.5) else "horizontal"
 
@@ -227,11 +316,24 @@ def bloques_desde_rectangulos(rects: list[_Rect]) -> tuple[list[BloqueDetectado]
             continue
         xs = [girados[i][0] for i in grupo]
         ys = [girados[i][1] for i in grupo]
-        L = _posiciones(xs, base.largo * 0.5)
-        A = _posiciones(ys, base.corto * 0.5)
-        if L * A != len(grupo):
-            incompletos += 1
-        tipos[(L, A)] += 1
+        cajas.append((min(xs), min(ys), max(xs), max(ys), len(grupo)))
+        # Cada bloque se cuenta con su propio giro: en un mismo plano hay
+        # bloques girados apenas distinto (Ecuahielos: 63,8° a 65°), y un
+        # grado de diferencia en un bloque de 40 m corre las filas casi un
+        # metro si se cuenta con el giro de otro.
+        giro_grupo = sorted(paneles[i].angulo for i in grupo)[len(grupo) // 2]
+        angulos_grupos.append(giro_grupo)
+        t = math.radians(-giro_grupo)
+        propios = [
+            (paneles[i].cx * math.cos(t) - paneles[i].cy * math.sin(t), paneles[i].cx * math.sin(t) + paneles[i].cy * math.cos(t))
+            for i in grupo
+        ]
+        partes = rectangulos_de_grupo(propios, base.largo, base.corto)
+        if len(partes) > 1:
+            escalonados += 1
+            partes_escalonadas += len(partes)
+        for L, A in partes:
+            tipos[(L, A)] += 1
 
     if not tipos:
         raise SinPaneles("solo sueltos")
@@ -260,10 +362,25 @@ def bloques_desde_rectangulos(rects: list[_Rect]) -> tuple[list[BloqueDetectado]
         )
     if sueltos:
         advertencias.append(f"Se ignoraron {sueltos} paneles sueltos que no forman un bloque.")
-    if incompletos:
+    if escalonados:
         advertencias.append(
-            f"{incompletos} bloque(s) no forman una grilla completa: les faltan o sobran paneles. "
-            f"Revisa sus medidas en la confirmación."
+            f"{escalonados} bloque(s) escalonados (columnas de distinto largo) se partieron en "
+            f"{partes_escalonadas} bloques rectangulares para cotizarlos. Revisa en la confirmación "
+            f"si corresponde cotizarlos así."
+        )
+    if angulos_grupos and max(angulos_grupos) - min(angulos_grupos) > 0.5:
+        advertencias.append(
+            f"Hay bloques dibujados con giros distintos ({min(angulos_grupos):.1f}° a "
+            f"{max(angulos_grupos):.1f}°): puede que el plano tenga varias fases o etapas. Se "
+            f"cotizaron todos; si solo corresponde una fase, ajusta las cantidades en la confirmación."
+        )
+    zonas = _zonas(cajas)
+    if len(zonas) > 1:
+        detalle = ", ".join(f"zona {i + 1}: {n} paneles" for i, n in enumerate(zonas))
+        advertencias.append(
+            f"Los paneles están en {len(zonas)} zonas separadas por más de {SEPARACION_ZONAS_M:g} m "
+            f"({detalle}), por ejemplo fases distintas del proyecto. Se cotizaron todas; si solo "
+            f"corresponde una, quita las demás en la confirmación."
         )
     impares = sorted({b.paneles_largo for b in bloques if b.paneles_largo % 2})
     if impares:
