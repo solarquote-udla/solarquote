@@ -121,6 +121,12 @@ class Settings(BaseSettings):
     PROFORMA_VALIDEZ_DIAS: int = Field(default=90, ge=1)
     PROFORMA_GARANTIA_ANIOS: int = Field(default=10, ge=1)
 
+    # Logística, cuando la cotización no edita la suya (acuerdo con Santi,
+    # 27 de noviembre): depende del lugar de entrega (Ibarra o en sitio),
+    # a veces es 0. Antes era el precio del catálogo del material LOG;
+    # ahora es un monto por cotización, igual que plazo/validez/garantía.
+    PROFORMA_LOGISTICA_MONTO: Decimal = Field(default=Decimal("0"), ge=0)
+
     # Forma de pago por defecto, cuando la cotización no edita sus propios
     # tramos (SQ-213): tres porcentajes sobre el subtotal (sin IVA) que
     # deben sumar 100. Cada cotización real suele tener su propia forma de
