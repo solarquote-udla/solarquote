@@ -2,16 +2,21 @@
  * Asistente, Paso 2 — Panel + Inversores (RF-02).
  *
  * Como en el prototipo: a la izquierda el panel (elegido del catálogo
- * con búsqueda, o ingreso manual) y a la derecha los inversores: la potencia objetivo del
- * sistema, la sugerencia automática de cuántos usar y una tarjeta por
- * inversor, cada una con su color (el mismo de sus bloques en el Paso 3).
- * "Siguiente" guarda si hay cambios y pasa al Paso 3.
+ * con búsqueda, o ingreso manual) y a la derecha los inversores, cada uno
+ * con su color (el mismo de sus bloques en el Paso 3). "Siguiente" guarda
+ * si hay cambios y pasa al Paso 3.
  *
- * Cada inversor se escribe a mano o se elige del catálogo de RF-08; en
- * los dos casos sus datos se copian al proyecto. La sugerencia se
- * recalcula mientras se escribe; el resto de cifras (separación, límites
- * de string) las calcula el backend al guardar, igual que las áreas del
- * terreno: una sola fuente de verdad.
+ * Revisión del 25 de noviembre (Lenin, Santi y Anita):
+ * - el ángulo de montaje es el de la estructura (7,5°), no un campo libre;
+ * - sin sol ni sombra ni el aviso del Voc;
+ * - con la potencia objetivo se ve si los paneles caben en el terreno y
+ *   la relación DC/AC con los inversores elegidos, con la cuenta de la
+ *   sugerencia. Es una referencia: los inversores los decide la ingeniería
+ *   del proyecto, así que nada de esto bloquea.
+ *
+ * Estas cifras se recalculan mientras se escribe con las mismas fórmulas
+ * del backend (utils/inversores.ts); el backend las vuelve a calcular al
+ * guardar y las usa en sus avisos y en el Paso 3.
  */
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
@@ -28,6 +33,7 @@ import { guardarEquipo, obtenerEquipo } from "@/services/equipo";
 import { listarInversores } from "@/services/inversores";
 import { listarPaneles } from "@/services/paneles";
 import { obtenerProyecto } from "@/services/proyectos";
+import { obtenerTerreno } from "@/services/terreno";
 import {
   MAX_INVERSORES,
   type ConfiguracionEquipo,
@@ -39,7 +45,16 @@ import {
 } from "@/types/api";
 import { filtrarPaneles } from "@/utils/buscarPanel";
 import { bordeCampo } from "@/utils/campo";
-import { colorInversor, sugerenciaInversores } from "@/utils/inversores";
+import {
+  RELACION_DC_AC_MAXIMA,
+  analizarInversores,
+  colorInversor,
+  ocupacionTerreno,
+  panelesParaPotencia,
+} from "@/utils/inversores";
+
+/** Ángulo de las aletas de los soportes A y V de HEXtructure (ficha Hex001). Igual que ANGULO_MONTAJE_HEXTRUCTURE. */
+const ANGULO_MONTAJE = 7.5;
 
 // Los campos numéricos se editan como texto: así el usuario puede borrar
 // un valor o escribir "52,3" con coma sin que el input lo rechace a mitad.
@@ -51,7 +66,6 @@ const PANEL_VACIO = {
   panel_ancho_mm: "",
   panel_voc_v: "",
   panel_vmp_v: "",
-  angulo_montaje: "",
 };
 
 type CampoPanel = keyof typeof PANEL_VACIO;
@@ -103,7 +117,6 @@ function desdeConfiguracion(c: ConfiguracionEquipo | null): Formulario {
     panel_ancho_mm: texto(c.panel.ancho_mm),
     panel_voc_v: texto(c.panel.voc_v),
     panel_vmp_v: texto(c.panel.vmp_v),
-    angulo_montaje: texto(c.angulo_montaje),
     potencia_objetivo_kwp: texto(c.potencia_objetivo_kwp),
     inversores: c.inversores.map(inversorAFormulario),
   };
@@ -158,10 +171,6 @@ function erroresDeFormulario(f: Formulario): Errores {
     const error = errorNumero(f[campo], minimo, maximo, unidad);
     if (error) e[campo] = error;
   }
-  const angulo = aNumero(f.angulo_montaje);
-  if (angulo === null) e.angulo_montaje = "Obligatorio.";
-  else if (Number.isNaN(angulo) || angulo < 0 || angulo > 90) e.angulo_montaje = "Debe estar entre 0 y 90°.";
-
   const largo = aNumero(f.panel_largo_mm);
   const ancho = aNumero(f.panel_ancho_mm);
   if (!e.panel_largo_mm && !e.panel_ancho_mm && largo !== null && ancho !== null && largo < ancho) {
@@ -223,7 +232,7 @@ function aPeticion(f: Formulario): ConfiguracionEquipoGuardar {
       voc_v: n(f.panel_voc_v),
       vmp_v: n(f.panel_vmp_v),
     },
-    angulo_montaje: n(f.angulo_montaje),
+    angulo_montaje: ANGULO_MONTAJE,
     inversores: f.inversores.map(
       (inv): Inversor => ({
         marca: inv.marca.trim(),
@@ -304,6 +313,8 @@ export function EquipoPage() {
   const [catalogoPanelesFallo, setCatalogoPanelesFallo] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [catalogo, setCatalogo] = useState<InversorCatalogo[]>([]);
+  // Área útil del terreno (Paso 1), para ver si la potencia objetivo cabe
+  const [areaTerreno, setAreaTerreno] = useState<number | null>(null);
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
 
@@ -353,6 +364,11 @@ export function EquipoPage() {
     listarInversores()
       .then((lista) => {
         if (!cancelado) setCatalogo(lista);
+      })
+      .catch(() => undefined);
+    obtenerTerreno(proyectoId)
+      .then((t) => {
+        if (!cancelado && t) setAreaTerreno(t.areas.area_util);
       })
       .catch(() => undefined);
 
@@ -521,20 +537,34 @@ export function EquipoPage() {
   const anchoMm = aNumero(formulario.panel_ancho_mm);
   const inversores = formulario.inversores;
 
-  const sugerencia = sugerenciaInversores(
-    aNumero(formulario.potencia_objetivo_kwp) ?? 0,
-    aNumero(formulario.panel_potencia_wp) ?? 0,
-  );
-  // Paneles que le tocarían a cada inversor, en proporción a su potencia
+  // Potencia objetivo → paneles; con ellos, el terreno y los inversores
+  const objetivoKwp = aNumero(formulario.potencia_objetivo_kwp);
+  const potenciaPanel = aNumero(formulario.panel_potencia_wp);
+  const panelesObjetivo =
+    objetivoKwp && objetivoKwp > 0 && potenciaPanel && potenciaPanel > 0 ? panelesParaPotencia(objetivoKwp, potenciaPanel) : null;
+  const ocupacion =
+    panelesObjetivo && largoMm && anchoMm && areaTerreno ? ocupacionTerreno(panelesObjetivo, largoMm, anchoMm, areaTerreno) : null;
   const potencias = inversores.map((i) => aNumero(i.potencia_kw));
-  const sumaPotencias = potencias.every((p) => p !== null && p > 0)
-    ? potencias.reduce<number>((s, p) => s + (p ?? 0), 0)
-    : null;
+  const analisis =
+    panelesObjetivo && potenciaPanel && potencias.every((p) => p !== null && p > 0)
+      ? analizarInversores(
+          panelesObjetivo,
+          potenciaPanel,
+          inversores.map((inv, k) => ({
+            potenciaKw: potencias[k] as number,
+            vmaxV: aNumero(inv.vmax_v),
+            vminV: aNumero(inv.vmin_v),
+            mppts: aNumero(inv.mppts),
+            stringsPorMppt: aNumero(inv.strings_por_mppt),
+          })),
+          aNumero(formulario.panel_voc_v),
+          aNumero(formulario.panel_vmp_v),
+        )
+      : null;
+  // Paneles que le tocarían a cada inversor, en proporción a su potencia
+  const sumaPotencias = analisis ? analisis.potenciaAcKw : null;
   const reparto = (indice: number) =>
-    sugerencia &&
-    Math.round(
-      sumaPotencias ? (sugerencia.paneles * (potencias[indice] ?? 0)) / sumaPotencias : sugerencia.paneles / inversores.length,
-    );
+    panelesObjetivo && sumaPotencias ? Math.round((panelesObjetivo * (potencias[indice] ?? 0)) / sumaPotencias) : null;
 
   const resumen =
     formulario.panel_marca && inversores[0]?.marca
@@ -555,7 +585,7 @@ export function EquipoPage() {
         onCambiosSinGuardar={setEncabezadoSucio}
         onActualizado={async (p) => {
           setProyecto(p);
-          // La separación entre filas depende de la latitud: se recalcula en el backend
+          // Los datos del proyecto pueden cambiar el terreno: se recalcula en el backend
           const actual = await obtenerEquipo(proyectoId);
           if (actual) setGuardado(actual);
         }}
@@ -706,9 +736,13 @@ export function EquipoPage() {
               <Entrada etiqueta="Vmp" unidad="V" error={visible("panel_vmp_v")} obligatorio>
                 <input className={clase("panel_vmp_v")} inputMode="decimal" value={formulario.panel_vmp_v} onChange={(e) => actualizar("panel_vmp_v", e.target.value)} onBlur={tocar("panel_vmp_v")} />
               </Entrada>
-              <Entrada etiqueta="Ángulo de montaje" unidad="°, 0 a 90" error={visible("angulo_montaje")} obligatorio>
-                <input className={clase("angulo_montaje")} inputMode="decimal" placeholder="Ej. 15" value={formulario.angulo_montaje} onChange={(e) => actualizar("angulo_montaje", e.target.value)} onBlur={tocar("angulo_montaje")} />
-              </Entrada>
+              <div>
+                <p className="text-xs font-medium text-acero-600">Ángulo de montaje</p>
+                <p className="mt-1 rounded-lg border border-acero-200 bg-acero-50 px-3 py-2 text-sm text-acero-800" aria-label="Ángulo de montaje">
+                  {numero(ANGULO_MONTAJE, 1)}°
+                </p>
+                <p className="mt-1 text-xs text-acero-400">Aletas de los soportes A y V (ficha Hex001)</p>
+              </div>
             </div>
 
             {largoMm && anchoMm && largoMm > 0 && anchoMm > 0 ? (
@@ -729,31 +763,36 @@ export function EquipoPage() {
             ) : null}
           </section>
 
-          {calculos && (
-            <section className="rounded-xl border border-acero-200 bg-superficie p-5">
-              <h2 className="text-sm font-semibold text-acero-700">Separación entre filas</h2>
-              {hayCambios && (
-                <p className="mt-2 rounded-lg bg-solar-50 px-3 py-2 text-xs text-solar-800">
-                  Los resultados corresponden a la última versión guardada.
-                </p>
-              )}
-              <dl className="mt-3 space-y-2">
-                {/* No depende de la latitud: se muestra siempre */}
-                <Fila nombre="Área por panel" valor={`${numero(calculos.area_panel_m2, 3)} m²`} />
-              </dl>
-              {calculos.separacion ? (
-                <dl className="mt-2 space-y-2">
-                  <Fila nombre="Sol más bajo al mediodía" valor={`${numero(calculos.separacion.elevacion_solar_grados)}°`} />
-                  <Fila nombre="Sombra (hueco libre)" valor={`${numero(calculos.separacion.sombra_m)} m`} />
-                  <div className="border-t border-acero-200 pt-2">
-                    <Fila nombre="Paso mínimo" valor={<span className="text-solar-700">{numero(calculos.separacion.paso_minimo_m)} m</span>} />
-                  </div>
+          <section className="rounded-xl border border-acero-200 bg-superficie p-5" aria-label="Paneles en el terreno">
+            <h2 className="text-sm font-semibold text-acero-700">¿Caben en el terreno?</h2>
+            {!panelesObjetivo ? (
+              <p className="mt-2 text-sm text-acero-500">Escribe la potencia objetivo para ver si los paneles caben en el terreno.</p>
+            ) : !ocupacion ? (
+              <p className="mt-2 text-sm text-acero-500">
+                {numero(panelesObjetivo, 0)} paneles. Dibuja el terreno en el Paso 1 para compararlos con su área.
+              </p>
+            ) : (
+              <>
+                <dl className="mt-3 space-y-2">
+                  <Fila nombre="Paneles necesarios" valor={`${numero(ocupacion.paneles, 0)} (kWp × 1000 ÷ Wp)`} />
+                  <Fila nombre="Superficie de los paneles" valor={`${numero(ocupacion.areaPanelesM2, 0)} m²`} />
+                  <Fila nombre="Área útil del terreno" valor={`${numero(ocupacion.areaTerrenoM2, 0)} m²`} />
                 </dl>
-              ) : (
-                <p className="mt-2 text-sm text-acero-500">Falta la latitud del proyecto (Paso 1).</p>
-              )}
-            </section>
-          )}
+                {ocupacion.cabe ? (
+                  <p className="mt-3 rounded-lg bg-green-50 px-3 py-2 text-xs text-green-800">
+                    Los paneles ocupan el {numero(ocupacion.porcentaje, 0)} % del terreno útil. El número final lo da el Paso 3:
+                    los pasillos y la forma del terreno reducen lo que entra.
+                  </p>
+                ) : (
+                  <p role="alert" className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+                    No caben: {numero(ocupacion.paneles, 0)} paneles ocupan {numero(ocupacion.areaPanelesM2, 0)} m² y el terreno útil
+                    tiene {numero(ocupacion.areaTerrenoM2, 0)} m². Aun sin pasillos, entran como máximo{" "}
+                    {numero(ocupacion.maximoPaneles, 0)} paneles ({numero((ocupacion.maximoPaneles * (potenciaPanel ?? 0)) / 1000, 1)} kWp).
+                  </p>
+                )}
+              </>
+            )}
+          </section>
         </div>
 
         {/* ─── Inversores ────────────────────────────────── */}
@@ -761,32 +800,57 @@ export function EquipoPage() {
           <section className="rounded-xl border border-acero-200 bg-superficie p-5">
             <h2 className="text-sm font-semibold text-acero-900">Inversores</h2>
 
-            {sugerencia ? (
-              <div className="mt-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
-                <p className="font-semibold">Sugerencia automática</p>
-                <p className="mt-1 text-xs">
-                  Con {numero(sugerencia.paneles, 0)} paneles (~{numero(sugerencia.potenciaKwp, 1)} kWp) se recomiendan{" "}
-                  <strong>
-                    {sugerencia.inversores} inversor{sugerencia.inversores === 1 ? "" : "es"}
-                  </strong>{" "}
-                  (~{numero(sugerencia.panelesPorInversor, 0)} paneles c/u · ~{numero(sugerencia.kwpPorInversor, 1)} kWp c/u).
+            {analisis ? (
+              <div
+                aria-label="Relación DC/AC"
+                className={[
+                  "mt-4 rounded-lg border px-4 py-3 text-sm",
+                  analisis.estado === "recorte"
+                    ? "border-amber-300 bg-amber-50 text-amber-900"
+                    : analisis.estado === "reserva"
+                      ? "border-sky-200 bg-sky-50 text-sky-900"
+                      : "border-green-200 bg-green-50 text-green-800",
+                ].join(" ")}
+              >
+                <p className="font-semibold">
+                  Relación DC/AC: {numero(analisis.relacion, 2)} ({numero(analisis.potenciaDcKwp, 1)} kWp ÷{" "}
+                  {numero(analisis.potenciaAcKw, 1)} kW)
                 </p>
-                {sugerencia.inversores > inversores.length && sugerencia.inversores <= MAX_INVERSORES && (
+                <p className="mt-1 text-xs">
+                  {analisis.estado === "reserva"
+                    ? "Los inversores suman más que los paneles: queda reserva para ampliaciones."
+                    : analisis.estado === "recorte"
+                      ? `Los paneles superan a los inversores en más de un ${numero((RELACION_DC_AC_MAXIMA - 1) * 100, 0)} %: en las horas de más sol recortarían la producción.`
+                      : `Dentro de lo habitual (de 1 a ${numero(RELACION_DC_AC_MAXIMA, 1)}).`}
+                </p>
+                {analisis.admitidos !== null && analisis.paneles > analisis.admitidos && (
+                  <p className="mt-1 text-xs">
+                    Las entradas admiten {numero(analisis.admitidos, 0)} paneles (MPPT × strings × paneles por string) y hay{" "}
+                    {numero(analisis.paneles, 0)}: faltan entradas.
+                  </p>
+                )}
+                <p className="mt-2 text-xs">
+                  Con el modelo del inversor 1 se sugieren <strong>{analisis.sugeridos}</strong>:{" "}
+                  {numero(analisis.potenciaDcKwp, 1)} kWp ÷ ({numero(potencias[0] ?? 0, 0)} kW × {numero(RELACION_DC_AC_MAXIMA, 1)}) ={" "}
+                  {numero(analisis.porPotencia, 2)}
+                  {analisis.porEntradas !== null &&
+                    `; ${numero(analisis.paneles, 0)} paneles ÷ ${numero(analisis.admiteModelo ?? 0, 0)} que admite cada uno = ${numero(analisis.porEntradas, 2)}`}
+                  . Se toma el mayor, hacia arriba. Es una referencia: los inversores los define la ingeniería del proyecto.
+                </p>
+                {analisis.sugeridos > inversores.length && analisis.sugeridos <= MAX_INVERSORES && (
                   <button
                     type="button"
-                    onClick={() => agregarInversores(sugerencia.inversores - inversores.length)}
-                    className="mt-2 rounded-md border border-green-200 px-2.5 py-1 text-xs font-medium hover:bg-green-100"
+                    onClick={() => agregarInversores(analisis.sugeridos - inversores.length)}
+                    className="mt-2 rounded-md border border-current px-2.5 py-1 text-xs font-medium hover:bg-white/50"
                   >
-                    Usar {sugerencia.inversores} inversores
+                    Usar {analisis.sugeridos} inversores
                   </button>
-                )}
-                {sugerencia.inversores < inversores.length && (
-                  <p className="mt-1 text-xs">Tienes {inversores.length} configurados.</p>
                 )}
               </div>
             ) : (
               <p className="mt-3 text-xs text-acero-400">
-                Con la potencia objetivo y la del panel se sugiere cuántos inversores usar (~400 paneles cada uno).
+                Con la potencia objetivo y la potencia de cada inversor se calcula la relación DC/AC (kWp de paneles ÷ kW de
+                inversores) y cuántos inversores conviene usar.
               </p>
             )}
 
@@ -903,8 +967,7 @@ export function EquipoPage() {
 
           {!calculos ? (
             <div className="rounded-xl border border-dashed border-acero-300 bg-superficie p-5 text-sm text-acero-500">
-              Guarda la configuración para ver el área por panel, la separación entre filas y los límites de string de
-              cada inversor.
+              Guarda la configuración para ver los límites de string de cada inversor y los avisos del sistema.
             </div>
           ) : (
             calculos.advertencias.length > 0 && (

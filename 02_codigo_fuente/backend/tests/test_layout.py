@@ -268,10 +268,11 @@ def test_pasillo_configurable_se_respeta():
     assert r.separacion_norte_sur_m == 4
 
 
-def test_la_sombra_reemplaza_al_pasillo_si_es_mayor():
+def test_la_latitud_ya_no_cambia_la_separacion():
     """
-    Con 30° y latitud 0,35: sol mínimo a 66,21°.
-    sombra = 9,112 × sen 30° / tan 66,21° = 4,556 / 2,269 ≈ 2,008 m.
+    Revisión del 25 de noviembre: la sombra se dejó de calcular. Antes,
+    con 30° y latitud 0,35, la separación este-oeste subía a 2,008 m; ahora
+    los bloques se separan solo por el pasillo, en las dos direcciones.
     """
     r = generar_layout(
         rectangulo(100, 60),
@@ -281,9 +282,9 @@ def test_la_sombra_reemplaza_al_pasillo_si_es_mayor():
         orientacion_norte=0,
         latitud=0.35,
     )
-    assert r.separacion_este_oeste_m == pytest.approx(2.008, abs=1e-3)
+    assert r.separacion_este_oeste_m == 0.5
     assert r.separacion_norte_sur_m == 0.5
-    assert any("sombra" in a for a in r.advertencias)
+    assert not any("sombra" in a for a in r.advertencias)
 
 
 def test_inclinacion_reduce_el_largo_en_planta():
@@ -294,11 +295,11 @@ def test_inclinacion_reduce_el_largo_en_planta():
 # ─── Advertencias y errores ─────────────────────────────────────────
 
 
-def test_advierte_sin_orientacion_ni_latitud():
+def test_advierte_sin_orientacion_y_no_pide_latitud():
     r = generar_layout(rectangulo(100, 60), [], PANEL_PLANO, ParametrosLayout(paneles_ancho=24))
     texto = " ".join(r.advertencias)
     assert "orientación del norte" in texto
-    assert "latitud" in texto
+    assert "latitud" not in texto
 
 
 def test_terreno_demasiado_chico():

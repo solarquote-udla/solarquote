@@ -25,7 +25,6 @@ from app.schemas.layout import (
     LayoutLeer,
     TipoBloqueLeer,
 )
-from app.services.calculo_equipo import inversores_sugeridos
 from app.services.calculo_layout import (
     Bloque,
     InversorLayout,
@@ -43,7 +42,7 @@ from app.services.calculo_layout import (
     validar_bloques,
     vertices_de,
 )
-from app.services.equipo import obtener_configuracion
+from app.services.equipo import analisis_inversores, obtener_configuracion
 from app.services.terreno import obtener_terreno
 
 
@@ -525,6 +524,8 @@ def a_respuesta(layout: Layout, huella: str, equipo: ConfiguracionEquipo | None)
         ]
     )
     resumen = layout.resumen
+    # Relación DC/AC y sugerencia con los paneles que de verdad entraron
+    analisis = analisis_inversores(equipo, layout.total_paneles) if equipo else None
 
     return LayoutLeer(
         proyecto_id=layout.proyecto_id,
@@ -575,7 +576,8 @@ def a_respuesta(layout: Layout, huella: str, equipo: ConfiguracionEquipo | None)
         area_ocupada_m2=resumen["area_ocupada_m2"],
         capacidad=CapacidadLeer(**resumen["capacidad"]) if resumen["capacidad"] else None,
         inversores=_inversores_del_layout(layout, equipo),
-        inversores_sugeridos=inversores_sugeridos(layout.total_paneles),
+        inversores_sugeridos=analisis.sugeridos if analisis else 0,
+        analisis_inversores=analisis,
         advertencias=resumen["advertencias"],
         angulo_norte=_angulo_del_layout(layout),
         lado_menor_m=_lado_menor_del_layout(layout),

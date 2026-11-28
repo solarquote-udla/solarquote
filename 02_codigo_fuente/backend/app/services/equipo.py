@@ -7,29 +7,25 @@ from sqlalchemy.orm import Session
 from app.models.equipo import ConfiguracionEquipo, InversorEquipo
 from app.models.proyecto import Proyecto
 from app.schemas.equipo import (
+    AnalisisInversoresLeer,
     CalculosEquipo,
     ConfiguracionEquipoGuardar,
     ConfiguracionEquipoLeer,
     Inversor,
     LimitesStringLeer,
+    OcupacionLeer,
     Panel,
-    SeparacionFilas,
-    SugerenciaLeer,
 )
 from app.services.calculo_equipo import (
+    InversorElectrico,
+    analizar_inversores,
     area_panel_m2,
     limites_string,
-    separacion_entre_filas,
-    sugerencia_inversores,
+    ocupacion_terreno,
+    paneles_para_potencia,
 )
 from app.services.proyecto import avanzar_a_en_diseno
-
-ADVERTENCIA_VOC_STC = (
-    "Los límites de string usan el Voc de la ficha, medido a 25 °C. En frío "
-    "el Voc sube: con temperaturas cercanas a 5 °C, un string en el límite "
-    "máximo puede superar el voltaje del inversor. El dimensionamiento "
-    "eléctrico definitivo corresponde al instalador."
-)
+from app.services.terreno import areas_de, obtener_terreno
 
 
 def obtener_configuracion(db: Session, proyecto_id: int) -> ConfiguracionEquipo | None:
@@ -121,38 +117,39 @@ def _reemplazar_inversores(
     db.flush()
 
 
-def _calculos(configuracion: ConfiguracionEquipo, proyecto: Proyecto) -> CalculosEquipo:
-    advertencias: list[str] = []
+def inversores_electricos(configuracion: ConfiguracionEquipo) -> list[InversorElectrico]:
+    return [
+        InversorElectrico(
+            potencia_kw=i.potencia_kw,
+            vmax_v=i.vmax_v,
+            vmin_v=i.vmin_v,
+            mppts=i.mppts,
+            strings_por_mppt=i.strings_por_mppt,
+        )
+        for i in configuracion.inversores
+    ]
 
-    # ─── Separación entre filas ──────────────────────────────
-    separacion = None
-    if proyecto.latitud is None:
-        advertencias.append(
-            "Registra la latitud del proyecto para calcular la separación "
-            "mínima entre filas: depende de la altura del sol en el sitio."
-        )
-    else:
-        resultado = separacion_entre_filas(
-            profundidad_m=configuracion.panel_largo_mm / 1000,
-            angulo_montaje=configuracion.angulo_montaje,
-            latitud=float(proyecto.latitud),
-        )
-        separacion = SeparacionFilas(
-            elevacion_solar_grados=round(resultado.elevacion_solar_grados, 2),
-            altura_m=round(resultado.altura_m, 3),
-            proyeccion_m=round(resultado.proyeccion_m, 3),
-            sombra_m=round(resultado.sombra_m, 3),
-            paso_minimo_m=round(resultado.paso_minimo_m, 3),
-            factor_sombra=round(resultado.factor_sombra, 5),
-        )
+
+def analisis_inversores(configuracion: ConfiguracionEquipo, paneles: int) -> AnalisisInversoresLeer | None:
+    """Relación DC/AC y sugerencia para `paneles`: la usan el Paso 2 (potencia objetivo) y el Paso 3 (layout)."""
+    analisis = analizar_inversores(
+        paneles,
+        configuracion.panel_potencia_wp,
+        inversores_electricos(configuracion),
+        configuracion.panel_voc_v,
+        configuracion.panel_vmp_v,
+    )
+    return AnalisisInversoresLeer(**vars(analisis)) if analisis else None
+
+
+def _calculos(configuracion: ConfiguracionEquipo, area_terreno_m2: float | None) -> CalculosEquipo:
+    advertencias: list[str] = []
 
     # ─── Límites de string, por inversor ─────────────────────
     strings: list[LimitesStringLeer | None] = []
-    sin_voltajes: list[int] = []
-    for numero, inversor in enumerate(configuracion.inversores, start=1):
+    for inversor in configuracion.inversores:
         if inversor.vmax_v is None or inversor.vmin_v is None:
             strings.append(None)
-            sin_voltajes.append(numero)
             continue
         limites = limites_string(
             vmax_inversor=inversor.vmax_v,
@@ -168,46 +165,44 @@ def _calculos(configuracion: ConfiguracionEquipo, proyecto: Proyecto) -> Calculo
                 motivo=limites.motivo,
             )
         )
-    if sin_voltajes:
-        cuales = ", ".join(str(n) for n in sin_voltajes)
-        advertencias.append(
-            f"Sin los voltajes máximo y mínimo del inversor {cuales} no se pueden "
-            f"validar sus límites de string ni la compatibilidad con el panel."
-        )
-    if any(limite is not None for limite in strings):
-        advertencias.append(ADVERTENCIA_VOC_STC)
+        # Solo se avisa cuando hay un problema real: el inversor no admite el panel
+        if not limites.compatible:
+            advertencias.append(f"Inversor {len(strings)}: {limites.motivo}")
 
-    # ─── Sugerencia de inversores ────────────────────────────
-    sugerencia = None
+    # ─── Potencia objetivo: inversores y terreno ─────────────
+    inversores = None
+    ocupacion = None
     if configuracion.potencia_objetivo_kwp:
-        sug = sugerencia_inversores(configuracion.potencia_objetivo_kwp, configuracion.panel_potencia_wp)
-        sugerencia = SugerenciaLeer(
-            paneles=sug.paneles,
-            potencia_kwp=round(sug.potencia_kwp, 2),
-            inversores=sug.inversores,
-            paneles_por_inversor=sug.paneles_por_inversor,
-            kwp_por_inversor=round(sug.kwp_por_inversor, 2),
-        )
-        if sug.inversores != len(configuracion.inversores):
-            advertencias.append(
-                f"Para {configuracion.potencia_objetivo_kwp:g} kWp (~{sug.paneles} paneles) se sugieren "
-                f"{sug.inversores} inversor(es), a razón de ~400 paneles cada uno; configuraste "
-                f"{len(configuracion.inversores)}."
+        paneles = paneles_para_potencia(configuracion.potencia_objetivo_kwp, configuracion.panel_potencia_wp)
+        inversores = analisis_inversores(configuracion, paneles)
+        if inversores:
+            advertencias.extend(inversores.mensajes)
+        if area_terreno_m2:
+            resultado = ocupacion_terreno(
+                paneles,
+                configuracion.panel_largo_mm,
+                configuracion.panel_ancho_mm,
+                configuracion.panel_potencia_wp,
+                area_terreno_m2,
             )
+            if resultado:
+                ocupacion = OcupacionLeer(**vars(resultado))
+                if resultado.mensaje:
+                    advertencias.insert(0, resultado.mensaje)
 
     return CalculosEquipo(
-        area_panel_m2=round(
-            area_panel_m2(configuracion.panel_largo_mm, configuracion.panel_ancho_mm), 4
-        ),
-        separacion=separacion,
+        area_panel_m2=round(area_panel_m2(configuracion.panel_largo_mm, configuracion.panel_ancho_mm), 4),
         strings=strings,
-        sugerencia=sugerencia,
+        inversores=inversores,
+        ocupacion=ocupacion,
         advertencias=advertencias,
     )
 
 
-def a_respuesta(configuracion: ConfiguracionEquipo, proyecto: Proyecto) -> ConfiguracionEquipoLeer:
-    """Arma la respuesta de la API: forma anidada más los cálculos."""
+def a_respuesta(configuracion: ConfiguracionEquipo, db: Session) -> ConfiguracionEquipoLeer:
+    """Arma la respuesta de la API: forma anidada más los cálculos (con el área útil del terreno, si hay)."""
+    terreno = obtener_terreno(db, configuracion.proyecto_id)
+    area_terreno = areas_de(terreno)["area_util"] if terreno is not None else None
     return ConfiguracionEquipoLeer(
         proyecto_id=configuracion.proyecto_id,
         panel=Panel(
@@ -233,7 +228,7 @@ def a_respuesta(configuracion: ConfiguracionEquipo, proyecto: Proyecto) -> Confi
             for i in configuracion.inversores
         ],
         potencia_objetivo_kwp=configuracion.potencia_objetivo_kwp,
-        calculos=_calculos(configuracion, proyecto),
+        calculos=_calculos(configuracion, area_terreno),
         created_at=configuracion.created_at,
         updated_at=configuracion.updated_at,
     )
