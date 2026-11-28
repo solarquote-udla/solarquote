@@ -49,6 +49,11 @@ interface Props {
   onAgregarPunto: (punto: Punto) => void;
   /** Se llama al hacer clic sobre el primer vértice del borrador. */
   onCerrarBorrador: () => void;
+  /**
+   * Hacia dónde apunta el norte, en grados en sentido horario desde arriba
+   * del plano. `undefined` no muestra la flecha; `null` la muestra sin definir.
+   */
+  norte?: number | null;
 }
 
 const redondear = (v: number) => Math.round(v * 100) / 100;
@@ -62,6 +67,7 @@ export function EditorPoligonos({
   pasoAjuste,
   onAgregarPunto,
   onCerrarBorrador,
+  norte,
 }: Props) {
   const grupoRef = useRef<SVGGElement>(null);
   const [cursor, setCursor] = useState<Punto | null>(null);
@@ -260,6 +266,19 @@ export function EditorPoligonos({
             })}
         </g>
       </svg>
+
+      {norte !== undefined && (
+        <div
+          className="pointer-events-none absolute right-3 top-3 flex flex-col items-center rounded-md bg-superficie/90 px-2 py-1.5 shadow-sm"
+          data-testid="norte-plano"
+          data-grados={norte ?? ""}
+        >
+          <svg viewBox="-12 -12 24 24" className="h-8 w-8" style={{ transform: `rotate(${norte ?? 0}deg)` }} aria-hidden="true">
+            <polygon points="0,-11 5,6 0,2 -5,6" className={norte == null ? "fill-acero-500" : "fill-red-600"} />
+          </svg>
+          <span className="text-[10px] font-semibold text-acero-600">N{norte == null ? "?" : ""}</span>
+        </div>
+      )}
 
       {/* Lectura de coordenadas del cursor */}
       <div className="pointer-events-none absolute bottom-3 right-3 rounded-md bg-superficie/90 px-2 py-1 font-mono text-xs text-acero-600 shadow-sm">

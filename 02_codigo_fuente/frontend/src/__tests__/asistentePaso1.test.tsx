@@ -19,7 +19,13 @@ vi.mock("@/services/clientes", () => ({
 const campo = (e: RegExp) => screen.getByLabelText(e) as HTMLInputElement;
 const escribir = (el: HTMLElement, v: string) => fireEvent.change(el, { target: { value: v } });
 const existente = () => montar(<TerrenoPage />, "/generar/5/terreno", ["/generar", "/generar/:proyectoId/terreno"]);
-const listo = () => screen.findByText("Actualizar plano");
+const listo = () => screen.findByText("MEDIDAS DEL TERRENO");
+/** Cambia el largo de un lado como lo hace el usuario: escribe y sale del campo. */
+function cambiarLado(n: number, valor: string) {
+  const lado = screen.getByLabelText(`Largo del lado ${n} (m)`);
+  fireEvent.change(lado, { target: { value: valor } });
+  fireEvent.blur(lado);
+}
 
 beforeEach(() => {
   vi.mocked(proyectos.obtenerProyecto).mockResolvedValue(PROYECTO as never);
@@ -49,9 +55,8 @@ describe("Paso 1: cambios sin guardar", () => {
       fireEvent.click(screen.getByRole("tab", { name: "Mapa" }));
       fireEvent.click(screen.getByText("CLIC EN EL MAPA"));
     }],
-    ["ancho sin Actualizar plano", () => escribir(campo(/^Ancho \(m\)/), "120")],
-    ["largo sin Actualizar plano", () => escribir(campo(/^Largo \(m\)/), "70")],
-    ["orientación", () => fireEvent.click(screen.getByText(/^Este/))],
+    ["largo de un lado", () => cambiarLado(1, "120")],
+    ["norte del plano", () => escribir(campo(/^Grados/), "90")],
     ["notas", () => escribir(campo(/^Notas del terreno/), "x")],
     ["vértice editado", () => {
       fireEvent.click(screen.getByText(/Editar coordenadas/));
@@ -86,10 +91,20 @@ describe("Paso 1: cambios sin guardar", () => {
     expect(hayCambiosPendientes()).toBe(false);
   });
 
+  it("un rectángulo escrito sin crear también cuenta como cambio", async () => {
+    vi.mocked(terreno.obtenerTerreno).mockResolvedValue(null as never);
+    existente();
+    await listo();
+    expect(hayCambiosPendientes()).toBe(false);
+    escribir(campo(/^Ancho \(m\)/), "120");
+    escribir(campo(/^Largo \(m\)/), "70");
+    expect(hayCambiosPendientes()).toBe(true);
+  });
+
   it("aceptar la confirmación sí sale", async () => {
     existente();
     await listo();
-    escribir(campo(/^Ancho \(m\)/), "120");
+    cambiarLado(1, "120");
     vi.spyOn(window, "confirm").mockReturnValue(true);
     await act(async () => fireEvent.click(screen.getByText("MENU HISTORIAL")));
     expect(await screen.findByText("HISTORIAL")).toBeTruthy();
@@ -106,12 +121,12 @@ describe("Paso 1: cambios sin guardar", () => {
 });
 
 describe("Paso 1: guardar y geometría", () => {
-  it("Siguiente guarda las dimensiones escritas y avanza sin preguntar", async () => {
+  it("Siguiente guarda el lado editado y avanza sin preguntar", async () => {
     const confirmar = vi.spyOn(window, "confirm");
     existente();
     await listo();
-    escribir(campo(/^Ancho \(m\)/), "120");
-    escribir(campo(/^Largo \(m\)/), "88,5");
+    cambiarLado(1, "120");
+    cambiarLado(2, "88,5");
     await act(async () => fireEvent.click(screen.getByText(/Siguiente/)));
     expect(await screen.findByText("PASO 2")).toBeTruthy();
     expect(confirmar).not.toHaveBeenCalled();
@@ -141,26 +156,51 @@ describe("Paso 1: guardar y geometría", () => {
     expect(vi.mocked(terreno.crearTerreno).mock.calls[0][1].vertices).toEqual(rect(120, 88));
   });
 
-  it("Actualizar plano confirma antes de pisar un contorno irregular editado a mano", async () => {
-    existente();
-    await listo();
-    fireEvent.click(screen.getByText(/Editar coordenadas/));
-    escribir(screen.getByLabelText("Vértice 3, x"), "130");
-    expect(campo(/^Ancho \(m\)/).value).toBe("130");
-    const confirmar = vi.spyOn(window, "confirm").mockReturnValue(false);
-    fireEvent.click(screen.getByText("Actualizar plano"));
-    expect(confirmar).toHaveBeenCalledOnce();
-    expect((screen.getByLabelText("Vértice 3, x") as HTMLInputElement).value).toBe("130");
-  });
-
-  it("contorno irregular con otras dimensiones: Siguiente bloquea con un mensaje", async () => {
+  it("con contorno no hay ancho, largo ni Actualizar plano: se muestran lados, perímetro y área", async () => {
     vi.mocked(terreno.obtenerTerreno).mockResolvedValue(TERRENO([[0, 0], [50, 0], [60, 30], [0, 40]]) as never);
     existente();
     await listo();
-    escribir(campo(/^Ancho \(m\)/), "70");
+    expect(screen.queryByLabelText(/^Ancho \(m\)/)).toBeNull();
+    expect(screen.queryByLabelText(/^Largo \(m\)/)).toBeNull();
+    expect(screen.queryByText("Actualizar plano")).toBeNull();
+    expect(screen.getByText("Lados (4)")).toBeTruthy();
+    // 50 + 31,62 + 60,83 + 40
+    expect(screen.getByTestId("perimetro-terreno").textContent).toBe("182,45 m");
+    expect(screen.getByTestId("area-terreno").textContent).toMatch(/^1\.950 m²/);
+    expect(screen.getByText(/4 lados · 182,45 m de perímetro/)).toBeTruthy();
+  });
+
+  it("Crear rectángulo arma el contorno y desde ahí se editan los lados", async () => {
+    vi.mocked(terreno.obtenerTerreno).mockResolvedValue(null as never);
+    existente();
+    await listo();
+    fireEvent.click(screen.getByText("Crear rectángulo"));
+    // Sin medidas, marca los dos campos
+    expect(campo(/^Ancho \(m\)/).getAttribute("aria-invalid")).toBe("true");
+    escribir(campo(/^Ancho \(m\)/), "80");
+    escribir(campo(/^Largo \(m\)/), "45,5");
+    fireEvent.click(screen.getByText("Crear rectángulo"));
+    expect(screen.queryByLabelText(/^Ancho \(m\)/)).toBeNull();
+    const lados = screen.getAllByLabelText(/^Largo del lado/).map((i) => (i as HTMLInputElement).value);
+    expect(lados).toEqual(["80", "45.5", "80", "45.5"]);
+  });
+
+  it("en una L, cambiar un lado no arrastra el resto del terreno", async () => {
+    const l: [number, number][] = [[0, 0], [60, 0], [60, 30], [30, 30], [30, 50], [0, 50]];
+    vi.mocked(terreno.obtenerTerreno).mockResolvedValue(TERRENO(l) as never);
+    existente();
+    await listo();
+    // El lado 3 va de (60, 30) a (30, 30): de 30 a 40 m
+    cambiarLado(3, "40");
     await act(async () => fireEvent.click(screen.getByText(/Siguiente/)));
-    expect(screen.getByRole("alert").textContent).toMatch(/contorno irregular/);
-    expect(terreno.actualizarTerreno).not.toHaveBeenCalled();
+    expect(vi.mocked(terreno.actualizarTerreno).mock.calls[0][1].vertices).toEqual([
+      [0, 0],
+      [60, 0],
+      [60, 30],
+      [20, 30],
+      [20, 50],
+      [0, 50],
+    ]);
   });
 
   it("Siguiente queda deshabilitado mientras se dibuja", async () => {

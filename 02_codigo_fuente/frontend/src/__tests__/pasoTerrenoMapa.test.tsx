@@ -23,7 +23,7 @@ vi.mock("@/services/clientes", () => ({
 
 const CON_UBICACION = { ...PROYECTO, latitud: PUNTO_DEL_MAPA.latitud, longitud: PUNTO_DEL_MAPA.longitud };
 
-const listo = () => screen.findByText("Actualizar plano");
+const listo = () => screen.findByText("MEDIDAS DEL TERRENO");
 const boton = (texto: string | RegExp) => fireEvent.click(screen.getByRole("button", { name: texto }));
 const valor = (etiqueta: RegExp) => (screen.getByLabelText(etiqueta) as HTMLInputElement).value;
 const lados = () =>
@@ -62,11 +62,14 @@ describe("Paso 1: terreno sobre el mapa", () => {
     expect(screen.getByTestId("contorno-mapa").textContent).toBe("4");
     // La tercera esquina estaba a 89°: quedó en 90° y el rectángulo cierra exacto
     expect(screen.getByTestId("lados-mapa").textContent).toBe("100 m | 60 m | 100 m | 60 m");
-    expect(valor(/^Ancho \(m\)/)).toBe("100");
-    expect(valor(/^Largo \(m\)/)).toBe("60");
-    expect(valor(/^Otro ángulo/)).toBe("0");
+    expect(screen.queryByLabelText(/^Ancho \(m\)/)).toBeNull();
     expect(lados()).toEqual(["100", "60", "100", "60"]);
     expect(screen.getAllByText("90°")).toHaveLength(4);
+    // En el mapa el norte no se pregunta; en el plano queda en 0°, arriba
+    expect(screen.queryByText("¿Hacia dónde apunta el norte en tu plano?")).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "Plano" }));
+    expect(valor(/^Grados/)).toBe("0");
+    expect(screen.getByTestId("norte-plano").dataset.grados).toBe("0");
   });
 
   it("sin ajuste a 90° el punto queda donde se marcó", async () => {
@@ -103,7 +106,6 @@ describe("Paso 1: terreno sobre el mapa", () => {
     fireEvent.blur(lado1);
 
     expect(lados()).toEqual(["120.5", "60", "120.5", "60"]);
-    expect(valor(/^Ancho \(m\)/)).toBe("120.5");
     verMapa();
     expect(screen.getByTestId("lados-mapa").textContent).toBe("120,5 m | 60 m | 120,5 m | 60 m");
 
