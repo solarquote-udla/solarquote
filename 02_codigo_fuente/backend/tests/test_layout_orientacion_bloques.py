@@ -228,3 +228,60 @@ def test_orientacion_invalida_responde_422(api, proyecto):
     pid, h = proyecto
     r = api.post(f"/api/proyectos/{pid}/layout", headers=h, json={**PARAMETROS, "orientacion_bloques": "este"})
     assert r.status_code == 422
+
+
+# ─── Revisión de Esteban del #107 y del #109 ────────────────────────
+
+
+def test_si_alineado_no_entra_nada_se_usa_el_norte_y_se_avisa(monkeypatch):
+    """No se cambia en silencio lo pedido: el resultado dice que usó el norte y por qué."""
+    import app.services.calculo_layout as calculo
+
+    monkeypatch.setattr(calculo, "angulos_del_terreno", lambda terreno: [])
+    r = calculo.generar_layout(
+        rectangulo(100, 60), [], PANEL_PLANO, ParametrosLayout(paneles_ancho=24), orientacion_norte=0, orientacion_bloques="terreno"
+    )
+    assert r.orientacion_bloques == "norte"
+    assert any("así no entra ningún bloque: se usó el norte" in a for a in r.advertencias)
+
+
+def test_se_guarda_la_orientacion_que_se_uso(api, proyecto, monkeypatch):
+    import app.services.calculo_layout as calculo
+
+    monkeypatch.setattr(calculo, "angulos_del_terreno", lambda terreno: [])
+    pid, h = proyecto
+    r = api.post(f"/api/proyectos/{pid}/layout", headers=h, json={**PARAMETROS, "orientacion_bloques": "terreno"})
+    assert r.status_code == 200
+    assert r.json()["parametros"]["orientacion_bloques"] == "norte"
+
+
+def test_corregir_la_latitud_no_desactualiza_el_layout(api, proyecto):
+    """La latitud ya no cambia el layout (#109): corregirla en el Paso 1 no obliga a regenerar ni bloquea la edición."""
+    pid, h = proyecto
+    generado = api.post(f"/api/proyectos/{pid}/layout", headers=h, json=PARAMETROS).json()
+    assert api.patch(f"/api/proyectos/{pid}", headers=h, json={"latitud": 0.35}).status_code == 200
+
+    assert api.get(f"/api/proyectos/{pid}/layout", headers=h).json()["desactualizado"] is False
+    bloques = [{"origen": b["vertices"][3], "paneles_ancho": b["paneles_ancho"]} for b in generado["bloques"]]
+    assert api.put(f"/api/proyectos/{pid}/layout/bloques", headers=h, json={"bloques": bloques}).status_code == 200
+
+
+def test_layout_con_la_huella_anterior_sigue_al_dia(api, proyecto, db):
+    """Un layout generado antes del cambio guardó la huella con la latitud: no debe aparecer desactualizado."""
+    from app.models.layout import Layout
+    from app.models.proyecto import Proyecto
+    from app.services.equipo import obtener_configuracion
+    from app.services.layout import _datos_huella
+    from app.services.terreno import obtener_terreno
+
+    pid, h = proyecto
+    api.post(f"/api/proyectos/{pid}/layout", headers=h, json=PARAMETROS)
+    proyecto_db = db.get(Proyecto, pid)
+    layout = db.query(Layout).filter(Layout.proyecto_id == pid).one()
+    layout.huella = _datos_huella(proyecto_db, obtener_terreno(db, pid), obtener_configuracion(db, pid), con_latitud=True)
+    db.flush()
+
+    assert api.get(f"/api/proyectos/{pid}/layout", headers=h).json()["desactualizado"] is False
+    # Si después cambia algo de verdad (el terreno), sí queda desactualizado
+    api.patch(f"/api/proyectos/{pid}/terreno", headers=h, json={"vertices": [[0, 0], [90, 0], [90, 60], [0, 60]]})
+    assert api.get(f"/api/proyectos/{pid}/layout", headers=h).json()["desactualizado"] is True

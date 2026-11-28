@@ -631,7 +631,7 @@ export interface Layout {
   bloque_compacto: boolean;
   /** Cambios hechos a mano desde la última generación (SQ-64) */
   ediciones_manuales: number;
-  /** Terreno, caminos, equipo o latitud cambiaron después de generar */
+  /** Terreno, caminos o equipo cambiaron después de generar */
   desactualizado: boolean;
   created_at: string;
   updated_at: string;

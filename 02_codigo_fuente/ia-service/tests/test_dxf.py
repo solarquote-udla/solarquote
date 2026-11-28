@@ -154,3 +154,12 @@ def test_bloques_cercanos_son_una_sola_zona():
 )
 def test_rectangulos_de_grupo(posiciones, esperado):
     assert sorted(rectangulos_de_grupo([(x * 2.4, y * 1.3) for x, y in posiciones], 2.348, 1.303)) == sorted(esperado)
+
+
+def test_panel_repetido_en_la_misma_posicion_se_cuenta_una_vez_y_se_avisa():
+    """Revisión del #108: un panel copiado encima de otro no debe sumar ni pasar en silencio."""
+    paneles = list(_bloque(0, 0, 4, 12))
+    r = interpretar_dxf(_dxf(paneles + paneles[:3]))
+    assert [(b.paneles_largo, b.paneles_ancho, b.repeticiones) for b in r.bloques] == [(4, 12, 1)]
+    assert any("3 paneles repetidos en la misma posición" in a for a in r.advertencias)
+    assert not any("no tienen el tamaño de un panel" in a for a in r.advertencias)

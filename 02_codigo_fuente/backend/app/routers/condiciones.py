@@ -1,6 +1,6 @@
 """
-GET /api/proforma/condiciones: plazo, validez, garantía y forma de pago de
-la configuración. El formulario de la confirmación (Paso 3 y boceto) parte
+GET /api/proforma/condiciones: plazo, validez, garantía, logística y forma
+de pago de la configuración. El formulario de la confirmación (Paso 3 y boceto) parte
 de estos valores y el Gerente los ajusta para cada cliente (acuerdo con
 Santi del 17 de noviembre). Mismo permiso que emitir una cotización.
 """
@@ -26,5 +26,6 @@ def condiciones_por_defecto() -> CondicionesPorDefectoLeer:
         plazo_dias=settings.PROFORMA_PLAZO_DIAS,
         validez_dias=settings.PROFORMA_VALIDEZ_DIAS,
         garantia_anios=settings.PROFORMA_GARANTIA_ANIOS,
+        logistica_monto=settings.PROFORMA_LOGISTICA_MONTO,
         pagos=[TramoPagoDefecto(nombre=n, porcentaje=p) for n, p in tramos_pago_por_defecto()],
     )

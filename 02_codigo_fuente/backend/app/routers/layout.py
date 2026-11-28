@@ -67,7 +67,7 @@ def consultar_layout(proyecto_id: int, db: Session = Depends(get_db)) -> LayoutL
             detail=f"El proyecto {proyecto_id} todavía no tiene layout generado",
         )
     return servicio.a_respuesta(
-        layout, servicio.huella_actual(db, proyecto), obtener_configuracion(db, proyecto_id)
+        layout, servicio.huella_actual(db, proyecto, layout.huella), obtener_configuracion(db, proyecto_id)
     )
 
 

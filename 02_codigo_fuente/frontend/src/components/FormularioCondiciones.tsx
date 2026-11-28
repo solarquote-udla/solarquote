@@ -1,7 +1,8 @@
 /**
  * Condiciones de la proforma en la confirmación (acuerdo con Santi del 17
- * de noviembre): plazo, validez, garantía y forma de pago, que cambian
- * según el cliente. Parte de los valores de la configuración.
+ * de noviembre): plazo, validez, garantía, logística y forma de pago, que
+ * cambian según el cliente y el lugar de entrega (la logística: Ibarra o en
+ * sitio, a veces 0). Parte de los valores de la configuración.
  *
  * Presentacional: el estado vive en useCondicionesProforma.
  */
@@ -38,7 +39,7 @@ export function FormularioCondiciones({ estado, deshabilitado = false }: { estad
       <h2 className="text-xs font-semibold tracking-wider text-acero-400">CONDICIONES DE LA PROFORMA</h2>
 
       <fieldset disabled={deshabilitado} className="mt-3 space-y-3">
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <Campo etiqueta="Plazo (días)" obligatorio error={errores.plazo}>
             <input className={`${CAMPO} ${bordeCampo(errores.plazo)}`} inputMode="numeric" value={f.plazo} onChange={(e) => cambiar({ plazo: e.target.value })} />
           </Campo>
@@ -47,6 +48,14 @@ export function FormularioCondiciones({ estado, deshabilitado = false }: { estad
           </Campo>
           <Campo etiqueta="Garantía (años)" obligatorio error={errores.garantia}>
             <input className={`${CAMPO} ${bordeCampo(errores.garantia)}`} inputMode="numeric" value={f.garantia} onChange={(e) => cambiar({ garantia: e.target.value })} />
+          </Campo>
+          <Campo etiqueta="Logística (USD)" obligatorio error={errores.logistica}>
+            <input
+              className={`${CAMPO} ${bordeCampo(errores.logistica)}`}
+              inputMode="decimal"
+              value={f.logistica}
+              onChange={(e) => cambiar({ logistica: e.target.value })}
+            />
           </Campo>
         </div>
 

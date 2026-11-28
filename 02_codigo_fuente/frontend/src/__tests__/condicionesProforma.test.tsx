@@ -16,6 +16,7 @@ import {
   desdeDefecto,
   erroresCondiciones,
   sumaPagos,
+  type CondicionesPorDefecto,
   type FormularioCondiciones,
 } from "@/utils/condiciones";
 
@@ -34,6 +35,7 @@ const DEFECTO = {
   plazo_dias: 20,
   validez_dias: 90,
   garantia_anios: 10,
+  logistica_monto: "2000.00",
   pagos: [
     { nombre: "Anticipo", porcentaje: "30.00" },
     { nombre: "Entrega", porcentaje: "40.00" },
@@ -60,12 +62,27 @@ describe("reglas del formulario de condiciones", () => {
       plazo_dias: 20,
       validez_dias: 90,
       garantia_anios: 10,
+      logistica_monto: 2000,
       pagos: [
         { nombre: "Anticipo", porcentaje: 30 },
         { nombre: "Entrega", porcentaje: 40 },
         { nombre: "A 60 días de la entrega", porcentaje: 30 },
       ],
     });
+  });
+
+  it("la logística es un monto desde 0, con hasta dos decimales (depende del lugar de entrega)", () => {
+    expect(erroresCondiciones(formulario({ logistica: "0" })).logistica).toBeUndefined();
+    expect(erroresCondiciones(formulario({ logistica: "2600,50" })).logistica).toBeUndefined();
+    expect(erroresCondiciones(formulario({ logistica: "" })).logistica).toBe("Ingresa el monto (0 si no se cobra).");
+    expect(erroresCondiciones(formulario({ logistica: "-5" })).logistica).toBe("Debe ser un monto desde 0.");
+    expect(erroresCondiciones(formulario({ logistica: "1.234" })).logistica).toBe("Hasta dos decimales.");
+  });
+
+  it("un backend sin el campo deja la logística en 0", () => {
+    const anterior: CondicionesPorDefecto = { ...DEFECTO };
+    delete anterior.logistica_monto;
+    expect(desdeDefecto(anterior).logistica).toBe("0");
   });
 
   it("plazo, validez y garantía son enteros mayores que cero", () => {
@@ -143,6 +160,8 @@ describe("Confirmación del Paso 3 con las condiciones", () => {
 
     fireEvent.click(within(seccion).getByRole("button", { name: "40 / 60" }));
     fireEvent.change(within(seccion).getByLabelText(/^Validez/), { target: { value: "2" } });
+    expect((within(seccion).getByLabelText(/^Logística/) as HTMLInputElement).value).toBe("2000");
+    fireEvent.change(within(seccion).getByLabelText(/^Logística/), { target: { value: "200" } });
     expect(tramos(seccion)).toEqual([
       ["Anticipo", "40"],
       ["Entrega total", "60"],
@@ -156,6 +175,7 @@ describe("Confirmación del Paso 3 con las condiciones", () => {
         plazo_dias: 20,
         validez_dias: 2,
         garantia_anios: 10,
+        logistica_monto: 200,
         pagos: [
           { nombre: "Anticipo", porcentaje: 40 },
           { nombre: "Entrega total", porcentaje: 60 },

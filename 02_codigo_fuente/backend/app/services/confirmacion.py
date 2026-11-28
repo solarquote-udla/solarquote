@@ -92,9 +92,9 @@ def cotizar_layout(
     layout = obtener_layout(db, proyecto.id)
     if layout is None or not layout.bloques:
         raise NoSePuedeCotizar("Genera el layout del proyecto antes de confirmarlo.")
-    if layout.huella != huella_actual(db, proyecto):
+    if layout.huella != huella_actual(db, proyecto, layout.huella):
         raise NoSePuedeCotizar(
-            "El terreno, los caminos, el panel o la latitud cambiaron después de generar el "
+            "El terreno, los caminos o el panel cambiaron después de generar el "
             "layout. Vuelve a generarlo antes de confirmarlo."
         )
 

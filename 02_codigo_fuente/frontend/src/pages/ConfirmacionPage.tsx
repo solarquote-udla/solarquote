@@ -115,7 +115,7 @@ export function ConfirmacionPage() {
     : !layout
       ? "Todavía no hay layout: genéralo en el Paso 3."
       : layout.desactualizado
-        ? "El terreno, los caminos, el panel o la latitud cambiaron después de generar el layout. Vuelve a generarlo en el Paso 3."
+        ? "El terreno, los caminos o el panel cambiaron después de generar el layout. Vuelve a generarlo en el Paso 3."
         : bloquesFuera > 0 && !acepta
           ? "Ajusta los bloques no compactos o acéptalos bajo tu responsabilidad."
           : Object.keys(condiciones.errores).length > 0

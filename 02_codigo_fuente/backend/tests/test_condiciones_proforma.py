@@ -19,6 +19,7 @@ def test_valores_por_defecto_de_la_configuracion(api, h):  # noqa: F811
     assert datos["plazo_dias"] == settings.PROFORMA_PLAZO_DIAS
     assert datos["validez_dias"] == settings.PROFORMA_VALIDEZ_DIAS
     assert datos["garantia_anios"] == settings.PROFORMA_GARANTIA_ANIOS
+    assert float(datos["logistica_monto"]) == float(settings.PROFORMA_LOGISTICA_MONTO)
     assert [t["nombre"] for t in datos["pagos"]] == ["Anticipo", "Entrega", "A 60 días de la entrega"]
     assert sum(float(t["porcentaje"]) for t in datos["pagos"]) == 100
 

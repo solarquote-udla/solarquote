@@ -61,26 +61,14 @@ def obtener_layout(db: Session, proyecto_id: int) -> Layout | None:
 # ─── Huella de las entradas ─────────────────────────────────────────
 
 
-def calcular_huella(
+def _datos_huella(
     proyecto: Proyecto,
     terreno: Terreno | None,
     equipo: ConfiguracionEquipo | None,
+    *,
+    con_latitud: bool = False,
 ) -> str:
-    """
-    SHA-256 de todo lo que el algoritmo lee de la base.
-
-    Si cualquiera de estos datos cambia después de generar, la huella
-    deja de coincidir y el layout se informa como desactualizado.
-    Los caminos se ordenan por id para que la huella no dependa del
-    orden en que los devuelva la consulta.
-
-    Los inversores no entran: no cambian dónde van los bloques, solo a
-    qué inversor se conecta cada uno, y eso se reparte de nuevo sin
-    volver a generar (`reagrupar`). La potencia objetivo sí entra: si
-    cambia en el Paso 2, el layout ya no corresponde a lo pedido.
-    """
     datos = {
-        "latitud": float(proyecto.latitud) if proyecto.latitud is not None else None,
         "terreno": None
         if terreno is None
         else {
@@ -102,16 +90,48 @@ def calcular_huella(
             "potencia_objetivo_kwp": equipo.potencia_objetivo_kwp,
         },
     }
+    if con_latitud:
+        datos["latitud"] = float(proyecto.latitud) if proyecto.latitud is not None else None
     serializado = json.dumps(datos, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(serializado.encode()).hexdigest()
 
 
-def huella_actual(db: Session, proyecto: Proyecto) -> str:
-    return calcular_huella(
-        proyecto,
-        obtener_terreno(db, proyecto.id),
-        obtener_configuracion(db, proyecto.id),
-    )
+def calcular_huella(
+    proyecto: Proyecto,
+    terreno: Terreno | None,
+    equipo: ConfiguracionEquipo | None,
+) -> str:
+    """
+    SHA-256 de todo lo que el algoritmo lee de la base.
+
+    Si cualquiera de estos datos cambia después de generar, la huella
+    deja de coincidir y el layout se informa como desactualizado.
+    Los caminos se ordenan por id para que la huella no dependa del
+    orden en que los devuelva la consulta.
+
+    Los inversores no entran: no cambian dónde van los bloques, solo a
+    qué inversor se conecta cada uno, y eso se reparte de nuevo sin
+    volver a generar (`reagrupar`). La potencia objetivo sí entra: si
+    cambia en el Paso 2, el layout ya no corresponde a lo pedido. La
+    latitud dejó de entrar cuando se quitó el cálculo de la sombra (#109):
+    ya no cambia el layout.
+    """
+    return _datos_huella(proyecto, terreno, equipo)
+
+
+def huella_actual(db: Session, proyecto: Proyecto, guardada: str | None = None) -> str:
+    """
+    Huella de las entradas de hoy. Un layout generado antes del #109
+    guardó la huella con la latitud: si `guardada` es esa huella y nada
+    más cambió, se devuelve tal cual, para que esos layouts no aparezcan
+    desactualizados solo porque la huella dejó de incluir la latitud.
+    """
+    terreno = obtener_terreno(db, proyecto.id)
+    equipo = obtener_configuracion(db, proyecto.id)
+    actual = calcular_huella(proyecto, terreno, equipo)
+    if guardada is not None and guardada != actual and guardada == _datos_huella(proyecto, terreno, equipo, con_latitud=True):
+        return guardada
+    return actual
 
 
 # ─── Generar ────────────────────────────────────────────────────────
@@ -156,7 +176,6 @@ def generar(db: Session, proyecto: Proyecto, datos: LayoutGenerar) -> Layout:
             separacion_ancho_m=datos.separacion_paneles_ancho_m,
         ),
         orientacion_norte=terreno.orientacion_norte,
-        latitud=float(proyecto.latitud) if proyecto.latitud is not None else None,
         orientacion_bloques=datos.orientacion_bloques,
     )
     asignacion = asignar_inversores(
@@ -192,12 +211,14 @@ def generar(db: Session, proyecto: Proyecto, datos: LayoutGenerar) -> Layout:
         "advertencias": resultado.advertencias,
         "angulo_norte": resultado.angulo_norte,
         # Sin columna propia: son parámetros más, y así no hace falta migración.
-        "orientacion_bloques": datos.orientacion_bloques,
+        # La que de verdad se usó: si se pidió alinear al terreno y no entró
+        # ningún bloque así, se usó el norte (y el resultado lo avisa).
+        "orientacion_bloques": resultado.orientacion_bloques,
         "paneles_por_orientacion": {"norte": resultado.paneles_norte, "terreno": resultado.paneles_terreno},
         "lado_menor_m": resultado.lado_menor_m,
         "separacion_paneles_ancho_m": resultado.separacion_ancho_m,
         "bloque_compacto": resultado.bloque_compacto,
-        # Advertencias que no dependen de qué bloques hay (latitud,
+        # Advertencias que no dependen de qué bloques hay (orientación,
         # orientación, sombra). Al editar se conservan y las de los
         # bloques se recalculan.
         "advertencias_base": [
@@ -279,9 +300,9 @@ def editar_bloques(db: Session, proyecto: Proyecto, datos: LayoutEditar) -> Layo
     layout = obtener_layout(db, proyecto.id)
     if layout is None:
         raise LayoutNoEditable("El proyecto todavía no tiene layout generado.")
-    if layout.huella != huella_actual(db, proyecto):
+    if layout.huella != huella_actual(db, proyecto, layout.huella):
         raise LayoutNoEditable(
-            "El terreno, los caminos, el equipo o la latitud cambiaron después de generar "
+            "El terreno, los caminos o el equipo cambiaron después de generar "
             "el layout. Vuelve a generarlo antes de editarlo."
         )
 
@@ -429,9 +450,9 @@ def reagrupar(db: Session, proyecto: Proyecto) -> Layout:
     layout = obtener_layout(db, proyecto.id)
     if layout is None:
         raise LayoutNoEditable("El proyecto todavía no tiene layout generado.")
-    if layout.huella != huella_actual(db, proyecto):
+    if layout.huella != huella_actual(db, proyecto, layout.huella):
         raise LayoutNoEditable(
-            "El terreno, los caminos, el equipo o la latitud cambiaron después de generar "
+            "El terreno, los caminos o el equipo cambiaron después de generar "
             "el layout. Vuelve a generarlo antes de reagrupar."
         )
     _repartir(layout, obtener_configuracion(db, proyecto.id))
