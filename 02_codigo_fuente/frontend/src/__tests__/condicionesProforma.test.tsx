@@ -16,6 +16,7 @@ import {
   desdeDefecto,
   erroresCondiciones,
   sumaPagos,
+  type CondicionesPorDefecto,
   type FormularioCondiciones,
 } from "@/utils/condiciones";
 
@@ -79,7 +80,8 @@ describe("reglas del formulario de condiciones", () => {
   });
 
   it("un backend sin el campo deja la logística en 0", () => {
-    const { logistica_monto: _sin, ...anterior } = DEFECTO;
+    const anterior: CondicionesPorDefecto = { ...DEFECTO };
+    delete anterior.logistica_monto;
     expect(desdeDefecto(anterior).logistica).toBe("0");
   });
 
