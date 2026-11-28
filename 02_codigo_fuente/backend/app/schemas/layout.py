@@ -4,6 +4,7 @@ Schemas del layout solar — RF-03.
 
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -79,13 +80,11 @@ class LayoutGenerar(BaseModel):
         ),
     )
 
-    lado_bloques: int | None = Field(
-        default=None,
-        ge=0,
-        le=10_000,
+    orientacion_bloques: Literal["norte", "terreno"] = Field(
+        default="norte",
         description=(
-            "Lado del terreno (0 = del primer vértice al segundo) con el que se alinean los "
-            "bloques. Sin valor, los bloques siguen el norte."
+            "norte: filas de norte a sur. terreno: alineados con el lado del terreno que más paneles "
+            "ubica, con las filas a lo largo o de través del lado."
         ),
     )
 
@@ -211,7 +210,7 @@ class LayoutLeer(BaseModel):
     angulo_norte: float = Field(
         description=(
             "Giro de los bloques usado al generar: grados en sentido horario desde +Y. Es el norte, "
-            "o el norte más el giro hacia el lado elegido en `lado_bloques`."
+            "o el giro que los alinea con el terreno si `orientacion_bloques` es terreno."
         )
     )
     lado_menor_m: float = Field(description="Lado menor del panel, en metros")
@@ -219,6 +218,10 @@ class LayoutLeer(BaseModel):
         description="Separación entre paneles en A: el bloque mide A · lado_menor + (A − 1) · separación"
     )
     bloque_compacto: bool = Field(description="El bloque completo cumple A = 3 × L dentro de la tolerancia")
+    paneles_por_orientacion: dict[str, int] | None = Field(
+        default=None,
+        description="Paneles que entran siguiendo el norte y alineados al terreno, para sugerir la mejor",
+    )
     ediciones_manuales: int = Field(description="Cambios hechos a mano desde la última generación")
 
     desactualizado: bool = Field(
