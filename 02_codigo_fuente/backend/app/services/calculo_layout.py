@@ -793,7 +793,12 @@ def generar_layout(
 ) -> ResultadoLayout:
     """
     `orientacion_bloques`: "norte" (filas de norte a sur) o "terreno"
-    (alineados con el lado del terreno que más paneles ubica).
+    (alineados con el lado del terreno que más paneles ubica). El
+    resultado dice la que se usó: si se pidió "terreno" y así no entra
+    ningún bloque, se usa el norte y se avisa.
+
+    `latitud` ya no cambia el layout (se quitó la sombra en el #109); se
+    acepta para no romper a quien todavía la pase.
     """
     if orientacion_bloques not in ORIENTACIONES:
         raise LayoutImposible("La orientación de los bloques debe ser norte o terreno.")
@@ -881,6 +886,12 @@ def generar_layout(
     paneles_terreno = terreno_elegido[0][0] if terreno_elegido else 0
 
     orientacion_usada = "terreno" if orientacion_bloques == "terreno" and terreno_elegido is not None else "norte"
+    if orientacion_bloques == "terreno" and terreno_elegido is None:
+        # Revisión del #107: no cambiar en silencio lo que se pidió
+        advertencias.append(
+            "Se pidió alinear los bloques con el terreno, pero así no entra ningún bloque: se usó "
+            "el norte. La orientación del layout queda como Norte."
+        )
     if orientacion_usada == "terreno":
         angulo, mejor = terreno_elegido[1], terreno_elegido[2]
         giro = _girar_180(angulo - angulo_norte)

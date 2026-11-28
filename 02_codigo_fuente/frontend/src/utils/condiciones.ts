@@ -1,7 +1,8 @@
 /**
  * Condiciones de la proforma en la confirmación (acuerdo con Santi del 17
- * de noviembre): plazo, validez, garantía y forma de pago se ingresan por
- * cotización, porque cambian según el cliente. Mismas reglas que
+ * de noviembre): plazo, validez, garantía, logística y forma de pago se
+ * ingresan por cotización, porque cambian según el cliente y el lugar de
+ * entrega. Mismas reglas que
  * `CondicionesProforma` en el backend.
  */
 import type { CondicionesProforma } from "@/types/api";
@@ -15,6 +16,8 @@ export interface FormularioCondiciones {
   plazo: string;
   validez: string;
   garantia: string;
+  /** Logística en USD: depende del lugar de entrega (Ibarra o en sitio), a veces 0 */
+  logistica: string;
   pagos: TramoFormulario[];
 }
 
@@ -23,6 +26,8 @@ export interface CondicionesPorDefecto {
   plazo_dias: number;
   validez_dias: number;
   garantia_anios: number;
+  /** Puede faltar si el backend es anterior al campo: se usa 0 */
+  logistica_monto?: string | number;
   pagos: { nombre: string; porcentaje: string | number }[];
 }
 
@@ -53,6 +58,7 @@ export function desdeDefecto(d: CondicionesPorDefecto): FormularioCondiciones {
     plazo: texto(d.plazo_dias),
     validez: texto(d.validez_dias),
     garantia: texto(d.garantia_anios),
+    logistica: texto(d.logistica_monto ?? 0),
     pagos: d.pagos.map((t) => ({ nombre: t.nombre, porcentaje: texto(t.porcentaje) })),
   };
 }
@@ -84,6 +90,10 @@ export function erroresCondiciones(f: FormularioCondiciones): Record<string, str
   poner("plazo", entero(f.plazo, "el plazo en días"));
   poner("validez", entero(f.validez, "la validez en días"));
   poner("garantia", entero(f.garantia, "la garantía en años"));
+  const logistica = numero(f.logistica);
+  if (f.logistica.trim() === "") errores.logistica = "Ingresa el monto (0 si no se cobra).";
+  else if (!Number.isFinite(logistica) || logistica < 0) errores.logistica = "Debe ser un monto desde 0.";
+  else if (Math.abs(logistica * 100 - Math.round(logistica * 100)) > 1e-6) errores.logistica = "Hasta dos decimales.";
 
   if (f.pagos.length === 0) errores.pagos = "Agrega al menos un tramo de pago.";
   f.pagos.forEach((t, i) => {
@@ -109,6 +119,7 @@ export function aCondiciones(f: FormularioCondiciones): CondicionesProforma {
     plazo_dias: numero(f.plazo),
     validez_dias: numero(f.validez),
     garantia_anios: numero(f.garantia),
+    logistica_monto: numero(f.logistica),
     pagos: f.pagos.map((t) => ({ nombre: t.nombre.trim(), porcentaje: numero(t.porcentaje) })),
   };
 }

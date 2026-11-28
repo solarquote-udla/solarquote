@@ -295,12 +295,20 @@ def bloques_desde_rectangulos(rects: list[_Rect]) -> tuple[list[BloqueDetectado]
 
     girados_aparte = sum(1 for r in paneles if diferencia(r.angulo) > 5)
     paneles = [r for r in paneles if diferencia(r.angulo) <= 5]
+    # Un panel copiado encima de otro (en la misma posición, a 2 cm) se
+    # cuenta una sola vez y se avisa: al partir los bloques escalonados ya
+    # no saltaría el aviso de grilla incompleta (revisión del #108).
+    unicos: dict[tuple[int, int], _Rect] = {}
+    for r in paneles:
+        unicos.setdefault((round(r.cx / 0.02), round(r.cy / 0.02)), r)
+    repetidos = len(paneles) - len(unicos)
+    paneles = list(unicos.values())
     theta = math.radians(-angulo)
     cos_t, sin_t = math.cos(theta), math.sin(theta)
     girados = [(r.cx * cos_t - r.cy * sin_t, r.cx * sin_t + r.cy * cos_t) for r in paneles]
 
     advertencias: list[str] = []
-    descartados = len(rects) - len(paneles)
+    descartados = len(rects) - len(paneles) - repetidos
     tipos: Counter = Counter()
     sueltos = 0
     escalonados = 0
@@ -354,6 +362,11 @@ def bloques_desde_rectangulos(rects: list[_Rect]) -> tuple[list[BloqueDetectado]
         advertencias.append(
             f"Se ignoraron {girados_aparte} paneles dibujados con otra orientación que el resto; "
             f"agrégalos a mano en la confirmación si corresponden."
+        )
+    if repetidos:
+        advertencias.append(
+            f"Se ignoraron {repetidos} paneles repetidos en la misma posición (copiados encima de otro "
+            f"en el plano)."
         )
     if descartados:
         advertencias.append(

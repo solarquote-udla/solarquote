@@ -838,7 +838,7 @@ export function LayoutPage() {
 
       {layout?.desactualizado && (
         <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          El terreno, los caminos, el equipo o la latitud cambiaron después de generar este layout.
+          El terreno, los caminos o el equipo cambiaron después de generar este layout.
           Vuelve a generarlo para que refleje los datos actuales.
         </div>
       )}

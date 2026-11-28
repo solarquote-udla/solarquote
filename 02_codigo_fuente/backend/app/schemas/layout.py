@@ -231,7 +231,7 @@ class LayoutLeer(BaseModel):
 
     desactualizado: bool = Field(
         description=(
-            "El terreno, los caminos, el equipo o la latitud cambiaron "
+            "El terreno, los caminos o el equipo cambiaron "
             "después de generar. Hay que volver a generar."
         )
     )

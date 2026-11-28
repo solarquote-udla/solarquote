@@ -17,4 +17,5 @@ class CondicionesPorDefectoLeer(BaseModel):
     plazo_dias: int
     validez_dias: int
     garantia_anios: int
+    logistica_monto: Decimal
     pagos: list[TramoPagoDefecto]

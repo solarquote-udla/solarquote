@@ -38,7 +38,7 @@ def obtener_planta(db: Session, cotizacion: Cotizacion) -> PlantaLeer:
     respuesta_layout = None
     if layout is not None:
         respuesta_layout = servicio_layout.a_respuesta(
-            layout, servicio_layout.huella_actual(db, proyecto), obtener_configuracion(db, proyecto.id)
+            layout, servicio_layout.huella_actual(db, proyecto, layout.huella), obtener_configuracion(db, proyecto.id)
         )
 
     cambios = [m.updated_at for m in (terreno, layout) if m is not None and m.updated_at is not None]
