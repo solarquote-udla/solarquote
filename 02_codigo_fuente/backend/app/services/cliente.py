@@ -95,7 +95,7 @@ def actualizar_cliente(
     # (se borra) — con un dict plano de Optional[...] no se puede.
     cambios = datos.model_dump(exclude_unset=True)
 
-    for campo in ("nombre", "tipo_identificacion"):
+    for campo in ("nombre", "tipo_identificacion", "email", "telefono"):
         if campo in cambios and cambios[campo] is None:
             raise ValueError(f"{campo} no puede quedar vacío")
 

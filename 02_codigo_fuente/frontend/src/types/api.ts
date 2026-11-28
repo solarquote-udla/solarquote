@@ -170,8 +170,10 @@ export interface ClienteCrear {
   nombre: string;
   tipo_identificacion: TipoIdentificacion;
   identificacion: string;
-  email: string | null;
-  telefono: string | null;
+  /** Obligatorio: lo necesita el botón "Enviar cotización" */
+  email: string;
+  /** Obligatorio: lo necesita el botón "Enviar cotización" */
+  telefono: string;
   direccion: string | null;
 }
 

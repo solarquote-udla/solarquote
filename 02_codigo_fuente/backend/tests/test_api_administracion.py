@@ -21,7 +21,13 @@ from tests.test_varios_inversores import _cabecera, api, h  # noqa: F401
 
 INEXISTENTE = 999_999
 
-CLIENTE = {"nombre": "SolarAndes Instalaciones", "tipo_identificacion": "ruc", "identificacion": "1091234567001"}
+CLIENTE = {
+    "nombre": "SolarAndes Instalaciones",
+    "tipo_identificacion": "ruc",
+    "identificacion": "1091234567001",
+    "email": "contacto@solarandes.ec",
+    "telefono": "0991234567",
+}
 INVERSOR = {"marca": "Genérico", "modelo": "INV-200K", "potencia_kw": 200, "vmax_v": 1100, "vmin_v": 200, "mppts": 10, "strings_por_mppt": 2}
 PANEL = {"marca": "Genérico", "modelo": "PAN-580", "potencia_wp": 580, "largo_mm": 2278, "ancho_mm": 1134, "voc_v": 52.0, "vmp_v": 43.0}
 

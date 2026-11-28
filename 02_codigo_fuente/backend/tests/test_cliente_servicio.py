@@ -19,6 +19,8 @@ from app.services.cliente import (
 
 CEDULA_VALIDA = "1710034065"
 RUC_VALIDO = "1710034065001"
+EMAIL_VALIDO = "cliente@example.com"
+TELEFONO_VALIDO = "0991234567"
 
 
 def _crear_usuario(db: Session) -> Usuario:
@@ -39,6 +41,8 @@ class TestClienteCrearSchema:
             nombre="Juan Pérez",
             tipo_identificacion=TipoIdentificacion.CEDULA,
             identificacion=CEDULA_VALIDA,
+            email=EMAIL_VALIDO,
+            telefono=TELEFONO_VALIDO,
         )
         assert datos.identificacion == CEDULA_VALIDA
 
@@ -48,6 +52,8 @@ class TestClienteCrearSchema:
                 nombre="Juan Pérez",
                 tipo_identificacion=TipoIdentificacion.CEDULA,
                 identificacion="1710034066",
+                email=EMAIL_VALIDO,
+                telefono=TELEFONO_VALIDO,
             )
 
     def test_normaliza_identificacion_con_guiones(self) -> None:
@@ -55,6 +61,8 @@ class TestClienteCrearSchema:
             nombre="Juan Pérez",
             tipo_identificacion=TipoIdentificacion.CEDULA,
             identificacion="171-0034065",
+            email=EMAIL_VALIDO,
+            telefono=TELEFONO_VALIDO,
         )
         assert datos.identificacion == CEDULA_VALIDA
 
@@ -64,6 +72,8 @@ class TestClienteCrearSchema:
                 nombre="Empresa X",
                 tipo_identificacion=TipoIdentificacion.RUC,
                 identificacion="1234567890001",
+                email=EMAIL_VALIDO,
+                telefono=TELEFONO_VALIDO,
             )
 
     def test_pasaporte_acepta_alfanumerico(self) -> None:
@@ -71,6 +81,8 @@ class TestClienteCrearSchema:
             nombre="Visitante",
             tipo_identificacion=TipoIdentificacion.PASAPORTE,
             identificacion="AB12345",
+            email=EMAIL_VALIDO,
+            telefono=TELEFONO_VALIDO,
         )
         assert datos.identificacion == "AB12345"
 
@@ -80,7 +92,46 @@ class TestClienteCrearSchema:
                 nombre="Juan Pérez",
                 tipo_identificacion=TipoIdentificacion.CEDULA,
                 identificacion=CEDULA_VALIDA,
+                email=EMAIL_VALIDO,
                 telefono="abc",
+            )
+
+    def test_rechaza_telefono_vacio(self) -> None:
+        with pytest.raises(ValidationError, match="telefono no puede quedar vacío"):
+            ClienteCrear(
+                nombre="Juan Pérez",
+                tipo_identificacion=TipoIdentificacion.CEDULA,
+                identificacion=CEDULA_VALIDA,
+                email=EMAIL_VALIDO,
+                telefono="   ",
+            )
+
+    def test_rechaza_telefono_faltante(self) -> None:
+        with pytest.raises(ValidationError, match="telefono"):
+            ClienteCrear(
+                nombre="Juan Pérez",
+                tipo_identificacion=TipoIdentificacion.CEDULA,
+                identificacion=CEDULA_VALIDA,
+                email=EMAIL_VALIDO,
+            )
+
+    def test_rechaza_email_invalido(self) -> None:
+        with pytest.raises(ValidationError):
+            ClienteCrear(
+                nombre="Juan Pérez",
+                tipo_identificacion=TipoIdentificacion.CEDULA,
+                identificacion=CEDULA_VALIDA,
+                email="no-es-un-correo",
+                telefono=TELEFONO_VALIDO,
+            )
+
+    def test_rechaza_email_faltante(self) -> None:
+        with pytest.raises(ValidationError, match="email"):
+            ClienteCrear(
+                nombre="Juan Pérez",
+                tipo_identificacion=TipoIdentificacion.CEDULA,
+                identificacion=CEDULA_VALIDA,
+                telefono=TELEFONO_VALIDO,
             )
 
     def test_nombre_se_recorta(self) -> None:
@@ -88,6 +139,8 @@ class TestClienteCrearSchema:
             nombre="  Juan Pérez  ",
             tipo_identificacion=TipoIdentificacion.CEDULA,
             identificacion=CEDULA_VALIDA,
+            email=EMAIL_VALIDO,
+            telefono=TELEFONO_VALIDO,
         )
         assert datos.nombre == "Juan Pérez"
 
@@ -98,6 +151,8 @@ class TestCrearCliente:
             nombre="Juan Pérez",
             tipo_identificacion=TipoIdentificacion.CEDULA,
             identificacion=CEDULA_VALIDA,
+            email=EMAIL_VALIDO,
+            telefono=TELEFONO_VALIDO,
         )
         cliente, total = crear_cliente(db, datos)
 
@@ -119,6 +174,8 @@ class TestCrearCliente:
             nombre="Otro nombre",
             tipo_identificacion=TipoIdentificacion.CEDULA,
             identificacion=CEDULA_VALIDA,
+            email=EMAIL_VALIDO,
+            telefono=TELEFONO_VALIDO,
         )
         with pytest.raises(IdentificacionDuplicada, match="Ya existe"):
             crear_cliente(db, datos)
@@ -179,20 +236,22 @@ class TestActualizarCliente:
         assert actualizado.telefono == "0991234567"  # no se tocó
 
     def test_null_explicito_borra_un_campo_opcional(self, db: Session) -> None:
+        # direccion es el único campo que sigue siendo opcional de verdad
+        # (email y telefono pasaron a obligatorios, ver tests de abajo).
         cliente = Cliente(
             nombre="Original",
             tipo_identificacion=TipoIdentificacion.CEDULA,
             identificacion=CEDULA_VALIDA,
-            telefono="0991234567",
+            direccion="Ibarra",
         )
         db.add(cliente)
         db.flush()
 
-        resultado = actualizar_cliente(db, cliente.id, ClienteActualizar(telefono=None))
+        resultado = actualizar_cliente(db, cliente.id, ClienteActualizar(direccion=None))
 
         assert resultado is not None
         actualizado, _ = resultado
-        assert actualizado.telefono is None
+        assert actualizado.direccion is None
 
     def test_rechaza_nombre_nulo(self, db: Session) -> None:
         cliente = Cliente(nombre="Original", tipo_identificacion=TipoIdentificacion.CEDULA, identificacion=CEDULA_VALIDA)
@@ -201,6 +260,32 @@ class TestActualizarCliente:
 
         with pytest.raises(ValueError, match="nombre"):
             actualizar_cliente(db, cliente.id, ClienteActualizar(nombre=None))
+
+    def test_rechaza_email_nulo(self, db: Session) -> None:
+        cliente = Cliente(
+            nombre="Original",
+            tipo_identificacion=TipoIdentificacion.CEDULA,
+            identificacion=CEDULA_VALIDA,
+            email=EMAIL_VALIDO,
+        )
+        db.add(cliente)
+        db.flush()
+
+        with pytest.raises(ValueError, match="email"):
+            actualizar_cliente(db, cliente.id, ClienteActualizar(email=None))
+
+    def test_rechaza_telefono_nulo(self, db: Session) -> None:
+        cliente = Cliente(
+            nombre="Original",
+            tipo_identificacion=TipoIdentificacion.CEDULA,
+            identificacion=CEDULA_VALIDA,
+            telefono=TELEFONO_VALIDO,
+        )
+        db.add(cliente)
+        db.flush()
+
+        with pytest.raises(ValueError, match="telefono"):
+            actualizar_cliente(db, cliente.id, ClienteActualizar(telefono=None))
 
     def test_reactiva_con_activo_true(self, db: Session) -> None:
         cliente = Cliente(

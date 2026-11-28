@@ -95,18 +95,20 @@ dar de baja a un cliente con trabajo en curso. Se calcula con un
 | `nombre` | Sí | 3 a 150 caracteres, sin espacios a los lados |
 | `tipo_identificacion` | Sí | `cedula`, `ruc` o `pasaporte` |
 | `identificacion` | Sí | Según el tipo (ver abajo). Única en la tabla |
-| `empresa` | No | Hasta 150 |
-| `email` | No | Formato válido (`EmailStr`, ya está `email-validator` en requirements) |
-| `telefono` | No | Ver abajo |
+| `email` | Sí | Formato válido (`EmailStr`, ya está `email-validator` en requirements) |
+| `telefono` | Sí | Ver abajo |
 | `direccion` | No | Hasta 255 |
 
-Los textos vacíos o solo con espacios se guardan como `null`.
+`email` y `telefono` son obligatorios desde el pedido de Anita del 25 de
+noviembre: los necesita el botón "Enviar cotización". `direccion` sigue
+opcional; sus textos vacíos o solo con espacios se guardan como `null`.
 
 ### `ClienteActualizar`
 
 Los mismos campos, todos opcionales, más `activo: bool`. Omitir un campo
-lo deja igual; enviarlo en `null` lo borra (salvo los obligatorios, que
-no aceptan `null`).
+lo deja igual; enviarlo en `null` lo borra (salvo los obligatorios —
+`nombre`, `tipo_identificacion`, `email` y `telefono` — que no aceptan
+`null`).
 
 Si viene `identificacion`, se valida contra `tipo_identificacion`: el
 enviado, o el guardado si no se envía.

@@ -23,10 +23,12 @@ import { CondicionesCotizacion } from "@/components/CondicionesCotizacion";
 import type { CotizacionDetalle, EventoEstado } from "@/types/api";
 import { formatoMoneda } from "@/utils/dinero";
 import { fechaHora } from "@/utils/fechas";
-import { nombreArchivoProforma } from "@/utils/proforma";
+import { enlaceCorreoProforma, enlaceWhatsappProforma, nombreArchivoProforma } from "@/utils/proforma";
 
 const BOTON_DESCARGA =
   "rounded-lg border border-acero-300 px-4 py-2 text-center text-sm text-acero-700 hover:bg-acero-100 disabled:cursor-not-allowed disabled:opacity-50";
+const BOTON_ENVIO =
+  "rounded-lg border border-acero-300 px-4 py-2 text-center text-sm text-acero-700 hover:bg-acero-100 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:pointer-events-none";
 
 /** Ruta por la que se llegó al detalle (con los filtros del historial activos) */
 interface EstadoNavegacion {
@@ -43,6 +45,8 @@ export function CotizacionDetallePage() {
   const [descargando, setDescargando] = useState<"docx" | "xlsx" | null>(null);
   const [errorDescarga, setErrorDescarga] = useState<string | null>(null);
   const [lineaTiempo, setLineaTiempo] = useState<EventoEstado[] | null>(null);
+  const correoHref = cotizacion ? enlaceCorreoProforma(cotizacion) : null;
+  const whatsappHref = cotizacion ? enlaceWhatsappProforma(cotizacion) : null;
 
   async function descargarProforma(extension: "docx" | "xlsx") {
     if (!cotizacion) return;
@@ -137,6 +141,27 @@ export function CotizacionDetallePage() {
                   {descargando === "xlsx" ? "Descargando…" : "Descargar Excel"}
                 </button>
               </div>
+              <div className="mt-2 flex justify-end gap-2">
+                <a
+                  href={correoHref ?? undefined}
+                  aria-disabled={!correoHref}
+                  title={correoHref ? undefined : "El cliente no tiene correo registrado"}
+                  className={BOTON_ENVIO}
+                >
+                  Enviar por correo
+                </a>
+                <a
+                  href={whatsappHref ?? undefined}
+                  target={whatsappHref ? "_blank" : undefined}
+                  rel="noreferrer"
+                  aria-disabled={!whatsappHref}
+                  title={whatsappHref ? undefined : "El cliente no tiene teléfono registrado"}
+                  className={BOTON_ENVIO}
+                >
+                  Enviar por WhatsApp
+                </a>
+              </div>
+              <p className="mt-1 text-xs text-acero-400">Descarga el documento primero: no se adjunta solo.</p>
             </div>
           </div>
 
