@@ -72,12 +72,16 @@ por eso es el que se busca.
 
 Separaciones
 ------------
-Entre bloques, el pasillo, en las dos direcciones. Hasta el 25 de
-noviembre la separación este-oeste podía crecer con la sombra calculada
-con la latitud; se quitó porque la estructura va a 7,5° y en Ecuador el
-sol pasa alto (nunca superaba el pasillo), el cliente no la usa y el
-cálculo aplicaba la sombra del mediodía en la dirección equivocada. La
-latitud ya no cambia el layout.
+Entre bloques, el pasillo, uno este-oeste (entre franjas) y otro
+norte-sur (entre bloques de una misma franja); no tienen que medir lo
+mismo, porque el camino que necesita el mantenimiento entre franjas no
+es el mismo que el que separa un bloque del siguiente en su fila (pedido
+de Joseph, 28 de noviembre). Hasta el 25 de noviembre la separación
+este-oeste podía crecer con la sombra calculada con la latitud; se quitó
+porque la estructura va a 7,5° y en Ecuador el sol pasa alto (nunca
+superaba el pasillo), el cliente no la usa y el cálculo aplicaba la
+sombra del mediodía en la dirección equivocada. La latitud ya no cambia
+el layout.
 """
 
 import math
@@ -169,7 +173,10 @@ class InversorLayout:
 @dataclass(frozen=True)
 class ParametrosLayout:
     paneles_largo: int = PANELES_LARGO_DEFECTO
-    pasillo_m: float = PASILLO_DEFECTO_M
+    # Pasillo entre franjas (este-oeste) y entre bloques de una misma
+    # franja (norte-sur). No tienen que medir lo mismo.
+    pasillo_este_oeste_m: float = PASILLO_DEFECTO_M
+    pasillo_norte_sur_m: float = PASILLO_DEFECTO_M
     tolerancia_proporcion: float = TOLERANCIA_DEFECTO
     capacidad_deseada_kwp: float | None = None
     paneles_ancho_minimo: int = PANELES_ANCHO_MINIMO_DEFECTO
@@ -831,8 +838,8 @@ def generar_layout(
     # Solo los pasillos: la sombra entre bloques se dejó de calcular
     # (revisión del 25 de noviembre). Con la estructura a 7,5° y el sol de
     # Ecuador no cambiaba nada, y el cliente no la usa.
-    separacion_ns = parametros.pasillo_m
-    separacion_eo = parametros.pasillo_m
+    separacion_ns = parametros.pasillo_norte_sur_m
+    separacion_eo = parametros.pasillo_este_oeste_m
 
     # ─── Área útil, rotada con el norte hacia +Y ─────────────────
     poligono_terreno = Polygon(terreno)
@@ -1023,6 +1030,12 @@ def validar_bloques(
     un bloque fuera del terreno, sobre un camino o encima de otro. Lo
     que es mala práctica pero posible —un pasillo más angosto que el
     configurado— solo se devuelve como advertencia.
+
+    Un bloque editado a mano se puede mover a cualquier posición, no solo
+    a lo largo de una franja o de una fila, así que `pasillo_m` no
+    distingue este-oeste de norte-sur: quien llama pasa el menor de los
+    dos pasillos configurados, para advertir si algún par queda más
+    cerca de lo que el pasillo más angosto permitiría.
 
     Todo se evalúa en el marco local (norte hacia +Y), donde los bloques
     son rectángulos alineados a los ejes. Cada bloque se achica la

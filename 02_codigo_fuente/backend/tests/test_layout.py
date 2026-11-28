@@ -263,9 +263,30 @@ def test_terreno_irregular_con_caminos_cruzados():
 
 def test_pasillo_configurable_se_respeta():
     terreno = rectangulo(120, 90)
-    r = generar_layout(terreno, [], PANEL_PLANO, ParametrosLayout(paneles_ancho=24, pasillo_m=4), orientacion_norte=0)
+    r = generar_layout(
+        terreno,
+        [],
+        PANEL_PLANO,
+        ParametrosLayout(paneles_ancho=24, pasillo_este_oeste_m=4, pasillo_norte_sur_m=4),
+        orientacion_norte=0,
+    )
     _validar_bloques(r, terreno, [], 4)
     assert r.separacion_norte_sur_m == 4
+
+
+def test_los_dos_pasillos_son_independientes():
+    """Pedido de Joseph (28 de noviembre): el pasillo este-oeste y el norte-sur no tienen que medir lo mismo."""
+    terreno = rectangulo(120, 90)
+    r = generar_layout(
+        terreno,
+        [],
+        PANEL_PLANO,
+        ParametrosLayout(paneles_ancho=24, pasillo_este_oeste_m=5, pasillo_norte_sur_m=1),
+        orientacion_norte=0,
+    )
+    assert r.separacion_este_oeste_m == 5
+    assert r.separacion_norte_sur_m == 1
+    _validar_bloques(r, terreno, [], 1)
 
 
 def test_la_latitud_ya_no_cambia_la_separacion():
@@ -278,7 +299,7 @@ def test_la_latitud_ya_no_cambia_la_separacion():
         rectangulo(100, 60),
         [],
         PanelLayout(2278, 1134, 580, 30),
-        ParametrosLayout(paneles_ancho=24, pasillo_m=0.5),
+        ParametrosLayout(paneles_ancho=24, pasillo_este_oeste_m=0.5, pasillo_norte_sur_m=0.5),
         orientacion_norte=0,
         latitud=0.35,
     )

@@ -14,7 +14,14 @@ from app.models.cliente import Cliente, TipoIdentificacion
 from tests.fabricas import LAYOUT_CLASICO, crear_usuario
 from tests.test_proyecto_avance import EQUIPO
 
-PARAMETROS = {"paneles_largo": 4, "pasillo_m": 2, "tolerancia_proporcion": 0.2, "capacidad_deseada_kwp": None, **LAYOUT_CLASICO}
+PARAMETROS = {
+    "paneles_largo": 4,
+    "pasillo_este_oeste_m": 2,
+    "pasillo_norte_sur_m": 2,
+    "tolerancia_proporcion": 0.2,
+    "capacidad_deseada_kwp": None,
+    **LAYOUT_CLASICO,
+}
 
 
 @pytest.fixture

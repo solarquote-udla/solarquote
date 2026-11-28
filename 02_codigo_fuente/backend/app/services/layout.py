@@ -147,7 +147,8 @@ def generar(db: Session, proyecto: Proyecto, datos: LayoutGenerar) -> Layout:
         ),
         ParametrosLayout(
             paneles_largo=datos.paneles_largo,
-            pasillo_m=datos.pasillo_m,
+            pasillo_este_oeste_m=datos.pasillo_este_oeste_m,
+            pasillo_norte_sur_m=datos.pasillo_norte_sur_m,
             tolerancia_proporcion=datos.tolerancia_proporcion,
             capacidad_deseada_kwp=datos.capacidad_deseada_kwp,
             paneles_ancho_minimo=datos.paneles_ancho_minimo,
@@ -171,7 +172,8 @@ def generar(db: Session, proyecto: Proyecto, datos: LayoutGenerar) -> Layout:
         db.add(layout)
 
     layout.paneles_largo = datos.paneles_largo
-    layout.pasillo_m = datos.pasillo_m
+    layout.pasillo_este_oeste_m = datos.pasillo_este_oeste_m
+    layout.pasillo_norte_sur_m = datos.pasillo_norte_sur_m
     layout.tolerancia_proporcion = datos.tolerancia_proporcion
     layout.capacidad_deseada_kwp = datos.capacidad_deseada_kwp
     layout.paneles_ancho_minimo = datos.paneles_ancho_minimo
@@ -310,7 +312,7 @@ def editar_bloques(db: Session, proyecto: Proyecto, datos: LayoutEditar) -> Layo
         terreno.vertices,
         [c.vertices for c in terreno.caminos],
         poligonos,
-        layout.pasillo_m,
+        min(layout.pasillo_este_oeste_m, layout.pasillo_norte_sur_m),
         angulo,
     )
 
@@ -531,7 +533,8 @@ def a_respuesta(layout: Layout, huella: str, equipo: ConfiguracionEquipo | None)
         proyecto_id=layout.proyecto_id,
         parametros=LayoutGenerar(
             paneles_largo=layout.paneles_largo,
-            pasillo_m=layout.pasillo_m,
+            pasillo_este_oeste_m=layout.pasillo_este_oeste_m,
+            pasillo_norte_sur_m=layout.pasillo_norte_sur_m,
             tolerancia_proporcion=layout.tolerancia_proporcion,
             capacidad_deseada_kwp=layout.capacidad_deseada_kwp,
             paneles_ancho_minimo=layout.paneles_ancho_minimo,

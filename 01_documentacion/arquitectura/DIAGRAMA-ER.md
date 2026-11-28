@@ -226,7 +226,8 @@ erDiagram
         int id PK
         int proyecto_id FK, UK
         int paneles_largo
-        float pasillo_m
+        float pasillo_este_oeste_m
+        float pasillo_norte_sur_m
         float tolerancia_proporcion
         float capacidad_deseada_kwp "nullable"
         int paneles_ancho_minimo
