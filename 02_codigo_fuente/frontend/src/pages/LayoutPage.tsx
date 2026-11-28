@@ -43,6 +43,7 @@ import {
   type ConfiguracionEquipo,
   type Layout,
   type LayoutGenerar,
+  type Orientacion,
   type Proyecto,
   type Punto,
   type Terreno,
@@ -57,7 +58,7 @@ import {
 import { aCompacto, esCompacto } from "@/utils/bloque";
 import { corredor, esPoligonoSimple, largoEje, medidasCamino, nombreCaminoDibujado } from "@/utils/caminos";
 import { formatearArea, limitesDe } from "@/utils/geometria";
-import { ajustarAngulo, largosDeLados } from "@/utils/terrenoMapa";
+import { ajustarAngulo } from "@/utils/terrenoMapa";
 import { colorInversor } from "@/utils/inversores";
 
 /** Un bloque del borrador: geometría editable más el inversor al que va. */
@@ -118,8 +119,8 @@ const PARAMETROS_DEFECTO = {
   aMinimo: "1",
   sepLargo: "6",
   sepAncho: "2",
-  // Lado del terreno con el que se alinean los bloques. Vacío = norte.
-  lado: "",
+  // Norte (filas de norte a sur) o alineados con el terreno
+  orientacion: "norte" as Orientacion,
 };
 type Parametros = typeof PARAMETROS_DEFECTO;
 
@@ -212,28 +213,11 @@ function posicionCentrada(terreno: Punto[], direccion: Direccion): string {
 }
 
 /**
- * El lado guardado sigue siendo el mismo lado físico del terreno. Se
- * guarda por su número, y si el terreno se editó en el Paso 1 (por
- * ejemplo, con un vértice nuevo) ese número puede apuntar a otro lado.
- * Los bloques se generaron paralelos al lado, así que su giro y la
- * dirección del lado coinciden módulo 90°: si no coinciden, el lado
- * cambió.
- */
-function ladoVigente(l: Layout, terreno: Punto[] | null | undefined): boolean {
-  const lado = l.parametros.lado_bloques;
-  if (lado == null || !terreno || lado >= terreno.length) return false;
-  const [p, q] = [terreno[lado], terreno[(lado + 1) % terreno.length]];
-  const direccion = (Math.atan2(q[0] - p[0], q[1] - p[1]) * 180) / Math.PI;
-  const diferencia = (((direccion - l.angulo_norte) % 90) + 90) % 90;
-  return Math.min(diferencia, 90 - diferencia) < 0.01;
-}
-
-/**
  * Parámetros del formulario. La capacidad deseada parte de la potencia
  * objetivo del Paso 2 si no hay layout o si el layout quedó desactualizado
  * (por ejemplo, porque esa potencia cambió); si no, de la del layout.
  */
-function desdeLayout(l: Layout | null, objetivoKwp: number | null, terreno: Punto[] | null | undefined): Parametros {
+function desdeLayout(l: Layout | null, objetivoKwp: number | null = null): Parametros {
   const objetivo = objetivoKwp == null ? "" : String(objetivoKwp);
   if (!l) return { ...PARAMETROS_DEFECTO, kwp: objetivo };
   const usarObjetivo = l.desactualizado && objetivoKwp != null;
@@ -250,8 +234,7 @@ function desdeLayout(l: Layout | null, objetivoKwp: number | null, terreno: Punt
     aMinimo: String(l.parametros.paneles_ancho_minimo ?? 1),
     sepLargo: String(Math.round((l.parametros.separacion_paneles_largo_m ?? 0) * 1000) / 10),
     sepAncho: String(Math.round((l.parametros.separacion_paneles_ancho_m ?? 0) * 1000) / 10),
-    // Un lado que ya no es el mismo vuelve al norte (ver ladoVigente)
-    lado: ladoVigente(l, terreno) ? String(l.parametros.lado_bloques) : "",
+    orientacion: l.parametros.orientacion_bloques ?? "norte",
   };
 }
 
@@ -263,11 +246,7 @@ function aNumero(valor: string): number | null {
   return Number.isFinite(n) ? n : Number.NaN;
 }
 
-/**
- * `lados`: cuántos lados tiene el terreno actual. Si el terreno cambió y
- * el lado guardado ya no existe, los bloques vuelven al norte.
- */
-function aPeticion(p: Parametros, lados: number): { datos: LayoutGenerar } | { error: string } {
+function aPeticion(p: Parametros): { datos: LayoutGenerar } | { error: string } {
   const largo = aNumero(p.L);
   const ancho = aNumero(p.A);
   const pasillo = aNumero(p.pasillo);
@@ -306,7 +285,7 @@ function aPeticion(p: Parametros, lados: number): { datos: LayoutGenerar } | { e
       tolerancia_proporcion: tolerancia / 100,
       capacidad_deseada_kwp: kwp,
       paneles_ancho_minimo: aMinimo,
-      lado_bloques: p.lado !== "" && Number(p.lado) < lados ? Number(p.lado) : null,
+      orientacion_bloques: p.orientacion,
     },
   };
 }
@@ -349,14 +328,8 @@ export function LayoutPage() {
 
   const [proyecto, setProyecto] = useState<Proyecto | null>(null);
   const [terreno, setTerreno] = useState<Terreno | null>(null);
-  // Lados del terreno para alinear los bloques: largo de cada uno y el más largo
-  const ladosTerreno = useMemo(() => (terreno ? largosDeLados(terreno.vertices) : []), [terreno]);
-  const ladoMasLargo = ladosTerreno.reduce((mejor, largo, i) => (largo > ladosTerreno[mejor] ? i : mejor), 0);
   const [equipo, setEquipo] = useState<ConfiguracionEquipo | null>(null);
   const [layout, setLayout] = useState<Layout | null>(null);
-  // Lado guardado que, tras editar el terreno, ya no es el mismo lado físico
-  const ladoCambiado =
-    layout !== null && layout.parametros.lado_bloques != null && terreno !== null && !ladoVigente(layout, terreno.vertices);
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
 
@@ -601,7 +574,7 @@ export function LayoutPage() {
         setTerreno(t);
         setEquipo(e);
         setLayout(l);
-        setParametros(desdeLayout(l, e?.potencia_objetivo_kwp ?? null, t?.vertices));
+        setParametros(desdeLayout(l, e?.potencia_objetivo_kwp ?? null));
         if (editarAlCargar.current && l && !l.desactualizado) {
           setBorrador(l.bloques.map((b, i) => ({ clave: i, origen: b.vertices[3], paneles_ancho: b.paneles_ancho, inversor: b.inversor })));
         }
@@ -756,7 +729,7 @@ export function LayoutPage() {
     setError(null);
     setAviso(null);
 
-    const resultado = aPeticion(parametros, ladosTerreno.length);
+    const resultado = aPeticion(parametros);
     if ("error" in resultado) {
       setError(resultado.error);
       return;
@@ -773,7 +746,7 @@ export function LayoutPage() {
     try {
       const nuevo = await generarLayout(proyectoId, resultado.datos);
       setLayout(nuevo);
-      setParametros(desdeLayout(nuevo, equipo?.potencia_objetivo_kwp ?? null, terreno?.vertices));
+      setParametros(desdeLayout(nuevo, equipo?.potencia_objetivo_kwp ?? null));
     } catch (e) {
       setError(mensajeDeError(e, "No se pudo generar el layout"));
     } finally {
@@ -795,10 +768,8 @@ export function LayoutPage() {
       : null;
 
   const parametrosCambiados =
-    JSON.stringify(aPeticion(parametros, ladosTerreno.length)) !==
-    JSON.stringify(
-      aPeticion(desdeLayout(layout, equipo?.potencia_objetivo_kwp ?? null, terreno?.vertices), ladosTerreno.length),
-    );
+    JSON.stringify(aPeticion(parametros)) !==
+    JSON.stringify(aPeticion(desdeLayout(layout, equipo?.potencia_objetivo_kwp ?? null)));
   const caminoACargar = formCamino !== null && JSON.stringify(formCamino) !== JSON.stringify(formCaminoInicial);
   const caminoDibujado = caminoMapa !== null && caminoMapa.eje.length > 0;
   const sinGuardar = borrador !== null || caminoACargar || caminoDibujado || parametrosCambiados || encabezadoSucio;
@@ -915,25 +886,21 @@ export function LayoutPage() {
                 <input className={CAMPO} inputMode="decimal" aria-label="Separación entre paneles (cm)" value={parametros.sepAncho} onChange={(e) => actualizar("sepAncho", e.target.value)} />
               </Entrada>
               <div className="sm:col-span-2">
-                <Entrada etiqueta="Orientación de los bloques" ayuda="Paralelo a un lado aprovecha mejor un terreno en diagonal">
+                <Entrada etiqueta="Orientación de los bloques" ayuda="Alineado al terreno prueba cada lado y se queda con el que más paneles mete">
                   <select
                     className={CAMPO}
                     aria-label="Orientación de los bloques"
-                    value={parametros.lado !== "" && Number(parametros.lado) < ladosTerreno.length ? parametros.lado : ""}
-                    onChange={(e) => actualizar("lado", e.target.value)}
+                    value={parametros.orientacion}
+                    onChange={(e) => actualizar("orientacion", e.target.value as Orientacion)}
                   >
-                    <option value="">Norte (filas de norte a sur)</option>
-                    {ladosTerreno.map((largo, i) => (
-                      <option key={i} value={String(i)}>
-                        {`Paralelo al lado ${i + 1} (${numero(largo, 1)} m)${i === ladoMasLargo ? ", el más largo" : ""}`}
-                      </option>
-                    ))}
+                    <option value="norte">Norte (filas de norte a sur)</option>
+                    <option value="terreno">Alineado al terreno</option>
                   </select>
                 </Entrada>
-                {ladoCambiado && (
-                  <p role="status" className="mt-1 text-xs text-amber-800">
-                    El terreno cambió y el lado {(layout?.parametros.lado_bloques ?? 0) + 1} ya no es el que se eligió.
-                    Los bloques vuelven al norte; elige de nuevo el lado si quieres alinearlos.
+                {layout?.paneles_por_orientacion && !layout.desactualizado && (
+                  <p role="status" className="mt-1 text-xs text-acero-500">
+                    Con este terreno entran {numero(layout.paneles_por_orientacion.norte, 0)} paneles siguiendo el norte y{" "}
+                    {numero(layout.paneles_por_orientacion.terreno, 0)} alineados al terreno.
                   </p>
                 )}
               </div>
@@ -1377,10 +1344,12 @@ export function LayoutPage() {
                   </li>
                 ))}
               </ul>
-              {layout.inversores.length > 0 && layout.inversores.length !== layout.inversores_sugeridos && (
+              {layout.analisis_inversores && layout.analisis_inversores.estado !== "normal" && (
                 <p className="mt-3 text-xs text-amber-800">
-                  Con {numero(layout.total_paneles, 0)} paneles se sugieren {layout.inversores_sugeridos} inversor
-                  {layout.inversores_sugeridos === 1 ? "" : "es"} (~400 paneles c/u) y hay {layout.inversores.length}.{" "}
+                  Relación DC/AC {numero(layout.analisis_inversores.relacion_dc_ac, 2)} con {numero(layout.total_paneles, 0)} paneles:{" "}
+                  {layout.analisis_inversores.estado === "reserva"
+                    ? "los inversores dejan reserva para ampliaciones."
+                    : `los inversores recortarían la producción; con el modelo del inversor 1 se sugieren ${layout.analisis_inversores.sugeridos}.`}{" "}
                   <Link to={rutaPaso(proyecto.id, 2)} className="font-semibold underline">
                     Ajustar en el Paso 2
                   </Link>
@@ -1553,7 +1522,11 @@ export function LayoutPage() {
                   </ul>
                 )}
                 <dl className="mt-4 space-y-2 border-t border-acero-200 pt-3">
-                  <Fila nombre="Inversores sugeridos (~400 paneles c/u)" valor={layout.inversores_sugeridos} />
+                  <Fila
+                    nombre="Relación DC/AC"
+                    valor={layout.analisis_inversores ? numero(layout.analisis_inversores.relacion_dc_ac, 2) : "—"}
+                  />
+                  <Fila nombre="Inversores sugeridos (modelo del inversor 1)" valor={layout.inversores_sugeridos} />
                 </dl>
               </Tarjeta>
 

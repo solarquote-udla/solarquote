@@ -74,7 +74,7 @@ async function intentarSalir(salir: () => void) {
 function llenarEquipo() {
   const textos = screen.getAllByRole("textbox");
   // Potencia objetivo (vacía, va primero y aparte), panel (8 campos) e Inversor 1
-  ["", "A", "B", "580", "2278", "1134", "52", "43", "15", "H", "M", "160"].forEach((v, i) =>
+  ["", "A", "B", "580", "2278", "1134", "52", "43", "H", "M", "160"].forEach((v, i) =>
     fireEvent.change(textos[i], { target: { value: v } }),
   );
 }
@@ -142,7 +142,8 @@ describe("Paso 2", () => {
     llenarEquipo();
     await act(async () => fireEvent.click(screen.getByText("Guardar y calcular")));
     expect(await screen.findByText("Configuración guardada.")).toBeTruthy();
-    expect(screen.getByText("Área por panel")).toBeTruthy();
+    // Con la configuración guardada ya no se pide guardar para ver los resultados
+    expect(screen.queryByText(/Guarda la configuración para ver/)).toBeNull();
   });
 });
 

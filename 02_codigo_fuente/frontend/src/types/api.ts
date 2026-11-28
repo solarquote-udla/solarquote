@@ -408,18 +408,8 @@ export interface ConfiguracionEquipoGuardar {
   angulo_montaje: number;
   /** En orden: el primero es el Inversor 1 */
   inversores: Inversor[];
-  /** Potencia que pide el cliente; con ella se sugiere cuántos inversores usar */
+  /** Potencia que pide el cliente; con ella se analizan los inversores y el terreno */
   potencia_objetivo_kwp: number | null;
-}
-
-/** Espejo de `SeparacionFilas`. Metros, para un panel en vertical. */
-export interface SeparacionFilas {
-  elevacion_solar_grados: number;
-  altura_m: number;
-  proyeccion_m: number;
-  sombra_m: number;
-  paso_minimo_m: number;
-  factor_sombra: number;
 }
 
 /** Espejo de `LimitesStringLeer` */
@@ -430,22 +420,41 @@ export interface LimitesString {
   motivo: string | null;
 }
 
-/** Espejo de `SugerenciaLeer`: la "Sugerencia automática" del Paso 2 */
-export interface SugerenciaInversores {
+/** Espejo de `AnalisisInversoresLeer`: relación DC/AC, entradas y sugerencia (referencia, nunca bloquea) */
+export interface AnalisisInversores {
   paneles: number;
-  potencia_kwp: number;
-  inversores: number;
-  paneles_por_inversor: number;
-  kwp_por_inversor: number;
+  potencia_dc_kwp: number;
+  potencia_ac_kw: number;
+  /** kWp de paneles ÷ kW de inversores */
+  relacion_dc_ac: number;
+  /** reserva (DC/AC < 1), normal o recorte (DC/AC > relacion_maxima) */
+  estado: "reserva" | "normal" | "recorte";
+  relacion_maxima: number;
+  /** MPPT × strings por MPPT × paneles por string, sumado; null si faltan datos */
+  paneles_admitidos: number | null;
+  sugeridos: number;
+  cuenta: string;
+  mensajes: string[];
+}
+
+/** Espejo de `OcupacionLeer`: si los paneles de la potencia objetivo caben en el terreno */
+export interface Ocupacion {
+  paneles: number;
+  area_paneles_m2: number;
+  area_terreno_m2: number;
+  porcentaje: number;
+  cabe: boolean;
+  maximo_paneles: number;
+  mensaje: string | null;
 }
 
 /** Espejo de `CalculosEquipo` */
 export interface CalculosEquipo {
   area_panel_m2: number;
-  separacion: SeparacionFilas | null;
   /** Uno por inversor, en el mismo orden; null si le faltan los voltajes */
   strings: (LimitesString | null)[];
-  sugerencia: SugerenciaInversores | null;
+  inversores: AnalisisInversores | null;
+  ocupacion: Ocupacion | null;
   advertencias: string[];
 }
 
@@ -466,6 +475,9 @@ export interface PanelReferencia extends Panel {
 // ─── Layout (Módulo 1 — RF-03) ──────────────────────────
 
 /** Espejo de `LayoutGenerar` (backend/app/schemas/layout.py) */
+/** Orientación de los bloques del layout (RF-03). */
+export type Orientacion = "norte" | "terreno";
+
 export interface LayoutGenerar {
   /** L: paneles en la dirección de la pendiente. Siempre par. */
   paneles_largo: number;
@@ -481,8 +493,8 @@ export interface LayoutGenerar {
   separacion_paneles_largo_m: number;
   /** Separación entre paneles a lo ancho (clamp intermedio), en metros */
   separacion_paneles_ancho_m: number;
-  /** Lado del terreno (0 = del primer vértice al segundo) con el que se alinean los bloques. Null = norte. */
-  lado_bloques?: number | null;
+  /** norte: filas de norte a sur. terreno: alineados con el lado del terreno que más paneles ubica. */
+  orientacion_bloques?: Orientacion;
 }
 
 /** Espejo de `BloqueLeer`. Vértices en metros, coordenadas del terreno. */
@@ -601,10 +613,14 @@ export interface Layout {
   capacidad: CapacidadLayout | null;
   inversores: InversorLayout[];
   /** Regla de HEXtructure: ~400 paneles por inversor */
+  /** Con el modelo del inversor 1, por potencia y por entradas (ver analisis_inversores) */
   inversores_sugeridos: number;
+  analisis_inversores?: AnalisisInversores | null;
   advertencias: string[];
-  /** Giro de los bloques usado al generar (el norte, o el norte más el giro hacia el lado elegido); la edición arma los bloques con este ángulo */
+  /** Giro de los bloques usado al generar (el norte, o el giro que los alinea con el terreno); la edición arma los bloques con este ángulo */
   angulo_norte: number;
+  /** Paneles que entran siguiendo el norte y alineados al terreno, para sugerir la mejor */
+  paneles_por_orientacion?: { norte: number; terreno: number } | null;
   /** Lado menor del panel, en metros */
   lado_menor_m: number;
   /** El bloque mide A · lado_menor_m + (A − 1) · separacion_paneles_ancho_m */

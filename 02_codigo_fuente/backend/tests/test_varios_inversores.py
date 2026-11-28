@@ -120,23 +120,60 @@ def test_guardar_y_leer_varios_inversores(api, h, pid):
     strings = respuesta["calculos"]["strings"]
     assert strings[0]["paneles_max"] == 21
     assert strings[1] is None
-    assert any("inversor 2" in a for a in respuesta["calculos"]["advertencias"])
+    # Sin el mensaje del Voc ni avisos por los datos opcionales que faltan (revisión del 25 de noviembre)
+    assert not any("Voc" in a or "inversor 2" in a for a in respuesta["calculos"]["advertencias"])
 
     leido = api.get(f"/api/proyectos/{pid}/equipo", headers=h).json()
     assert leido["inversores"] == respuesta["inversores"]
 
 
-def test_sugerencia_con_potencia_objetivo(api, h, pid):
+def test_analisis_de_inversores_con_potencia_objetivo(api, h, pid):
+    """
+    500 kWp con paneles de 580 Wp = 863 paneles (500,54 kWp) y un inversor de 250 kW:
+    - relación DC/AC 500,54 ÷ 250 = 2,00: los inversores recortarían la producción;
+    - entradas: 2 MPPT × 10 strings × floor(1100 ÷ 52,31) = 420 paneles: faltan entradas;
+    - sugeridos: el mayor entre 500,54 ÷ (250 × 1,3) = 1,54 y 863 ÷ 420 = 2,05, hacia arriba: 3.
+    """
     respuesta = guardar(api, h, pid, equipo(inversor(), objetivo=500))
-    # 500 kWp / 0,58 = 862,07 → 863 paneles → 3 inversores de 288
-    assert respuesta["calculos"]["sugerencia"] == {
-        "paneles": 863, "potencia_kwp": 500.54, "inversores": 3, "paneles_por_inversor": 288, "kwp_por_inversor": 167.04,
-    }
-    assert any("se sugieren 3 inversor(es)" in a for a in respuesta["calculos"]["advertencias"])
+    analisis = respuesta["calculos"]["inversores"]
+    assert analisis["paneles"] == 863
+    assert analisis["relacion_dc_ac"] == pytest.approx(2.002, abs=1e-3)
+    assert analisis["estado"] == "recorte"
+    assert analisis["paneles_admitidos"] == 420
+    assert analisis["sugeridos"] == 3
+    advertencias = respuesta["calculos"]["advertencias"]
+    assert any("recortarían la producción" in a for a in advertencias)
+    assert any("faltan entradas" in a for a in advertencias)
+
+    # El terreno de 100 × 60 m: 863 paneles de 2,583 m² ocupan 2.229 m², el 37 %
+    ocupacion = respuesta["calculos"]["ocupacion"]
+    assert ocupacion["cabe"] is True
+    assert ocupacion["porcentaje"] == pytest.approx(37.2, abs=0.1)
 
     sin_objetivo = guardar(api, h, pid, equipo(inversor()))
-    assert sin_objetivo["calculos"]["sugerencia"] is None
+    assert sin_objetivo["calculos"]["inversores"] is None
+    assert sin_objetivo["calculos"]["ocupacion"] is None
     assert sin_objetivo["potencia_objetivo_kwp"] is None
+
+
+def test_potencia_objetivo_que_no_cabe_en_el_terreno(api, h, pid):
+    """El caso de Anita: mucha más potencia que terreno. 5.000 kWp son 8.621 paneles = 22.270 m² en 6.000 m²."""
+    respuesta = guardar(api, h, pid, equipo(inversor(), objetivo=5000))
+    assert respuesta["calculos"]["ocupacion"]["cabe"] is False
+    assert respuesta["calculos"]["advertencias"][0].startswith("No caben: 8.621 paneles ocupan 22.270 m²")
+
+
+def test_mas_potencia_en_inversores_es_reserva(api, h, pid):
+    """Lenin: más kW en inversores que kWp en paneles no es un error, es reserva para ampliaciones."""
+    respuesta = guardar(api, h, pid, equipo(inversor(300), inversor(300), objetivo=500))
+    assert respuesta["calculos"]["inversores"]["estado"] == "reserva"
+    assert any("queda reserva para ampliaciones" in a for a in respuesta["calculos"]["advertencias"])
+
+
+def test_angulo_de_montaje_por_defecto_es_el_de_la_estructura(api, h, pid):
+    datos = equipo(inversor())
+    del datos["angulo_montaje"]
+    assert guardar(api, h, pid, datos)["angulo_montaje"] == 7.5
 
 
 def test_cambiar_la_cantidad_de_inversores_varias_veces(api, h, pid):
@@ -167,7 +204,10 @@ def test_generar_reparte_los_bloques_entre_los_inversores(api, h, pid):
     # 880 paneles = 41 strings de 21 (sobran 19) → 21 por MPPT y admite 10
     assert (primero["strings"], primero["paneles_sin_string"]) == (41, 19)
     assert primero["compatible"] is False
+    # 1.764 paneles (1.023,1 kWp) con el inversor de 160 kW: 1.023,1 ÷ (160 × 1,3) = 4,92 y
+    # 1.764 ÷ 420 que admite = 4,2 → 5, con la relación DC/AC sobre 1,3
     assert layout["inversores_sugeridos"] == 5
+    assert layout["analisis_inversores"]["estado"] == "recorte"
 
 
 def test_un_solo_inversor_se_lleva_todos_los_bloques(api, h, pid):
