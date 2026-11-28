@@ -563,6 +563,8 @@ export interface CondicionesProforma {
   plazo_dias?: number;
   validez_dias?: number;
   garantia_anios?: number;
+  /** Depende del lugar de entrega (Ibarra o en sitio); a veces es 0. Pantalla: Joseph. */
+  logistica_monto?: number;
   /** Deben sumar 100. Las proformas reales varían cuántos tramos tienen. */
   pagos?: TramoPago[];
 }

@@ -83,6 +83,11 @@ class CondicionesProforma(BaseModel):
     plazo_dias: int | None = Field(default=None, ge=1)
     validez_dias: int | None = Field(default=None, ge=1)
     garantia_anios: int | None = Field(default=None, ge=1)
+    logistica_monto: Decimal | None = Field(
+        default=None,
+        ge=0,
+        description="Depende del lugar de entrega (Ibarra o en sitio); a veces es 0.",
+    )
     pagos: list[TramoPago] | None = Field(
         default=None,
         min_length=1,

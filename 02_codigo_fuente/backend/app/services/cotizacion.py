@@ -24,15 +24,13 @@ from app.models.proyecto import Proyecto
 from app.models.usuario import Usuario
 from app.schemas.cotizacion import CondicionesProforma, CotizacionCrear, ItemCalculoEntrada, ResultadoCalculoCotizacion
 from app.services.calc_service import calcular_via_calc_service
-from app.services.material import (
-    CODIGOS_FORMULA,
-    obtener_precios_vigentes,
-    obtener_precios_vigentes_opcionales,
-)
+from app.services.material import CODIGOS_FORMULA, obtener_precios_vigentes
 from app.services.proforma import siguiente_numero_proforma
 from app.services.proyecto import ClienteNoDisponible, avanzar_a_cotizado
 
 # Cantidad fija de logística por cotización (SQ-76): no escala con L/A/B.
+# El monto ya no sale del precio del catálogo (acuerdo con Santi, 27 de
+# noviembre: depende del lugar de entrega) — ver `condiciones.logistica_monto`.
 CODIGO_LOGISTICA = "LOG"
 CANTIDAD_LOGISTICA = 1
 
@@ -80,17 +78,26 @@ def crear_cotizacion(
             raise ProyectoNoDisponible(f"No existe el proyecto {datos.proyecto_id}")
 
     # Los precios se piden solo de los códigos de fórmula que siguen
-    # activos (+ LOG): un material de fórmula desactivado queda fuera de
-    # las cotizaciones nuevas, igual que uno que no participa del cálculo
-    # o uno nuevo sin precio todavía — ninguno de esos casos debe bloquear
+    # activos: un material de fórmula desactivado queda fuera de las
+    # cotizaciones nuevas, igual que uno que no participa del cálculo o
+    # uno nuevo sin precio todavía — ninguno de esos casos debe bloquear
     # una cotización.
     filas = db.query(Material.id, Material.codigo, Material.activo).all()
     material_id_por_codigo = {fila.codigo: fila.id for fila in filas}
     codigos_formula_activos = {fila.codigo for fila in filas if fila.activo and fila.codigo in CODIGOS_FORMULA}
 
-    precios = obtener_precios_vigentes(db, sorted(codigos_formula_activos))
-    precios.update(obtener_precios_vigentes_opcionales(db, [CODIGO_LOGISTICA]))
+    condiciones = datos.condiciones or CondicionesProforma()
+    logistica_monto = (
+        condiciones.logistica_monto if condiciones.logistica_monto is not None else settings.PROFORMA_LOGISTICA_MONTO
+    )
 
+    precios = obtener_precios_vigentes(db, sorted(codigos_formula_activos))
+    # El monto ya no depende de que el catálogo tenga un precio vigente
+    # para LOG (ver arriba): depende de que el material exista, igual que
+    # antes — si alguna vez se borra del catálogo, una cotización no debe
+    # reventar por eso, simplemente queda sin esa línea.
+    if CODIGO_LOGISTICA in material_id_por_codigo:
+        precios[CODIGO_LOGISTICA] = logistica_monto
     cargos_fijos = {CODIGO_LOGISTICA: CANTIDAD_LOGISTICA} if CODIGO_LOGISTICA in precios else {}
 
     resultado = calcular_via_calc_service(
@@ -116,7 +123,6 @@ def crear_cotizacion(
         cliente_email = datos.cliente_email
         cliente_telefono = datos.cliente_telefono
 
-    condiciones = datos.condiciones or CondicionesProforma()
     plazo_dias = condiciones.plazo_dias if condiciones.plazo_dias is not None else settings.PROFORMA_PLAZO_DIAS
     validez_dias = condiciones.validez_dias if condiciones.validez_dias is not None else settings.PROFORMA_VALIDEZ_DIAS
     garantia_anios = (

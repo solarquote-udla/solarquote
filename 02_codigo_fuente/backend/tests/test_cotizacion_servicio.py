@@ -220,20 +220,41 @@ def test_persiste_la_cantidad_y_precio_unitario_de_cada_material(
     usuario = _crear_usuario(db)
     _mock_calc_service_ok(monkeypatch)
 
-    cotizacion, _ = crear_cotizacion(db, _datos_minimos(), usuario)
+    datos = CotizacionCrear(
+        cliente_nombre="Cliente de prueba",
+        items=[ItemCalculoEntrada(paneles_largo=4, paneles_ancho=3, bloques=1)],
+        condiciones=CondicionesProforma(logistica_monto=Decimal("200.00")),
+    )
+    cotizacion, _ = crear_cotizacion(db, datos, usuario)
 
     materiales = {m.material.codigo: m for m in cotizacion.materiales}
     assert materiales["VAR1650"].cantidad == 8
     assert materiales["VAR1650"].precio_unitario == Decimal("7.20")
     assert materiales["LOG"].cantidad == 1
-    assert materiales["LOG"].precio_unitario == Decimal("35.00")
+    # El precio histórico del catálogo (35.00, sembrado arriba) ya no se
+    # usa para LOG: lo que manda es el monto de la cotización.
+    assert materiales["LOG"].precio_unitario == Decimal("200.00")
 
 
-def test_no_manda_cargo_fijo_de_logistica_si_no_esta_activo(
+def test_logistica_usa_el_valor_de_settings_por_defecto(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Acuerdo con Santi (27 de noviembre): sin editarla, es la de `settings` (0 por defecto)."""
+    _sembrar_materiales_de_formula(db)
+    db.add(Material(codigo="LOG", nombre="Logística", activo=True))
+    db.flush()
+    usuario = _crear_usuario(db)
+    _mock_calc_service_ok(monkeypatch)
+
+    cotizacion, _ = crear_cotizacion(db, _datos_minimos(), usuario)
+
+    materiales = {m.material.codigo: m for m in cotizacion.materiales}
+    assert materiales["LOG"].precio_unitario == settings.PROFORMA_LOGISTICA_MONTO
+
+
+def test_no_manda_cargo_fijo_de_logistica_si_el_material_no_existe(
     db: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Si alguna vez se borra LOG del catálogo, la cotización no debe reventar: queda sin esa línea."""
     _sembrar_materiales_de_formula(db)
-    _crear_material_con_precio(db, "LOG", Decimal("35.00"), activo=False)
     usuario = _crear_usuario(db)
     llamada = _mock_calc_service_ok(monkeypatch)
 
