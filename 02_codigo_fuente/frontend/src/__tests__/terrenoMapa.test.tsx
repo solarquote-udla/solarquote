@@ -18,6 +18,7 @@ import {
   desplazamientoEtiqueta,
   insertarEnMitad,
   largosDeLados,
+  perimetro,
   quitarVertice,
 } from "@/utils/terrenoMapa";
 
@@ -97,6 +98,48 @@ describe("geometría del terreno sobre el mapa", () => {
     expect(nuevo[2]).toEqual([110, 40]);
     expect(nuevo[3]).toEqual([50, 40]);
     expect(cambiarLargoLado(l, 0, 0)).toBe(l);
+  });
+
+  it("solo se mueven los dos vértices del lado siguiente, aunque otros queden más allá", () => {
+    // L de la revisión: el lado 3 (de (60, 30) a (30, 30)) pasa de 30 a 40 m
+    const l: Punto[] = [
+      [0, 0],
+      [60, 0],
+      [60, 30],
+      [30, 30],
+      [30, 50],
+      [0, 50],
+    ];
+    const nuevo = cambiarLargoLado(l, 2, 40);
+    expect(nuevo).toEqual([
+      [0, 0],
+      [60, 0],
+      [60, 30],
+      [20, 30],
+      [20, 50],
+      [0, 50],
+    ]);
+    // El lado de abajo no cambia; el siguiente se corrió entero y solo se acortó el de arriba
+    expect(largosDeLados(nuevo)).toEqual([60, 30, 40, 20, 20, 50]);
+    expect(anguloEnVertice(nuevo, 3)).toBeCloseTo(90);
+    expect(anguloEnVertice(nuevo, 4)).toBeCloseTo(90);
+  });
+
+  it("el último lado mueve los primeros vértices, y un triángulo sigue cerrado", () => {
+    expect(cambiarLargoLado(RECTANGULO, 3, 70)).toEqual([
+      [0, -10],
+      [100, -10],
+      [100, 60],
+      [0, 60],
+    ]);
+    const triangulo: Punto[] = [[0, 0], [30, 0], [0, 40]];
+    expect(largosDeLados(cambiarLargoLado(triangulo, 0, 40))[0]).toBe(40);
+  });
+
+  it("perímetro del contorno cerrado", () => {
+    expect(perimetro(RECTANGULO)).toBe(320);
+    expect(perimetro([[0, 0], [3, 0], [0, 4]])).toBe(12);
+    expect(perimetro([[0, 0], [3, 0]])).toBe(0);
   });
 
   it("agrega un vértice en la mitad de un lado y quita vértices sin bajar de tres", () => {

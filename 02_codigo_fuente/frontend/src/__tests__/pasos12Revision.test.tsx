@@ -74,7 +74,7 @@ describe("Paso 1: nuevo cliente sin salir del asistente", () => {
     const { obtenerTerreno } = await import("@/services/terreno");
     vi.mocked(obtenerTerreno).mockResolvedValue(TERRENO(rect(100, 60)) as never);
     montar(<TerrenoPage />, "/generar/5/terreno", ["/generar/:proyectoId/terreno"]);
-    await screen.findByText("Actualizar plano");
+    await screen.findByText("MEDIDAS DEL TERRENO");
     expect(screen.queryByText("+ Nuevo cliente")).toBeNull();
   });
 });

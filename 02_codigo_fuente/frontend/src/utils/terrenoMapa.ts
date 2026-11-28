@@ -94,10 +94,12 @@ export function largosDeLados(vertices: Punto[]): number[] {
 }
 
 /**
- * Cambia el largo del lado `i` (del vértice i al i + 1) estirando el
- * terreno en la dirección de ese lado: se mueven el vértice final y los
- * que quedan a la misma altura o más allá de él. En un rectángulo eso
- * mueve el lado opuesto completo y sigue siendo rectángulo.
+ * Cambia el largo del lado `i` (del vértice i al i + 1) sin arrastrar el
+ * resto del terreno (revisión con Anita, 25 de noviembre): el lado
+ * siguiente se corre entero en la dirección del lado editado, así que
+ * conserva su largo y sus ángulos. Solo cambia el largo del lado que
+ * viene después. En un rectángulo eso mueve el lado opuesto y sigue
+ * siendo rectángulo; en una L se mantienen los 90°.
  */
 export function cambiarLargoLado(vertices: Punto[], i: number, largo: number): Punto[] {
   const n = vertices.length;
@@ -106,14 +108,16 @@ export function cambiarLargoLado(vertices: Punto[], i: number, largo: number): P
   const fin = vertices[(i + 1) % n];
   const actual = Math.hypot(fin[0] - inicio[0], fin[1] - inicio[1]);
   if (actual === 0) return vertices;
-  const ux = (fin[0] - inicio[0]) / actual;
-  const uy = (fin[1] - inicio[1]) / actual;
   const delta = largo - actual;
-  const proyeccion = (p: Punto) => (p[0] - inicio[0]) * ux + (p[1] - inicio[1]) * uy;
-  const limite = actual - 0.01;
-  return vertices.map((p, k) =>
-    k !== i && proyeccion(p) >= limite ? [cm(p[0] + ux * delta), cm(p[1] + uy * delta)] : p,
-  );
+  const dx = ((fin[0] - inicio[0]) / actual) * delta;
+  const dy = ((fin[1] - inicio[1]) / actual) * delta;
+  const mover = new Set([(i + 1) % n, (i + 2) % n]);
+  return vertices.map((p, k) => (mover.has(k) ? [cm(p[0] + dx), cm(p[1] + dy)] : p));
+}
+
+/** Perímetro del contorno cerrado, en metros. */
+export function perimetro(vertices: Punto[]): number {
+  return vertices.length < 3 ? 0 : largosDeLados(vertices).reduce((s, l) => s + l, 0);
 }
 
 /** Agrega un vértice en la mitad del lado `i`. */

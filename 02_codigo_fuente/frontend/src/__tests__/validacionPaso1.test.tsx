@@ -24,7 +24,7 @@ const campo = (e: RegExp) => screen.getByLabelText(e) as HTMLInputElement;
 const escribir = (el: HTMLElement, v: string) => fireEvent.change(el, { target: { value: v } });
 const existente = () => montar(<TerrenoPage />, "/generar/5/terreno", ["/generar/:proyectoId/terreno"]);
 const nuevo = () => montar(<TerrenoPage />, "/generar", ["/generar"]);
-const listo = () => screen.findByText("Actualizar plano");
+const listo = () => screen.findByText("MEDIDAS DEL TERRENO");
 const pestana = (nombre: "Mapa" | "Plano") => fireEvent.click(screen.getByRole("tab", { name: nombre }));
 const siguiente = () => act(async () => fireEvent.click(screen.getByText(/Siguiente/)));
 
@@ -66,8 +66,19 @@ describe("Paso 1: errores junto al campo", () => {
     [/^Ancho \(m\)/, "-5", "Debe ser mayor que cero."],
     [/^Ancho \(m\)/, "0", "Debe ser mayor que cero."],
     [/^Largo \(m\)/, "abc", "Debe ser un número en metros."],
-    [/^Otro ángulo/, "360", "Debe estar entre 0 y 359,99 grados."],
-    [/^Otro ángulo/, "-1", "Debe estar entre 0 y 359,99 grados."],
+  ])("sin contorno, %s = %j: muestra «%s» y no guarda", async (etiqueta, valor, mensaje) => {
+    nuevo();
+    await listo();
+    escribir(campo(etiqueta), valor);
+    await siguiente();
+
+    expect(errorDe(campo(etiqueta))).toBe(mensaje);
+    expect(proyectos.crearProyecto).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [/^Grados/, "360", "Debe estar entre 0 y 359,99 grados."],
+    [/^Grados/, "-1", "Debe estar entre 0 y 359,99 grados."],
     [/^Nombre del proyecto/, "ab", "Debe tener al menos 3 caracteres."],
   ])("%s = %j: muestra «%s» y no guarda", async (etiqueta, valor, mensaje) => {
     existente();
@@ -81,7 +92,7 @@ describe("Paso 1: errores junto al campo", () => {
   });
 
   it("el error aparece al dejar el campo, no mientras se escribe", async () => {
-    existente();
+    nuevo();
     await listo();
     const ancho = campo(/^Ancho \(m\)/);
     escribir(ancho, "-3");
@@ -95,14 +106,26 @@ describe("Paso 1: errores junto al campo", () => {
   it("al corregir los campos avanza", async () => {
     existente();
     await listo();
-    escribir(campo(/^Ancho \(m\)/), "-5");
+    escribir(campo(/^Grados/), "400");
     await siguiente();
     expect(terreno.actualizarTerreno).not.toHaveBeenCalled();
 
-    escribir(campo(/^Ancho \(m\)/), "120");
+    escribir(campo(/^Grados/), "30");
     await siguiente();
     expect(await screen.findByText("PASO 2")).toBeTruthy();
-    expect(vi.mocked(terreno.actualizarTerreno).mock.calls[0][1].vertices).toEqual(rect(120, 60));
+    expect(vi.mocked(terreno.actualizarTerreno).mock.calls[0][1].orientacion_norte).toBe(30);
+  });
+
+  it("un norte inválido escrito en el plano lleva de vuelta al plano al intentar avanzar", async () => {
+    existente();
+    await listo();
+    escribir(campo(/^Grados/), "400");
+    pestana("Mapa");
+    expect(screen.queryByLabelText(/^Grados/)).toBeNull();
+    await siguiente();
+    expect(screen.getByRole("tab", { name: "Plano" }).getAttribute("aria-selected")).toBe("true");
+    expect(errorDe(campo(/^Grados/))).toBe("Debe estar entre 0 y 359,99 grados.");
+    expect(terreno.actualizarTerreno).not.toHaveBeenCalled();
   });
 
   it("los obligatorios llevan el asterisco rojo", async () => {
@@ -135,7 +158,7 @@ describe("Paso 1: ubicación en el mapa", () => {
     expect(proyectos.actualizarProyecto).toHaveBeenCalledWith(5, { latitud: -0.2298, longitud: -78.5249 });
   });
 
-  it("Quitar ubicación borra el punto y avisa que no habrá sombra", async () => {
+  it("Quitar ubicación borra el punto y avisa que no se podrá usar el mapa", async () => {
     vi.mocked(proyectos.obtenerProyecto).mockResolvedValue({ ...PROYECTO, latitud: 0.35, longitud: -78.12 } as never);
     existente();
     await listo();
@@ -143,7 +166,7 @@ describe("Paso 1: ubicación en el mapa", () => {
     expect(screen.getByTestId("marcador").textContent).toBe("0.35,-78.12");
     fireEvent.click(screen.getByText("Quitar ubicación"));
     expect(screen.getByTestId("marcador").textContent).toBe("sin marcador");
-    expect(screen.getByText(/Sin ubicación no se calcula la sombra/)).toBeTruthy();
+    expect(screen.getByText(/Sin ubicación, el terreno no se puede ver ni dibujar en el mapa/)).toBeTruthy();
   });
 
   it("un proyecto con solo latitud la conserva y pide marcar el punto", async () => {

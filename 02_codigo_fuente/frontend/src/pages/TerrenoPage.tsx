@@ -2,18 +2,21 @@
  * Asistente, Paso 1 — Terreno (RF-01).
  *
  * Como en el prototipo: el plano a la izquierda y, a la derecha, los datos
- * del proyecto, las dimensiones del terreno y la orientación del norte.
+ * del proyecto, las medidas del terreno y el norte del plano.
  * Sin id en la ruta (/generar) es un proyecto nuevo: "Siguiente" lo crea,
  * guarda el terreno y pasa al Paso 2.
  *
  * Cuatro formas de ingresar la geometría, porque los datos llegan de
  * formas distintas según el proyecto:
- *   - Ancho y largo (el caso más común): "Actualizar plano"
+ *   - Empezar con un rectángulo de ancho por largo (solo sin contorno)
  *   - Dibujar el contorno sobre el mapa satelital, con el largo de cada
  *     lado y ángulos de 90° (revisión del 16 de noviembre, Lenin)
  *   - Dibujar el contorno con clics sobre el plano (terrenos irregulares)
  *   - Editar las coordenadas a mano (datos de un levantamiento)
- * En los cuatro casos el largo de cada lado se puede corregir a mano.
+ * Con el contorno definido se editan sus lados, nunca un ancho y largo:
+ * convertirlo en rectángulo pierde la forma real (Anita, 25 de noviembre).
+ *
+ * El norte solo se pregunta en el plano. En el mapa ya se conoce: arriba.
  *
  * Los caminos se definen en el Paso 3, junto al layout. Aquí solo se
  * muestran si ya existen.
@@ -23,7 +26,7 @@
  * directa y coincide con la "bruta" del backend.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import { BarraPaso } from "@/components/BarraPaso";
@@ -51,6 +54,7 @@ import {
   cambiarLargoLado,
   insertarEnMitad,
   largosDeLados,
+  perimetro,
   quitarVertice,
   type Coordenadas,
 } from "@/utils/terrenoMapa";
@@ -63,12 +67,6 @@ const CAMPO = `${CAMPO_BASE} ${bordeCampo()}`;
 const ETIQUETA = "block text-xs font-medium text-acero-600";
 const TARJETA = "rounded-xl border border-acero-200 bg-superficie p-5";
 const TITULO_TARJETA = "text-xs font-semibold tracking-wider text-acero-400";
-
-/** Orientaciones rápidas del prototipo; cualquier otro ángulo se escribe a mano. */
-const ORIENTACIONES = [
-  { etiqueta: "Norte", grados: 0, flecha: "↑" },
-  { etiqueta: "Este", grados: 90, flecha: "→" },
-];
 
 interface DatosProyecto {
   nombre: string;
@@ -125,9 +123,10 @@ function erroresPaso1(
   if (nombre === "") errores.nombre = "Escribe el nombre del proyecto.";
   else if (nombre.length < 3) errores.nombre = "Debe tener al menos 3 caracteres.";
   if (exigeCliente && !datos.clienteId) errores.cliente = "Elige el cliente del proyecto.";
-  errores.ancho = errorDimension(dimensiones.ancho);
-  errores.largo = errorDimension(dimensiones.largo);
+  // Ancho y largo solo existen mientras no hay contorno
   if (!hayContorno) {
+    errores.ancho = errorDimension(dimensiones.ancho);
+    errores.largo = errorDimension(dimensiones.largo);
     if (!errores.ancho && dimensiones.ancho.trim() === "") errores.ancho = "Ingresa el ancho o dibuja el contorno.";
     if (!errores.largo && dimensiones.largo.trim() === "") errores.largo = "Ingresa el largo o dibuja el contorno.";
   }
@@ -156,30 +155,6 @@ function areaPoligono(vertices: Punto[]): number {
 function extension(vertices: Punto[]): { ancho: number; largo: number } | null {
   const caja = vertices.length >= 3 ? limitesDe(vertices) : null;
   return caja ? { ancho: caja.maxX - caja.minX, largo: caja.maxY - caja.minY } : null;
-}
-
-/** Ancho y largo como texto para los campos, redondeados al centímetro. */
-function textoDimensiones(vertices: Punto[]): { ancho: string; largo: string } {
-  const ext = extension(vertices);
-  return ext
-    ? { ancho: String(Math.round(ext.ancho * 100) / 100), largo: String(Math.round(ext.largo * 100) / 100) }
-    : { ancho: "", largo: "" };
-}
-
-/** Rectángulo con lados paralelos a los ejes: el único que "ancho × largo" describe sin perder nada. */
-function esRectanguloAlineado(vertices: Punto[]): boolean {
-  if (vertices.length !== 4) return false;
-  const clave = (v: number) => Math.round(v * 1e6);
-  const xs = new Set(vertices.map((p) => clave(p[0])));
-  const ys = new Set(vertices.map((p) => clave(p[1])));
-  const esquinas = new Set(vertices.map((p) => `${clave(p[0])},${clave(p[1])}`));
-  return xs.size === 2 && ys.size === 2 && esquinas.size === 4;
-}
-
-/** Esquina inferior izquierda del contorno, o el origen si no hay contorno. */
-function esquinaInferior(vertices: Punto[]): Punto {
-  const caja = limitesDe(vertices);
-  return caja ? [caja.minX, caja.minY] : [0, 0];
 }
 
 const formatoCoordenada = new Intl.NumberFormat("es-EC", { minimumFractionDigits: 4, maximumFractionDigits: 6 });
@@ -239,7 +214,7 @@ export function TerrenoPage() {
     setVertices(terreno?.vertices ?? []);
     setOrientacion(terreno?.orientacion_norte != null ? String(terreno.orientacion_norte) : "");
     setNotas(terreno?.notas ?? "");
-    setDimensiones(textoDimensiones(terreno?.vertices ?? []));
+    setDimensiones({ ancho: "", largo: "" });
     const ext = extension(terreno?.vertices ?? []);
     if (ext) setLienzo({ ancho: Math.max(10, ext.ancho), alto: Math.max(10, ext.largo) });
     setBorrador([]);
@@ -315,14 +290,9 @@ export function TerrenoPage() {
 
   // ─── Geometría ───────────────────────────────────────
 
-  /**
-   * Única forma de cambiar el contorno: mantiene ancho y largo iguales a
-   * la extensión real, para que "Actualizar plano" nunca parta de cifras
-   * viejas (revisión del PR #34).
-   */
+  /** Única forma de cambiar el contorno. */
   function cambiarContorno(nuevos: Punto[]) {
     setVertices(nuevos);
-    setDimensiones(textoDimensiones(nuevos));
   }
 
   /** Ancho y largo escritos en los campos, si son válidos. */
@@ -332,22 +302,13 @@ export function TerrenoPage() {
     return ancho && ancho > 0 && largo && largo > 0 ? { ancho, largo } : null;
   }
 
-  /**
-   * Los campos tienen un ancho y largo válidos distintos de la extensión
-   * del contorno (por más de medio centímetro). Campos vacíos o inválidos
-   * no cuentan: en ese caso vale lo que está dibujado.
-   */
-  const dimensionesPendientes = (() => {
-    const escritas = dimensionesEscritas();
-    if (!escritas) return false;
-    const ext = extension(vertices);
-    return !ext || Math.abs(escritas.ancho - ext.ancho) > 0.005 || Math.abs(escritas.largo - ext.largo) > 0.005;
-  })();
+  /** Sin contorno, ancho y largo válidos escritos que todavía no forman el rectángulo. */
+  const dimensionesPendientes = vertices.length < 3 && dimensionesEscritas() !== null;
 
   /**
    * Todo lo escrito en este paso que todavía no está en el servidor:
-   * datos del proyecto, contorno, orientación, notas, ancho y largo sin
-   * aplicar y un contorno a medio dibujar.
+   * datos del proyecto, contorno, orientación, notas, un rectángulo escrito
+   * sin crear y un contorno a medio dibujar.
    */
   const sinGuardar =
     JSON.stringify(datos) !== JSON.stringify(proyecto ? datosDe(proyecto) : DATOS_VACIOS) ||
@@ -358,38 +319,25 @@ export function TerrenoPage() {
   const permitirSalida = useCambiosSinGuardar(sinGuardar);
   const unaVez = useAccionUnica();
 
-  /** Rectángulo con las dimensiones escritas, en la misma esquina que el contorno actual. */
+  /** Rectángulo con las dimensiones escritas, con la esquina en el punto de ubicación. */
   function rectanguloEscrito(): Punto[] | null {
     const d = dimensionesEscritas();
-    if (!d) return null;
-    const [x, y] = esquinaInferior(vertices);
-    return rectangulo(x, y, d.ancho, d.largo);
+    return d ? rectangulo(0, 0, d.ancho, d.largo) : null;
   }
 
-  function actualizarPlano() {
+  /** Arma el contorno con el ancho y el largo escritos; después se editan los lados. */
+  function crearRectangulo() {
     setError(null);
     const nuevo = rectanguloEscrito();
-    if (!nuevo) {
+    const d = dimensionesEscritas();
+    if (!nuevo || !d) {
       setTocados((t) => ({ ...t, ancho: true, largo: true }));
-      if (!errores.ancho && !errores.largo) {
-        setError("Ingresa el ancho y el largo del terreno para actualizar el plano.");
-      }
-      return;
-    }
-    // Un contorno irregular no se describe con ancho y largo: reemplazarlo pierde vértices
-    if (
-      vertices.length >= 3 &&
-      !esRectanguloAlineado(vertices) &&
-      !window.confirm(
-        `El terreno tiene un contorno irregular de ${vertices.length} vértices. ¿Reemplazarlo por un rectángulo de ${dimensiones.ancho} × ${dimensiones.largo} m?`,
-      )
-    ) {
       return;
     }
     cambiarContorno(nuevo);
     // Ajusta el plano a la figura para que no quede diminuta ni cortada
-    const d = dimensionesEscritas();
-    if (d) setLienzo({ ancho: d.ancho, alto: d.largo });
+    setLienzo({ ancho: d.ancho, alto: d.largo });
+    setDimensiones({ ancho: "", largo: "" });
     setBorrador([]);
     setDibujando(false);
   }
@@ -523,16 +471,8 @@ export function TerrenoPage() {
     const latitud = numeroOpcional(datos.latitud);
     const longitud = numeroOpcional(datos.longitud);
     if (dibujando) return "Termina o cancela el dibujo del contorno.";
-    // Si escribió ancho y largo sin pulsar "Actualizar plano", se aplican al guardar
-    // cuando no hay nada que perder (sin contorno o con un rectángulo); si el
-    // contorno es irregular, se pide decidir antes de pisarlo.
-    let contorno = vertices;
-    if (dimensionesPendientes) {
-      if (vertices.length >= 3 && !esRectanguloAlineado(vertices)) {
-        return "Las dimensiones escritas no coinciden con el contorno irregular: pulsa «Actualizar plano» para reemplazarlo, o deja ancho y largo como estaban.";
-      }
-      contorno = rectanguloEscrito() ?? vertices;
-    }
+    // Sin contorno, el ancho y el largo escritos forman el rectángulo al guardar
+    const contorno = dimensionesPendientes ? (rectanguloEscrito() ?? vertices) : vertices;
     if (contorno.length < 3) return "Define el terreno: ingresa ancho y largo, o dibuja su contorno.";
     const grados = numeroOpcional(orientacion);
     return {
@@ -550,6 +490,8 @@ export function TerrenoPage() {
   async function siguiente() {
     setError(null);
     setIntentoAvanzar(true);
+    // El norte solo se edita en el plano: si tiene un error, se lleva ahí
+    if (errores.orientacion) setVista("plano");
     const valido = validar();
     if (valido === null) return;
     if (typeof valido === "string") {
@@ -726,7 +668,9 @@ export function TerrenoPage() {
                 <span className="rounded-lg bg-acero-100 px-3 py-1.5 text-xs text-acero-600">
                   {dibujando
                     ? "Haz clic en el plano para marcar cada vértice; clic en el primero para cerrar."
-                    : "Ingresa ancho y largo a la derecha, o dibuja el contorno si el terreno es irregular."}
+                    : vertices.length >= 3
+                      ? "Corrige el largo de los lados a la derecha o redibuja el contorno."
+                      : "Empieza con un rectángulo a la derecha o dibuja el contorno con clics."}
                 </span>
                 <label className="ml-auto flex items-center gap-2 text-sm text-acero-600">
                   <input type="checkbox" checked={angulosRectos} onChange={(e) => setAngulosRectos(e.target.checked)} className="accent-solar-500" />
@@ -747,6 +691,7 @@ export function TerrenoPage() {
                 pasoAjuste={ajustarAlMetro ? 1 : null}
                 onAgregarPunto={agregarAlBorrador}
                 onCerrarBorrador={cerrarBorrador}
+                norte={gradosOrientacion !== null && !Number.isNaN(gradosOrientacion) ? gradosOrientacion : null}
               />
 
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-acero-500">
@@ -876,41 +821,48 @@ export function TerrenoPage() {
                     Tiene latitud {formatoCoordenada.format(latitudNumero)} pero falta el punto en el mapa. Búscalo o márcalo para completar la ubicación.
                   </p>
                 ) : (
-                  <p className="mt-1 text-xs text-amber-700">Sin ubicación no se calcula la sombra entre filas ni entre bloques.</p>
+                  <p className="mt-1 text-xs text-amber-700">Sin ubicación, el terreno no se puede ver ni dibujar en el mapa.</p>
                 )}
               </div>
             </div>
           </div>
 
           <div className={TARJETA}>
-            <h2 className={TITULO_TARJETA}>DIMENSIONES DEL TERRENO</h2>
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <Campo etiqueta="Ancho (m)" obligatorio error={visible("ancho")}>
-                <input className={claseCampo("ancho")} inputMode="decimal" value={dimensiones.ancho} onChange={(e) => setDimensiones((d) => ({ ...d, ancho: e.target.value }))} onBlur={tocar("ancho")} />
-              </Campo>
-              <Campo etiqueta="Largo (m)" obligatorio error={visible("largo")}>
-                <input className={claseCampo("largo")} inputMode="decimal" value={dimensiones.largo} onChange={(e) => setDimensiones((d) => ({ ...d, largo: e.target.value }))} onBlur={tocar("largo")} />
-              </Campo>
-            </div>
-            <p className={`mt-3 ${ETIQUETA}`}>Área calculada</p>
-            <p className="mt-1 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-800">
-              {area !== null ? formatearArea(area) : "Sin terreno"}
-            </p>
-            {vertices.length >= 3 && !esRectanguloAlineado(vertices) && (
-              <p className="mt-1 text-xs text-acero-500">Contorno irregular de {vertices.length} vértices; ancho y largo son su extensión.</p>
-            )}
-            {dimensionesPendientes && (
-              <p className="mt-1 text-xs text-amber-700">
-                Las dimensiones escritas no coinciden con el plano: pulsa «Actualizar plano» para aplicarlas.
-              </p>
-            )}
-            <button type="button" className={`${BOTON} mt-3 w-full`} onClick={actualizarPlano}>
-              Actualizar plano
-            </button>
-
-            {vertices.length >= 3 && (
-              <div className="mt-4">
-                <p className={ETIQUETA}>Medidas de los lados</p>
+            <h2 className={TITULO_TARJETA}>MEDIDAS DEL TERRENO</h2>
+            {vertices.length < 3 ? (
+              <>
+                <p className="mt-3 text-xs text-acero-500">
+                  Dibuja el terreno en el mapa o en el plano, o empieza con un rectángulo y luego corrige sus lados.
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <Campo etiqueta="Ancho (m)" obligatorio error={visible("ancho")}>
+                    <input className={claseCampo("ancho")} inputMode="decimal" value={dimensiones.ancho} onChange={(e) => setDimensiones((d) => ({ ...d, ancho: e.target.value }))} onBlur={tocar("ancho")} />
+                  </Campo>
+                  <Campo etiqueta="Largo (m)" obligatorio error={visible("largo")}>
+                    <input className={claseCampo("largo")} inputMode="decimal" value={dimensiones.largo} onChange={(e) => setDimensiones((d) => ({ ...d, largo: e.target.value }))} onBlur={tocar("largo")} />
+                  </Campo>
+                </div>
+                <button type="button" className={`${BOTON} mt-3 w-full`} onClick={crearRectangulo}>
+                  Crear rectángulo
+                </button>
+              </>
+            ) : (
+              <>
+                <dl className="mt-3 grid grid-cols-2 gap-3" aria-label="Resumen del terreno">
+                  <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2">
+                    <dt className="text-[11px] text-green-700">Área</dt>
+                    <dd className="text-sm font-medium text-green-800" data-testid="area-terreno">
+                      {formatearArea(area ?? 0)}
+                    </dd>
+                  </div>
+                  <div className="rounded-lg border border-acero-200 bg-acero-50 px-3 py-2">
+                    <dt className="text-[11px] text-acero-500">Perímetro</dt>
+                    <dd className="text-sm font-medium text-acero-800" data-testid="perimetro-terreno">
+                      {formatearMetros(perimetro(vertices))}
+                    </dd>
+                  </div>
+                </dl>
+                <p className={`mt-4 ${ETIQUETA}`}>Lados ({vertices.length})</p>
                 <ul className="mt-1 max-h-56 space-y-1 overflow-y-auto" aria-label="Medidas de los lados">
                   {largosDeLados(vertices).map((largo, i) => (
                     <LadoEditable
@@ -923,9 +875,9 @@ export function TerrenoPage() {
                   ))}
                 </ul>
                 <p className="mt-1 text-[11px] text-acero-400">
-                  Al cambiar un lado, el terreno se estira en esa dirección: en un rectángulo se mueve el lado opuesto.
+                  Al cambiar un lado, el lado siguiente se corre sin deformarse y solo se ajusta el que viene después. Un rectángulo sigue siendo rectángulo.
                 </p>
-              </div>
+              </>
             )}
 
             <button type="button" className="mt-3 text-xs font-medium text-solar-700 hover:underline" onClick={() => setVerCoordenadas((v) => !v)} aria-expanded={verCoordenadas}>
@@ -964,35 +916,27 @@ export function TerrenoPage() {
             )}
           </div>
 
-          <div className={TARJETA}>
-            <h2 className={TITULO_TARJETA}>ORIENTACIÓN NORTE</h2>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              {ORIENTACIONES.map((o) => {
-                const activo = gradosOrientacion === o.grados;
-                return (
-                  <button
-                    key={o.etiqueta}
-                    type="button"
-                    onClick={() => setOrientacion(String(o.grados))}
-                    className={[
-                      "rounded-lg border px-3 py-2 text-sm font-medium transition",
-                      activo ? "border-solar-500 bg-solar-50 text-solar-700" : "border-acero-300 text-acero-700 hover:bg-acero-100",
-                    ].join(" ")}
-                  >
-                    {o.etiqueta} {o.flecha}
-                  </button>
-                );
-              })}
+          {vista === "plano" && (
+            <div className={TARJETA}>
+              <h2 className={TITULO_TARJETA}>NORTE DEL PLANO</h2>
+              <p className="mt-2 text-sm text-acero-700">¿Hacia dónde apunta el norte en tu plano?</p>
+              <div className="mt-3 flex items-start gap-4">
+                <Brujula
+                  grados={gradosOrientacion !== null && !Number.isNaN(gradosOrientacion) ? gradosOrientacion : null}
+                  onCambiar={(g) => {
+                    setOrientacion(String(g));
+                    setTocados((t) => ({ ...t, orientacion: true }));
+                  }}
+                />
+                <Campo className="flex-1" etiqueta="Grados (°)" error={visible("orientacion")} ayuda="0° es hacia arriba del plano y aumenta en sentido horario: 90° es hacia la derecha.">
+                  <input className={claseCampo("orientacion")} inputMode="decimal" placeholder="Sin definir" value={orientacion} onChange={(e) => setOrientacion(e.target.value)} onBlur={tocar("orientacion")} />
+                </Campo>
+              </div>
+              <p className="mt-2 text-[11px] text-acero-400">
+                Haz clic en el círculo para apuntar la flecha. Si dibujaste el terreno en el mapa, déjalo en 0°: ahí el norte ya está arriba.
+              </p>
             </div>
-            <Campo
-              className="mt-3"
-              etiqueta="Otro ángulo (°)"
-              error={visible("orientacion")}
-              ayuda="Hacia dónde apunta el norte: 0 = arriba del plano, sentido horario"
-            >
-              <input className={claseCampo("orientacion")} inputMode="decimal" placeholder="Sin definir" value={orientacion} onChange={(e) => setOrientacion(e.target.value)} onBlur={tocar("orientacion")} />
-            </Campo>
-          </div>
+          )}
 
           <div className={TARJETA}>
             <label className={ETIQUETA}>
@@ -1055,7 +999,7 @@ export function TerrenoPage() {
         }}
         resumen={
           area !== null
-            ? `${formatearMetros(numeroOpcional(dimensiones.ancho) || 0)} × ${formatearMetros(numeroOpcional(dimensiones.largo) || 0)} · ${formatearArea(area)}`
+            ? `${vertices.length} lados · ${formatearMetros(perimetro(vertices))} de perímetro · ${formatearArea(area)}`
             : "Define el terreno para continuar"
         }
         adelante={{
@@ -1120,5 +1064,55 @@ function LadoEditable({
         {recto ? "90°" : ""}
       </span>
     </li>
+  );
+}
+
+/**
+ * Flecha del norte del plano. Un clic en el círculo la apunta hacia ese
+ * lado; con el teclado, las flechas la giran de 5 en 5 grados.
+ */
+function Brujula({ grados, onCambiar }: { grados: number | null; onCambiar: (grados: number) => void }) {
+  const normalizar = (g: number) => Math.round((((g % 360) + 360) % 360) * 100) / 100;
+
+  function clic(e: MouseEvent<SVGSVGElement>) {
+    const caja = e.currentTarget.getBoundingClientRect();
+    const dx = e.clientX - (caja.left + caja.width / 2);
+    const dy = e.clientY - (caja.top + caja.height / 2);
+    if (dx === 0 && dy === 0) return;
+    onCambiar(normalizar(Math.round((Math.atan2(dx, -dy) * 180) / Math.PI)));
+  }
+
+  function tecla(e: KeyboardEvent<SVGSVGElement>) {
+    const paso = { ArrowRight: 5, ArrowUp: 5, ArrowLeft: -5, ArrowDown: -5 }[e.key];
+    if (paso === undefined) return;
+    e.preventDefault();
+    onCambiar(normalizar((grados ?? 0) + paso));
+  }
+
+  return (
+    <svg
+      viewBox="-30 -30 60 60"
+      className="h-24 w-24 shrink-0 cursor-pointer rounded-full focus:outline-none focus:ring-2 focus:ring-solar-500"
+      role="slider"
+      tabIndex={0}
+      aria-label="Flecha del norte"
+      aria-valuemin={0}
+      aria-valuemax={359}
+      aria-valuenow={grados ?? undefined}
+      aria-valuetext={grados == null ? "Sin definir" : `${grados}°`}
+      onClick={clic}
+      onKeyDown={tecla}
+    >
+      <circle r="28" className="fill-acero-50 stroke-acero-300" strokeWidth="1" />
+      {[0, 90, 180, 270].map((g) => (
+        <line key={g} x1="0" y1="-28" x2="0" y2="-24" className="stroke-acero-400" strokeWidth="1" transform={`rotate(${g})`} />
+      ))}
+      <g transform={`rotate(${grados ?? 0})`}>
+        <polygon points="0,-15 6,7 0,3 -6,7" className={grados == null ? "fill-acero-400" : "fill-red-600"} />
+        <text y="-17" textAnchor="middle" className={grados == null ? "fill-acero-500 text-[8px] font-bold" : "fill-red-700 text-[8px] font-bold"}>
+          {grados == null ? "N?" : "N"}
+        </text>
+      </g>
+    </svg>
   );
 }
